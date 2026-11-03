@@ -1,65 +1,78 @@
-# aven-mo
-Similar like Venmo app that demoes nearby payments
+# aven-mo — Split Party
 
-## Split Party data model (Firestore)
+A Venmo-like PoC that demoes nearby payments: friends at a partner merchant
+join a **Split Party** with a three-emoji code and settle the bill in one tap.
+Two native apps (iOS and Android) share a single Firestore database.
 
-The full contract for both mobile apps is in
-[`docs/firestore-schema.md`](docs/firestore-schema.md). In short:
+**Docs:** [PRD](docs/prd.md) · [Firestore schema (the data contract)](docs/firestore-schema.md) ·
+[Demo runbook](docs/demo-runbook.md) · [Firestore target](docs/firestore-target.md) ·
+[Repository structure](docs/repo-structure.md)
 
-| Collection     | Key                          | Holds |
-| -------------- | ---------------------------- | ----- |
-| `users`        | username (`maxi`)            | `username`, `displayName`, `avatar`, `balanceCents`, `friendIds` |
-| `merchants`    | `tonys-greenwich`            | `name`, `city`, `logoRef`, `offer`, `geofence {center, radiusMeters}` |
-| `parties`      | auto id                      | `hostId`, `merchantId`, `joinCode` (3 emojis), `status` (`open`/`paid`/`expired`), `createdAt`, `expiresAt` (+5 min), `paidAt`, `billCents`, `tip`, `memberIds`, `members {uid: {joinedAt, paid}}`, `wrongCodeAttempts {uid: n}` |
-| `joinCodes`    | `{merchantId}_{emojis}`      | Lock that keeps a join code unique among active parties at a merchant |
-| `transactions` | `seed_tx_NN` / `{partyId}_{payerId}` | `payerId`, `payeeId`, `participantIds`, `amountCents`, `memo`, `merchantId`, `merchantName`, `partyId`, `createdAt`, `likesCount`, `commentsCount`, `source` |
+## What's where
 
-- All money is integer cents.
-- The per-person share is **not stored**. Every phone computes it from the
-  bill, tip and headcount, leftover cents go to the host (see
-  `firebase/lib/split.js`).
-- Feed query: `transactions orderBy createdAt desc`. Me tab:
-  `where participantIds array-contains <uid> orderBy createdAt desc`.
+| Folder | Purpose |
+| ------ | ------- |
+| [`ios/`](ios) | Native SwiftUI iOS app (iOS 17+); opened, built and run from this folder only |
+| [`android/`](android) | Native Kotlin + Jetpack Compose Android app (API 26+); opened, built and run from this folder only |
+| [`backend/`](backend) | Firestore rules and indexes, the emulator config, and the seed/reset scripts with their tests |
+| [`docs/`](docs) | Shared docs: PRD, Firestore schema, demo runbook, conventions |
+| [`chiron-memory/`](chiron-memory) | Project memory (decisions, conventions, gotchas) for AI-assisted sessions |
 
-### Seed and reset
+The three projects are independent: nothing is shared at build time, only
+the [schema](docs/firestore-schema.md). New platform-specific work goes in
+its platform's folder, and shared docs go in `docs/`. See
+[Repository structure](docs/repo-structure.md).
 
-The tooling lives in [`firebase/`](firebase) (Node 20.12+).
+## Quick start
+
+### Run the iOS app
 
 ```sh
-cd firebase
+cp ios/Config/FirestoreTarget.example.xcconfig ios/Config/FirestoreTarget.local.xcconfig   # set your team id + target
+open ios/SplitParty.xcodeproj
+```
+
+Pick your iPhone and press Run. Details: [`ios/README.md`](ios/README.md).
+
+### Run the Android app
+
+```sh
+cp android/firestore.properties.example android/firestore.properties   # set the target
+```
+
+Open the `android/` folder in Android Studio, pick your phone and press Run
+(or run `cd android && ./gradlew installDebug`). Details:
+[`android/README.md`](android/README.md).
+
+### Seed and reset the database
+
+```sh
+cd backend
 npm install
-cp .env.example .env        # then pick emulator or hosted in .env
+cp .env.example .env       # emulator by default; see the file for hosted
+npm run emulators          # emulator only, in its own terminal (needs Java 21+)
+npm run seed               # 3 friends, Tony's, seeded feed, no parties
+npm run reset              # back to the seeded state (hosted: npm run reset -- --yes)
 ```
 
-Choose the target via environment (`firebase/.env` is git-ignored; no
-credentials are ever committed):
+Details: [`backend/README.md`](backend/README.md).
 
-| Variable                         | Emulator               | Hosted |
-| -------------------------------- | ---------------------- | ------ |
-| `FIREBASE_TARGET`                | `emulator`             | `hosted` |
-| `FIREBASE_PROJECT_ID`            | `demo-split-party`     | your Firebase project id |
-| `FIRESTORE_EMULATOR_HOST`        | `127.0.0.1:8080`       | must be **unset** |
-| `GOOGLE_APPLICATION_CREDENTIALS` | –                      | path to a service-account key **outside** the repo |
+### Run the full demo
 
-If anything is missing, the scripts exit with a message that names it and
-write nothing.
+Phones and scripts must point at the **same** database. Use the same three
+keys everywhere ([Firestore target](docs/firestore-target.md)):
 
-```sh
-npm run emulators          # local only: start the Firestore emulator (needs Java 21+)
-npm run seed               # 3 friends (Maxi, Annie, Christophe), Tony's, seeded feed; safe to re-run
-npm run reset              # delete all parties and party transactions, restore balances and feed
-npm run reset -- --yes     # required when FIREBASE_TARGET=hosted
-```
+- **Emulator:** `backend/.env` uses `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`;
+  each phone uses `FIRESTORE_EMULATOR_HOST=<laptop LAN IP>:8080`. All use
+  `FIREBASE_TARGET=emulator` and `FIREBASE_PROJECT_ID=demo-split-party`.
+- **Hosted:** everywhere `FIREBASE_TARGET=hosted` and the same
+  `FIREBASE_PROJECT_ID`, with no emulator host.
 
-Seed is idempotent: every document has a fixed id and fixed values. Reset
-leaves the database exactly as it is after a fresh seed.
+Then follow the [demo runbook](docs/demo-runbook.md): seed, log in as
+`maxi`, `annie` and `christophe` on three phones, run the party, reset.
 
-Hosted setup: deploy the rules and indexes once with
-`npx firebase deploy --only firestore --project <id>`.
+## Secrets
 
-### Tests
-
-```sh
-npm test         # split rule and validator unit tests
-npm run verify   # starts the emulator, then runs the acceptance and security-rules tests
-```
+Never commit `GoogleService-Info.plist`, `google-services.json`, `.env` files
+or service-account keys; they are git-ignored. Each folder's README says
+where its file goes. There is no CI: each piece is built and verified locally.

@@ -1,0 +1,14 @@
+# Copy to android/firestore.properties (git-ignored) and edit.
+# This is the ONE place to switch the Android app between the emulator and the
+# hosted project. Rebuild after changing it. Convention: docs/firestore-target.md
+
+# --- Local emulator started from backend/ (npm run emulators) ---------------
+FIREBASE_TARGET=emulator
+FIREBASE_PROJECT_ID=demo-split-party
+# A physical phone cannot use 127.0.0.1: use the laptop's LAN IP.
+FIRESTORE_EMULATOR_HOST=192.168.1.20:8080
+
+# --- Hosted Firestore -------------------------------------------------------
+# FIREBASE_TARGET=hosted
+# FIREBASE_PROJECT_ID=your-firebase-project-id
+# FIRESTORE_EMULATOR_HOST=
