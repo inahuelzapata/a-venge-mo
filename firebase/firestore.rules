@@ -1,0 +1,125 @@
+rules_version = '2';
+
+// Split Party PoC: shape validation for client writes, as specified in
+// docs/firestore-schema.md. Login is username-only (no Firebase Auth), so these
+// rules check document SHAPE, not identity. The Admin SDK (seed/reset) bypasses them.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function palette() {
+      return ['🍕', '🍔', '🌮', '🍣', '🍩', '🍺', '🎉', '🔥', '🚀', '🎸', '🐶', '🌵'];
+    }
+    function isNonNegInt(v) { return v is int && v >= 0; }
+    function isId(v) { return v is string && v.size() > 0; }
+
+    function validJoinCode(code) {
+      return code is list && code.size() == 3 && code.hasOnly(palette());
+    }
+
+    function validTip(t) {
+      return t == null
+        || (t is map && t.type == 'percent' && t.keys().hasOnly(['type', 'percent'])
+            && t.percent in [15, 18, 20, 25])
+        || (t is map && t.type == 'custom' && t.keys().hasOnly(['type', 'amountCents'])
+            && isNonNegInt(t.amountCents));
+    }
+
+    function validMember(m) {
+      return m is map && m.keys().hasOnly(['joinedAt', 'paid']) && m.keys().hasAll(['joinedAt', 'paid'])
+        && m.joinedAt is timestamp && m.paid is bool;
+    }
+
+    // Rules have no loops; the PoC caps parties at 8 members, so check up to 8.
+    function validMembers(p) {
+      let ids = p.memberIds;
+      return ids is list && ids.size() >= 1 && ids.size() <= 8
+        && ids[0] == p.hostId
+        && p.members is map
+        && p.members.keys().size() == ids.size()
+        && p.members.keys().hasAll(ids) && ids.hasAll(p.members.keys())
+        && validMember(p.members[ids[0]])
+        && (ids.size() < 2 || validMember(p.members[ids[1]]))
+        && (ids.size() < 3 || validMember(p.members[ids[2]]))
+        && (ids.size() < 4 || validMember(p.members[ids[3]]))
+        && (ids.size() < 5 || validMember(p.members[ids[4]]))
+        && (ids.size() < 6 || validMember(p.members[ids[5]]))
+        && (ids.size() < 7 || validMember(p.members[ids[6]]))
+        && (ids.size() < 8 || validMember(p.members[ids[7]]));
+    }
+
+    function validParty(p) {
+      return p.keys().hasOnly(['hostId', 'merchantId', 'joinCode', 'status', 'createdAt', 'expiresAt',
+                               'paidAt', 'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts'])
+        && p.keys().hasAll(['hostId', 'merchantId', 'joinCode', 'status', 'createdAt', 'expiresAt',
+                            'paidAt', 'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts'])
+        && isId(p.hostId) && isId(p.merchantId)
+        && validJoinCode(p.joinCode)
+        && p.status in ['open', 'paid', 'expired']
+        && p.createdAt is timestamp && p.expiresAt is timestamp
+        && p.expiresAt == p.createdAt + duration.value(5, 'm')
+        && (p.paidAt == null || p.paidAt is timestamp)
+        && (p.billCents == null || isNonNegInt(p.billCents))
+        && validTip(p.tip)
+        && (p.status != 'paid' || (p.paidAt != null && p.billCents != null && p.tip != null))
+        && validMembers(p)
+        && p.wrongCodeAttempts is map;
+    }
+
+    match /parties/{partyId} {
+      allow read: if true;
+      allow create: if validParty(request.resource.data)
+        && request.resource.data.status == 'open';
+      allow update: if validParty(request.resource.data)
+        // identity, code and timing never change
+        && request.resource.data.diff(resource.data).unchangedKeys()
+             .hasAll(['hostId', 'merchantId', 'joinCode', 'createdAt', 'expiresAt'])
+        // paid and expired are terminal
+        && resource.data.status == 'open';
+      allow delete: if false;
+    }
+
+    match /joinCodes/{lockId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['merchantId', 'joinCode', 'partyId', 'expiresAt'])
+        && isId(request.resource.data.merchantId)
+        && validJoinCode(request.resource.data.joinCode)
+        && isId(request.resource.data.partyId)
+        && request.resource.data.expiresAt is timestamp
+        && lockId == request.resource.data.merchantId + '_' + request.resource.data.joinCode.join('');
+      allow delete: if true;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      // Accounts come from the seed script; clients may only move the mock balance.
+      allow create, delete: if false;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balanceCents'])
+        && request.resource.data.balanceCents is int;
+    }
+
+    match /merchants/{merchantId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /transactions/{txId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['payerId', 'payeeId', 'participantIds', 'amountCents',
+                         'memo', 'merchantId', 'merchantName', 'partyId', 'createdAt', 'likesCount',
+                         'commentsCount', 'source'])
+        && isId(request.resource.data.payerId) && isId(request.resource.data.payeeId)
+        && request.resource.data.payerId != request.resource.data.payeeId
+        && request.resource.data.participantIds == [request.resource.data.payerId, request.resource.data.payeeId]
+        && request.resource.data.amountCents is int && request.resource.data.amountCents > 0
+        && request.resource.data.memo is string && request.resource.data.memo.size() > 0
+        && request.resource.data.memo.size() <= 80
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.likesCount == 0 && request.resource.data.commentsCount == 0
+        && request.resource.data.source == 'party';
+      // Only the social counters move after creation.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'commentsCount'])
+        && isNonNegInt(request.resource.data.likesCount) && isNonNegInt(request.resource.data.commentsCount);
+      allow delete: if false;
+    }
+  }
+}
