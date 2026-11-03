@@ -1,0 +1,23 @@
+{
+  "name": "split-party-firebase",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Firestore schema tooling for the Split Party PoC: seed, reset, rules, verification",
+  "type": "module",
+  "engines": { "node": ">=20.12" },
+  "scripts": {
+    "seed": "node --env-file-if-exists=.env scripts/seed.js",
+    "reset": "node --env-file-if-exists=.env scripts/reset.js",
+    "emulators": "firebase emulators:start --only firestore --project demo-split-party",
+    "test": "node --test test/unit/",
+    "verify": "firebase emulators:exec --only firestore --project demo-split-party \"node --test --test-concurrency=1 test/emulator/\""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.2.0",
+    "firebase-tools": "^15.34.2"
+  }
+}
