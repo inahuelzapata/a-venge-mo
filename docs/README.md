@@ -10,3 +10,4 @@ exists here once; platform READMEs link to it and never copy it.
 | [Firestore target](firestore-target.md) | How every piece picks the hosted project or the local emulator |
 | [Demo runbook](demo-runbook.md) | Seed, reset and run the 3-phone demo |
 | [Repository structure](repo-structure.md) | Where new work goes; nothing is shared at build time |
+| [App shell design](design/README.md) | Reference screenshots, palette, avatars and row layout both apps match |
