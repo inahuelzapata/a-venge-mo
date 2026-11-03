@@ -1,7 +1,7 @@
 # Split Party — Firestore schema (PoC)
 
 This document is the contract between the iOS app, the Android app and the
-seed/reset scripts in [`firebase/`](../firebase). Both apps read and write
+seed/reset scripts in [`backend/`](../backend). Both apps read and write
 **exactly** these collections and fields. If a field is not listed here, do
 not write it.
 
@@ -49,7 +49,7 @@ Usernames are therefore immutable.
 Login (username only, no password): `users/{username.trim().toLowerCase()}`,
 and the account exists if that document exists.
 
-Seeded accounts (see `firebase/lib/seedData.js` for the exact values):
+Seeded accounts (see `backend/lib/seedData.js` for the exact values):
 
 | id           | displayName | avatar              | balanceCents | friendIds                |
 | ------------ | ----------- | ------------------- | ------------ | ------------------------ |
@@ -191,7 +191,7 @@ share(joinee)  = base
 ```
 
 So the shares always sum exactly to `totalCents`, and any leftover cents go to
-the host. The reference implementation is `firebase/lib/split.js` (covered by
+the host. The reference implementation is `backend/lib/split.js` (covered by
 `npm test`).
 
 **Worked example.** 3 people (host Maxi, Annie, Christophe), bill `$100.00`
@@ -267,7 +267,7 @@ transactions  where("participantIds", "array-contains", uid)  orderBy("createdAt
 ```
 
 This needs the composite index `participantIds (array-contains) + createdAt
-(desc)`, declared in `firebase/firestore.indexes.json`.
+(desc)`, declared in `backend/firestore.indexes.json`.
 
 **Open parties at a merchant** (nearby hosts for a joinee):
 
@@ -281,8 +281,8 @@ Declared in `firestore.indexes.json` as well.
 
 ## Validation
 
-`firebase/firestore.rules` enforces these shapes for client writes, and
-`firebase/lib/validate.js` applies the same checks in scripts and tests. A
+`backend/firestore.rules` enforces these shapes for client writes, and
+`backend/lib/validate.js` applies the same checks in scripts and tests. A
 party document is **invalid** (rejected) if, among other things:
 
 - `billCents` is not an integer (e.g. `12.5`, `"1250"`) or is negative;

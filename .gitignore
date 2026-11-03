@@ -1,0 +1,49 @@
+# Root ignore rules for all three stacks (see docs/repo-structure.md).
+# Goal: building both apps and running seed/reset leaves `git status` clean.
+
+# --- macOS / editors ---------------------------------------------------------
+.DS_Store
+.vscode/
+*.swp
+
+# --- Secrets and Firebase platform config (never committed) ------------------
+GoogleService-Info.plist
+google-services.json
+service-account*.json
+*-credentials.json
+.env
+.env.*
+!.env.example
+
+# --- iOS: Xcode and Swift packages -------------------------------------------
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+.swiftpm/
+.build/
+ios/Config/FirestoreTarget.local.xcconfig
+
+# --- Android: Gradle and Android Studio --------------------------------------
+.gradle/
+.kotlin/
+.idea/
+*.iml
+.cxx/
+.externalNativeBuild/
+captures/
+local.properties
+android/firestore.properties
+*.apk
+*.aab
+
+# --- backend: Node scripts and Firebase emulator -----------------------------
+node_modules/
+npm-debug.log*
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+*.log
+.firebase/
+emulator-data/

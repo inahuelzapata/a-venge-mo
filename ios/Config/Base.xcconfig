@@ -1,0 +1,19 @@
+// Build settings shared by every configuration of the SplitParty target.
+//
+// Per-developer values (signing team, bundle id, Firestore target) live in
+// FirestoreTarget.local.xcconfig, which is git-ignored. Copy
+// FirestoreTarget.example.xcconfig to that name and edit it. Without it the app
+// still builds, and the placeholder screen says the target is not configured.
+// Convention shared with Android and backend: docs/firestore-target.md
+
+PRODUCT_BUNDLE_IDENTIFIER = com.splitparty.ios
+DEVELOPMENT_TEAM =
+
+// Firestore target: "emulator" or "hosted". Empty means "not configured".
+FIREBASE_TARGET =
+// Hosted project id, or demo-split-party for the emulator.
+FIREBASE_PROJECT_ID =
+// Emulator only: <laptop LAN IP>:8080 (a physical phone cannot use 127.0.0.1).
+FIRESTORE_EMULATOR_HOST =
+
+#include? "FirestoreTarget.local.xcconfig"

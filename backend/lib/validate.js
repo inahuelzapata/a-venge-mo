@@ -1,4 +1,4 @@
-// Shape checks mirroring firebase/firestore.rules. Each returns a list of
+// Shape checks mirroring backend/firestore.rules. Each returns a list of
 // problems; an empty list means the document is valid.
 import {
   EMOJI_PALETTE,

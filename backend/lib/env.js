@@ -45,7 +45,7 @@ export function readConfig(env = process.env) {
     throw new ConfigError(
       'Firestore target is not configured. Nothing was written.\n' +
         problems.map((p) => `  - ${p}`).join('\n') +
-        '\nSee firebase/.env.example.',
+        '\nSee backend/.env.example.',
     );
   }
   return { target, projectId, emulatorHost: env.FIRESTORE_EMULATOR_HOST ?? null };
