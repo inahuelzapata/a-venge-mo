@@ -76,3 +76,7 @@ What: With only the default roles, `firebase deploy --only firestore` with the f
 
 What: While the transactions(participantIds, createdAt desc) index was still building, the Me query with limit(1) succeeded but the same query without a limit failed FAILED_PRECONDITION; a query on an empty collection also succeeds. test-hosted therefore lists indexes through the Firestore admin REST API (collectionGroups/-/indexes) and waits for state READY · Where: backend/scripts/test-hosted.js waitForIndexes
 
+
+## Navigating to Home with restoreState brings back a screen pushed over Home
+
+What: switchTab reaches Home with popBackStack<HomeDestination>(saveState only when leaving a tab), never navigate(Home){ popUpTo(start){saveState}; restoreState } · Why: a non-inclusive popUpTo with saveState also maps the saved stack to the popUpTo destination (Home), so restoring Home re-pushes Split Party; the Home tab tap from the placeholder then did nothing · Where: android ui/shell/MainShell.kt switchTab, MainShellNavigationTest.homeTabFromThePlaceholderReturnsHome
