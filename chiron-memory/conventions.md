@@ -21,3 +21,7 @@ What: each ViewModel exposes one immutable StateFlow<XUiState> and an onAction(X
 ## Reduced motion through LocalReduceMotion
 
 What: Every Split Party animation (entrances, pop-in, bob, spring, pulse, sheen, shake) checks LocalReduceMotion, which defaults to !ValueAnimator.areAnimatorsEnabled() (animator scale 0 / Remove animations); haptics never depend on it. Paparazzi's screen() helper provides it as true so goldens show settled states · Where: android ui/theme/Motion.kt, ui/components/PartyMotion.kt, app/src/test/.../screenshots/Snapshots.kt
+
+## iOS party fixture and capture names match the Android parity renders
+
+What: In Debug, -UITestFriendParty <host> (with -UITestFriendPartyMembers, -UITestFriendPartyAge, -UITestFriendPartyAfter) and -UITestFriendsJoinEvery drive the FixtureDataSource parties, which always use the code 🍕🍺🎉; ReferenceCaptureUITests saves join-banner, join-confirm, party-one-member, party-three-members, party-expired and home-demo-off under the same names as Android's ParityScreenshotTest · Why: UI tests and captures need a known correct option, and compare.py pairs iOS and Android images by file name · Where: ios/SplitParty/App/AppModel.swift (UITestLaunch), ios/SplitParty/Data/FixtureDataSource.swift, ios/SplitPartyUITests/ReferenceCaptureUITests.swift
