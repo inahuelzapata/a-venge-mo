@@ -80,3 +80,6 @@ What: While the transactions(participantIds, createdAt desc) index was still bui
 ## Navigating to Home with restoreState brings back a screen pushed over Home
 
 What: switchTab reaches Home with popBackStack<HomeDestination>(saveState only when leaving a tab), never navigate(Home){ popUpTo(start){saveState}; restoreState } · Why: a non-inclusive popUpTo with saveState also maps the saved stack to the popUpTo destination (Home), so restoring Home re-pushes Split Party; the Home tab tap from the placeholder then did nothing · Where: android ui/shell/MainShell.kt switchTab, MainShellNavigationTest.homeTabFromThePlaceholderReturnsHome
+## capture-ios.sh re-takes every capture, even screens a change did not touch
+
+What: Running docs/design/capture/capture-ios.sh rewrites all PNGs in docs/design/ios-captures, and login/Me/Pay-Request come out byte-different from the committed ones (keyboard, cursor, status-bar noise) even when nothing changed · Why: committing those makes unrelated screens look changed to Android reviewers · Where: docs/design/capture/capture-ios.sh · Learned: after a run, git checkout the captures of screens the work did not change

@@ -9,3 +9,7 @@ What: ios/ (SwiftUI, iOS 17+), android/ (Kotlin + Compose, API 26+) and backend/
 ## Android app is layered ui → domain → data, wired by Koin
 
 What: android/ is one :app module with packages ui/ (Route + stateless Screen + ViewModel per feature), domain/ (models, repository interfaces, use cases, LiveState; no Android or Firebase imports), data/ (Firestore, DataStore, ConnectivityManager implementations) and di/AppModules.kt (Koin firebaseModule, dataModule, domainModule, viewModelModule) · Why: lets ViewModels and use cases be unit-tested on the JVM with fakes, and keeps Firestore details in one place · Where: android/app/src/main/java/com/splitparty/android/di/AppModules.kt · Learned: FirebaseFirestore is only bound for FirebaseConnection.Ready; the root shows the Setup screen before anything resolves it
+
+## Home pushes screens through one NavigationStack with a single Split Party destination
+
+What: MainTabView wraps Home in HomeNavigationStack (NavigationStack with a [HomeDestination] path, nav bar hidden on Home); the banner appends .splitParty and navigationDestination maps it to SplitPartyPlaceholderView. The bottom bar stays visible on pushed screens and Back keeps Home's scroll position because Home stays mounted · Why: the placeholder must be the one point a real party screen replaces, without touching the card · Where: ios/SplitParty/UI/MainTabView.swift, ios/SplitParty/UI/SplitPartyPlaceholderView.swift · Learned: snapshot tests open a pushed screen via MainTabView(initialHomePath:)
