@@ -17,8 +17,32 @@ What it does today (PoC-1 to PoC-6):
 - **Me**: display name, avatar, live mock balance and the user's own payments.
 - **Pay/Request**: placeholder tab.
 
-The look follows the reference screenshots in
-[`docs/design/`](../docs/design) (shared with the iOS app).
+## Appearance: the iOS captures are the source of truth
+
+The app looks like the iOS app, screen for screen. **The iOS captures in
+[`docs/design/ios-captures/`](../docs/design/ios-captures/) are the source of
+truth for appearance**, not this code and not the iOS source. The numbers to
+build to (colours, spacing, type roles, tab bar, status bar, radii) are in
+[`docs/design/visual-conventions.md`](../docs/design/visual-conventions.md),
+in `ui/theme/` (`Brand`, `Dimens`, `Type`) here. To check the match, look at the
+side-by-side images and 50% overlays in
+[`docs/design/comparisons/`](../docs/design/comparisons/).
+
+Only these differences are allowed, because the platform forces them (the
+conventions note explains each one):
+
+1. System-drawn status bar content (clock, signal, battery). Its background and dark tint are matched.
+2. The system navigation/gesture area.
+3. System back behaviour: back from Me or Pay/Request returns to Home, and back from Home leaves the app.
+4. Text rendering: Apple's SF Pro may not be bundled, so the app ships **Inter** (SIL OFL 1.1, licence in `app/src/main/assets/licenses/Inter-OFL.txt`) at the iOS sizes, weights and line heights.
+5. The OS keyboard.
+6. Icon glyph shapes (SF Symbols can't ship): look-alike vectors of the same size and position.
+7. No backdrop blur under the tab bar.
+
+Anything else that differs from a capture is a bug. The app is always light
+(it ignores the system dark theme, as iOS does), shows no ripples or elevation
+changes, and lays out against at least the iPhone's safe area (62 dp top,
+34 dp bottom) so headers and the tab bar line up with an iPhone placed beside it.
 
 ## Run it on a phone, step by step
 
@@ -134,8 +158,8 @@ di/      Koin modules wiring the three layers
 | `ui/root` | App root: setup / login / shell, session ViewModel |
 | `ui/shell` | Bottom bar and tab navigation (back from a tab returns to Home) |
 | `ui/login`, `ui/home`, `ui/me`, `ui/pay`, `ui/gate`, `ui/setup` | Feature screens |
-| `ui/components`, `ui/theme`, `format/` | Shared feed row and cards, palette, money and time formatting |
-| `app/src/main/res/drawable/ic_*.xml` | Material icons as local vectors (the Compose icon packs are discontinued) |
+| `ui/components`, `ui/theme`, `format/` | Shared feed row, cards and pill button; palette/spacing/type tokens (`Brand`, `Dimens`, `Type`); money and time formatting |
+| `app/src/main/res/drawable/ic_*.xml`, `res/font/` | SF Symbol look-alike vector icons; the bundled Inter font |
 
 ### Adding a screen
 
@@ -162,8 +186,10 @@ di/      Koin modules wiring the three layers
 - **Compose UI tests (Robolectric, JVM)**: Login, Home and shell navigation (with the
   real ViewModels and fake data sources). No device needed.
 - **Screenshot tests (Paparazzi, JVM)**: every stateless screen in each of its states
-  (`app/src/test/.../screenshots/`), on a fixed Pixel 5 config, plus a 1.5× font-size
-  pass. Goldens live in `app/src/test/snapshots/images/` and are committed; on a
+  (`app/src/test/.../screenshots/`), on the reference iPhone's geometry (402 × 874 dp at
+  3×), plus a 1.5× font-size pass. `ParityScreenshotTest` renders each iOS capture's
+  state at full resolution; `python3 docs/design/capture/compare.py` turns those into
+  the comparison images (rerun it after re-recording). Goldens live in `app/src/test/snapshots/images/` and are committed; on a
   mismatch the expected, actual and diff images are in `app/build/paparazzi/failures/`.
   After an intended UI change, run `recordPaparazziDebug`, look at the new PNGs, and
   commit them with the change. Snapshot names come from the test class and method,

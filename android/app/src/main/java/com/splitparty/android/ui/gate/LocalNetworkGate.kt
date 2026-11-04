@@ -9,18 +9,16 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,19 +26,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.splitparty.android.R
 import com.splitparty.android.data.firebase.FirestoreTarget
+import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.SplitPartyTheme
+import com.splitparty.android.ui.theme.Type
+import com.splitparty.android.ui.theme.bottomInset
+import com.splitparty.android.ui.theme.topInset
 
 private const val ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 private const val ANDROID_17 = 37
@@ -93,35 +95,49 @@ fun LocalNetworkPermissionScreen(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // No iOS counterpart (Android-only permission); built from the same tokens as login.
     Column(
-        modifier = modifier.fillMaxSize().background(Brand.Card).safeDrawingPadding().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+        modifier = modifier
+            .fillMaxSize()
+            .background(Brand.Page)
+            .padding(top = topInset(), bottom = bottomInset())
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("📶", fontSize = 48.sp)
-        Text("Allow local network", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Brand.Ink)
+        Icon(
+            painter = painterResource(R.drawable.ic_wifi_exclamationmark),
+            contentDescription = null,
+            tint = Brand.Blue,
+            modifier = Modifier.size(48.dp)
+        )
+        Text("Allow local network", style = Type.PlaceholderTitle, color = Brand.Ink)
         Text(
             "This build talks to the demo database on your laptop ($targetSummary). " +
                 "Android needs your permission to reach devices on this Wi-Fi.",
+            style = Type.Body,
             color = Brand.InkSecondary,
             textAlign = TextAlign.Center
         )
         if (denied) {
             Text(
                 "Still blocked. If no prompt appears, allow it in Settings → Apps → Split Party → Permissions.",
+                style = Type.Body,
                 color = Brand.Error,
-                textAlign = TextAlign.Center,
-                fontSize = 14.sp
+                textAlign = TextAlign.Center
             )
         }
-        Button(
-            onClick = onAllow,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(28.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Brand.Ink, contentColor = Color.White)
-        ) { Text("Allow", fontSize = 17.sp) }
+        Spacer(Modifier.height(8.dp))
+        PillButton(text = "Allow", onClick = onAllow)
         if (denied) {
-            TextButton(onClick = onOpenSettings) { Text("Open Settings", color = Brand.Blue) }
+            Text(
+                "Open Settings",
+                style = Type.Subtitle,
+                color = Brand.Blue,
+                modifier = Modifier
+                    .clickable(role = Role.Button, onClick = onOpenSettings)
+                    .padding(12.dp)
+            )
         }
     }
 }

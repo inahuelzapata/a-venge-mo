@@ -32,3 +32,7 @@ Compose:
     active: true
   ViewModelForwarding:
     active: true
+  CompositionLocalAllowlist:
+    active: true
+    # Screenshot tests shrink the reference-iPhone minimum insets (ui/theme/SplitPartyTheme.kt).
+    allowedCompositionLocals: ['LocalMinimumInsets']

@@ -33,6 +33,8 @@ import kotlinx.coroutines.launch
 @Immutable
 data class HomeUiState(
     val currentUserName: String,
+    /** `users.avatar` of the signed-in user; null (grey initials) until the users load. */
+    val currentUserAvatar: String? = null,
     val feed: LiveState<ImmutableList<Transaction>> = LiveState.Loading,
     val users: ImmutableMap<String, User> = persistentMapOf(),
     /** Ids of rows that just arrived; each stays here briefly, then its highlight fades. */
@@ -56,6 +58,7 @@ class HomeViewModel(private val userId: String, observeFeed: ObserveFeedUseCase,
     val state: StateFlow<HomeUiState> = combine(feed, users, highlighted) { feed, users, highlighted ->
         HomeUiState(
             currentUserName = users[userId]?.displayName ?: Username.fallbackName(userId),
+            currentUserAvatar = users[userId]?.avatar,
             feed = feed,
             users = users,
             highlighted = highlighted
@@ -77,6 +80,7 @@ class HomeViewModel(private val userId: String, observeFeed: ObserveFeedUseCase,
     }
 
     companion object {
-        const val HIGHLIGHT_HOLD_MS = 900L
+        /** As on iOS: a new row stays tinted for 1.5 s, then fades back to white. */
+        const val HIGHLIGHT_HOLD_MS = 1_500L
     }
 }

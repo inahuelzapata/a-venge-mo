@@ -42,7 +42,7 @@ struct MainTabView: View {
 
 /// Floating capsule with Home and Me as regular tabs and, between them, the
 /// Pay/Request action as a raised round brand-blue button carrying the white
-/// Aven-mo mark (Venmo-style). Sizes: Theme, docs/design/README.md "Brand mark".
+/// Aven-mo mark (Venmo-style). Sizes: Theme, docs/design/visual-conventions.md "Brand mark".
 private struct BottomBar: View {
     @Binding var selectedTab: AppTab
 
@@ -54,12 +54,12 @@ private struct BottomBar: View {
         ZStack {
             HStack(spacing: 4) {
                 tabButton(.home, systemImage: "house.fill")
-                // Keeps Home and Me clear of the button.
-                Color.clear.frame(width: Theme.payButtonDiameter + 8)
+                // The centre third stays empty under the button, so Home and Me
+                // keep their equal-thirds positions.
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                 tabButton(.me, systemImage: "person.fill")
             }
             .padding(6)
-            .frame(height: Theme.bottomBarHeight)
             .background(Capsule().fill(.regularMaterial))
             .overlay(Capsule().stroke(Color.black.opacity(0.06)))
             .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
@@ -79,12 +79,13 @@ private struct BottomBar: View {
             VStack(spacing: 3) {
                 Image(systemName: systemImage)
                     .font(.system(size: 22, weight: .semibold))
-                    .frame(height: 26)
+                    .frame(height: Theme.tabIconSlot)
                 Text(tab.title)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
             }
             .foregroundStyle(isSelected ? Theme.primaryText : Theme.secondaryText)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
             .background(Capsule().fill(isSelected ? Color.black.opacity(0.06) : .clear))
             .contentShape(Capsule())
         }

@@ -1,45 +1,43 @@
 package com.splitparty.android.ui.shell
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -50,17 +48,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.splitparty.android.R
 import com.splitparty.android.ui.components.BrandMark
-import com.splitparty.android.ui.components.BrandMarkSizes
 import com.splitparty.android.ui.home.HomeRoute
 import com.splitparty.android.ui.me.MeRoute
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.theme.Brand
-
-private val BarHeight = BrandMarkSizes.BottomBarHeight
+import com.splitparty.android.ui.theme.Dimens
+import com.splitparty.android.ui.theme.Type
+import com.splitparty.android.ui.theme.bottomInset
 
 /**
- * Signed-in shell: Home, Pay/Request and Me behind a floating bottom bar
- * (docs/design/home-feed-reference-*.jpg). Home is the start destination and
+ * Signed-in shell: Home, Pay/Request and Me behind the floating tab bar of
+ * docs/design/ios-captures/home-feed.png. Home is the start destination and
  * every tab switch pops back to it, so system back from another tab returns to
  * Home and back from Home leaves the app.
  */
@@ -68,30 +66,48 @@ private val BarHeight = BrandMarkSizes.BottomBarHeight
 fun MainShell(userId: String, modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val current = backStackEntry?.destination.toTab()
-    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // Room for the floating bar so the last row can scroll above it.
-    val contentPadding = PaddingValues(bottom = BarHeight + 24.dp + navBottom)
-
-    Box(modifier.fillMaxSize().background(Brand.Page)) {
-        NavHost(navController = navController, startDestination = HomeDestination, modifier = Modifier.fillMaxSize()) {
+    ShellFrame(
+        current = backStackEntry?.destination.toTab(),
+        onSelect = navController::switchTab,
+        modifier = modifier
+    ) { contentPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = HomeDestination,
+            modifier = Modifier.fillMaxSize(),
+            // iOS swaps tabs instantly; no cross-fade.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) {
             composable<HomeDestination> { HomeRoute(userId, contentPadding) }
             composable<PayDestination> { PayRequestScreen(contentPadding) }
             composable<MeDestination> { MeRoute(userId, contentPadding) }
         }
-        BottomBar(
-            current = current,
-            onSelect = navController::switchTab,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
     }
 }
 
-/** The bottom bar's tabs and the destination each one opens. */
-enum class Tab(val destination: Any) {
-    Home(HomeDestination),
-    Pay(PayDestination),
-    Me(MeDestination)
+/**
+ * The page with the floating bar on top. [content] gets the bottom padding that
+ * keeps it clear of the bar; lists scroll underneath it. Stateless, so
+ * screenshot tests render whole screens with it.
+ */
+@Composable
+fun ShellFrame(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier, content: @Composable (PaddingValues) -> Unit) {
+    val contentPadding = PaddingValues(bottom = bottomInset() + Dimens.TabBarInset)
+    Box(modifier.fillMaxSize().background(Brand.Page)) {
+        content(contentPadding)
+        BottomBar(current = current, onSelect = onSelect, modifier = Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** The bottom bar's tabs, in bar order, and the destination each one opens. */
+enum class Tab(val destination: Any, val label: String) {
+    Home(HomeDestination, "Home"),
+    /** No visible label: this is the TalkBack label of the centre button, as iOS's VoiceOver label. */
+    Pay(PayDestination, "Pay or request"),
+    Me(MeDestination, "Me")
 }
 
 private fun NavDestination?.toTab(): Tab = when {
@@ -118,49 +134,52 @@ object ShellTestTags {
 }
 
 /**
- * Floating capsule with Home and Me as regular tabs and, between them, the
- * Pay/Request action as a raised round button carrying the white Aven-mo mark
- * (Venmo-style), matching iOS. The box is [BrandMarkSizes.PayButtonLift] taller
- * than the capsule so the raised part of the button is inside it and still
- * receives taps (Compose drops touches outside a parent's bounds).
+ * Floating capsule, 92 tall, 16 from the sides and 4 above the gesture area,
+ * with three equal slots: Home and Me are icon-above-label tabs, and the centre
+ * slot is covered by the raised Pay/Request button (Venmo-style).
+ *
+ * The box is [Dimens.PayButtonLift] taller than the capsule so the raised part
+ * of the button lies inside it: Compose only delivers taps to children inside
+ * their parent's bounds.
  */
 @Composable
-internal fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
+private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
+            .padding(
+                start = Dimens.TabBarSideMargin,
+                end = Dimens.TabBarSideMargin,
+                bottom = bottomInset() + Dimens.TabBarBottomMargin
+            )
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+            .height(Dimens.TabBarHeight + Dimens.PayButtonLift)
     ) {
-        Surface(
+        Row(
             modifier = Modifier
-                .padding(top = BrandMarkSizes.PayButtonLift)
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(BarHeight),
-            shape = RoundedCornerShape(50),
-            color = Color.White.copy(alpha = 0.97f),
-            border = BorderStroke(1.dp, Brand.Outline),
-            shadowElevation = 6.dp
+                .height(Dimens.TabBarHeight)
+                .dropShadow(
+                    CircleShape,
+                    Shadow(radius = 16.dp, offset = DpOffset(0.dp, 4.dp), color = Brand.Shadow.copy(alpha = 0.12f))
+                )
+                .background(Brand.TabBar, CircleShape)
+                .border(1.dp, Brand.TabBarOutline, CircleShape)
+                .padding(Dimens.TabBarPadding),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Row(Modifier.fillMaxSize().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TabItem(
-                    label = "Home",
-                    selectedIcon = R.drawable.ic_home_filled,
-                    icon = R.drawable.ic_home_outlined,
-                    selected = current == Tab.Home,
-                    onClick = { onSelect(Tab.Home) },
-                    modifier = Modifier.weight(1f).testTag(ShellTestTags.tab(Tab.Home))
-                )
-                // Keeps Home and Me clear of the button.
-                Spacer(Modifier.width(BrandMarkSizes.PayButtonDiameter + 8.dp))
-                TabItem(
-                    label = "Me",
-                    selectedIcon = R.drawable.ic_person_filled,
-                    icon = R.drawable.ic_person_outlined,
-                    selected = current == Tab.Me,
-                    onClick = { onSelect(Tab.Me) },
-                    modifier = Modifier.weight(1f).testTag(ShellTestTags.tab(Tab.Me))
-                )
+            Tab.entries.forEach { tab ->
+                if (tab == Tab.Pay) {
+                    // Keeps Home and Me at their equal-thirds positions.
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    TabItem(
+                        tab = tab,
+                        selected = current == tab,
+                        onClick = { onSelect(tab) },
+                        modifier = Modifier.weight(1f).testTag(ShellTestTags.tab(tab))
+                    )
+                }
             }
         }
         PayRequestButton(
@@ -172,61 +191,70 @@ internal fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier
 }
 
 @Composable
-private fun TabItem(
-    label: String,
-    @DrawableRes selectedIcon: Int,
-    @DrawableRes icon: Int,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val tint = if (selected) Brand.Ink else Brand.InkSecondary
     Column(
         modifier = modifier
-            .fillMaxHeight()
-            .background(if (selected) Brand.Chip else Color.Transparent, RoundedCornerShape(50))
-            .clickable(role = Role.Tab, onClick = onClick)
-            .semantics { this.selected = selected },
-        verticalArrangement = Arrangement.Center,
+            .height(Dimens.TabItemHeight)
+            .background(if (selected) Brand.TabSelected else Color.Transparent, CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            )
+            .semantics { this.selected = selected }
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            painter = painterResource(if (selected) selectedIcon else icon),
-            contentDescription = null,
-            tint = Brand.Ink,
-            modifier = Modifier.size(26.dp)
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = Brand.Ink,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-        )
+        Box(Modifier.height(Dimens.TabIconSlot), contentAlignment = Alignment.Center) {
+            when (tab) {
+                Tab.Home -> TabIcon(R.drawable.ic_house_fill, tint, width = 31.dp, height = 31.dp)
+
+                Tab.Me -> TabIcon(R.drawable.ic_person_fill, tint, width = 27.dp, height = 26.dp)
+
+                // Drawn by PayRequestButton, never as a TabItem.
+                Tab.Pay -> Unit
+            }
+        }
+        Spacer(Modifier.height(3.dp))
+        Text(tab.label, style = if (selected) Type.TabLabelSelected else Type.TabLabel, color = tint)
     }
 }
 
-/** Accessibility label of the centre button, the same words iOS uses. */
-const val PAY_BUTTON_DESCRIPTION = "Pay or request"
-
 /**
- * Raised brand-blue circle with the white mark and no text. It looks the same
- * whether or not Pay/Request is open; only its selected semantics change.
+ * Raised brand-blue circle carrying the white mark, no text. It looks the same
+ * whether or not Pay/Request is open (only its selected semantics change) and,
+ * like every control here, has no ripple. Its shadow is the iOS one (black 24%,
+ * radius 8, y 4), recorded as elevation 8 in the conventions note.
  */
 @Composable
 private fun PayRequestButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onClick,
+    Box(
         modifier = modifier
-            .size(BrandMarkSizes.PayButtonDiameter)
+            .size(Dimens.PayButtonDiameter)
+            .dropShadow(
+                CircleShape,
+                Shadow(radius = 8.dp, offset = DpOffset(0.dp, 4.dp), color = Brand.Shadow.copy(alpha = 0.24f))
+            )
+            .background(Brand.Blue, CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
             .semantics {
-                contentDescription = PAY_BUTTON_DESCRIPTION
+                contentDescription = Tab.Pay.label
                 this.selected = selected
             },
-        shape = CircleShape,
-        color = Brand.PayButtonBlue,
-        shadowElevation = BrandMarkSizes.PayButtonElevation
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            BrandMark(size = BrandMarkSizes.PayButtonMark, color = Color.White)
-        }
+        BrandMark(size = Dimens.PayButtonMark, color = Color.White)
     }
+}
+
+@Composable
+private fun TabIcon(@DrawableRes icon: Int, tint: Color, width: Dp, height: Dp, modifier: Modifier = Modifier) {
+    Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = modifier.size(width, height))
 }

@@ -24,7 +24,7 @@ enum Theme {
     static let screenGutter: CGFloat = 8
 
     // Aven-mo mark and the centre Pay/Request button. Android uses the same
-    // numbers in dp; both are listed in docs/design/README.md ("Brand mark").
+    // numbers in dp; all are in docs/design/visual-conventions.md ("Brand mark").
 
     /// Navy of the mark artwork (brand/aven-mo-mark.svg).
     static let markNavy = Color(hex: 0x021F40)
@@ -33,7 +33,10 @@ enum Theme {
     /// Mark to the left of the "Home" title.
     static let headerMarkSize: CGFloat = 24
     static let headerMarkSpacing: CGFloat = 6
-    static let bottomBarHeight: CGFloat = 68
+    /// Tab bar: 6 padding around 80-tall items (6 + 52 icon slot + 3 + 13 label + 6).
+    /// Used to place the raised button; the bar's own height comes from its items.
+    static let bottomBarHeight: CGFloat = 92
+    static let tabIconSlot: CGFloat = 52
     static let payButtonDiameter: CGFloat = 60
     static let payButtonMarkSize: CGFloat = 30
     /// How far the button's top edge sits above the bar's top edge.

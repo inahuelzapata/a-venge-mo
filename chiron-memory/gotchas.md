@@ -65,6 +65,10 @@ What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDe
 
 What: The raised Pay/Request button sits inside a Box made PayButtonLift (16 dp) taller than the bar capsule, instead of being offset upward past the bar · Why: Compose only hit-tests children inside the parent's layout bounds, so an offset button's top part would ignore taps · Where: android/app/src/main/java/com/splitparty/android/ui/shell/MainShell.kt BottomBar · Learned: SwiftUI .offset moves hit-testing with the view, so iOS can just offset the button
 
-## Paparazzi screen snapshots never include the bottom bar
+## iOS snapshots shift slightly after the simulator restarts or captures run
 
-What: The per-screen Paparazzi goldens render stateless screens without MainShell, so BottomBar is internal and has its own BottomBarScreenshotTest (Home and Pay selected) · Why: the bar, and the centre button with it, would otherwise appear in no Android golden or comparison image · Where: android/app/src/test/java/com/splitparty/android/screenshots/BottomBarScreenshotTest.kt
+What: After capture-ios.sh (status bar override) and a simulator shutdown/reboot, ScreenSnapshotTests failed on Home and Me with every pixel off by at most 3/255 and no layout change; re-recording on the current simulator state made two full runs pass · Why: the screens that failed are the ones with content blurred under the material tab bar, whose rendering moved with the fresh simulator state · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, docs/design/capture/capture-ios.sh · Learned: record snapshots and run them on the same booted simulator session; measure the diff before assuming a UI regression
+
+## iOS reference captures need the simulator's hardware keyboard disconnected
+
+What: With I/O ▸ Keyboard ▸ Connect Hardware Keyboard on (com.apple.iphonesimulator ConnectHardwareKeyboard), the login captures come out without the software keyboard, unlike the reference set and Android's keyboard stand-in · Why: the focused field only shows the on-screen keyboard when no hardware keyboard is attached · Where: docs/design/capture/capture-ios.sh, docs/design/ios-captures/README.md
