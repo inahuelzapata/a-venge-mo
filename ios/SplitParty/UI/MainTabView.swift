@@ -41,14 +41,10 @@ struct MainTabView: View {
 }
 
 /// Floating capsule with Home and Me as regular tabs and, between them, the
-/// Pay/Request action as a raised round brand-blue button carrying the white
+/// Pay/Request action as a round brand-blue button carrying the white
 /// Aven-mo mark (Venmo-style). Sizes: Theme, docs/design/visual-conventions.md "Brand mark".
 private struct BottomBar: View {
     @Binding var selectedTab: AppTab
-
-    /// Moves the button up from the bar's centre line so its top edge sits
-    /// `payButtonLift` above the bar's top edge.
-    private static let payButtonOffset = -(Theme.bottomBarHeight / 2 - Theme.payButtonDiameter / 2 + Theme.payButtonLift)
 
     var body: some View {
         ZStack {
@@ -64,8 +60,9 @@ private struct BottomBar: View {
             .overlay(Capsule().stroke(Color.black.opacity(0.06)))
             .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
 
+            // Seated in the bar, centred on it: not lifted and no shadow of its own,
+            // so it reads as part of the bar rather than floating over it.
             payRequestButton
-                .offset(y: Self.payButtonOffset)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
@@ -100,8 +97,6 @@ private struct BottomBar: View {
             BrandMark(size: Theme.payButtonMarkSize, color: .white)
                 .frame(width: Theme.payButtonDiameter, height: Theme.payButtonDiameter)
                 .background(Circle().fill(Theme.brandBlue))
-                // Elevation 8, matching Android's shadowElevation = 8.dp.
-                .shadow(color: .black.opacity(0.24), radius: 8, y: 4)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

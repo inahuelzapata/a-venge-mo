@@ -33,14 +33,10 @@ enum Theme {
     /// Mark to the left of the "Home" title.
     static let headerMarkSize: CGFloat = 24
     static let headerMarkSpacing: CGFloat = 6
-    /// Tab bar: 6 padding around 80-tall items (6 + 52 icon slot + 3 + 13 label + 6).
-    /// Used to place the raised button; the bar's own height comes from its items.
-    static let bottomBarHeight: CGFloat = 92
+    /// Tab bar items: 6 + 52 icon slot + 3 + 13 label + 6 = 80, inside 6 padding (bar 92).
     static let tabIconSlot: CGFloat = 52
     static let payButtonDiameter: CGFloat = 60
     static let payButtonMarkSize: CGFloat = 30
-    /// How far the button's top edge sits above the bar's top edge.
-    static let payButtonLift: CGFloat = 16
 }
 
 extension Color {

@@ -86,11 +86,11 @@ screen. The only hairline is the capsule's own outline.
 | Position | 16 from the left and right, 4 above the bottom safe area (gesture area) |
 | Size | Full width minus 32 × **92** tall (6 padding around 80 tall items) |
 | Fill / outline / shadow | `#F2F2F4` / black 6%, 1 / black 12%, radius 16, y 4 |
-| Items | Home, Pay/Request, Me. Equal widths, 4 apart. Home and Me: icon above label. The centre third is empty, under the raised button |
+| Items | Home, Pay/Request, Me. Equal widths, 4 apart. Home and Me: icon above label. The centre third holds the Pay/Request button |
 | Item | 6 above, icon slot 52 tall, 3 gap, label 11, 6 below |
 | Selected | Icon and label primary (black), label semibold, pill behind the item (black 6%). Home and Me only |
 | Unselected | Icon and label secondary `#7F7F7F`, label regular |
-| Centre button | Raised circle, **60** across, brand blue `#0087E0`, white Aven-mo mark 30, no label. Horizontally centred; top edge **16 above** the bar's top edge. Shadow black 24%, radius 8, y 4 (elevation 8). Looks the same whether Pay/Request is open or not. VoiceOver / TalkBack label "Pay or request" |
+| Centre button | Circle **60** across, brand blue `#0087E0`, white Aven-mo mark 30, no label. **Seated in the bar**: centred horizontally and vertically on the 92 capsule (16 clear above and below), not lifted above it, and no shadow of its own (elevation 0). Looks the same whether Pay/Request is open or not. VoiceOver / TalkBack label "Pay or request" |
 | Content | Scrolls underneath the bar. The last row stays reachable thanks to 24 bottom padding plus the bar inset |
 
 ## Brand mark
@@ -106,7 +106,7 @@ fills the box's full height and 87% of its width.
 | Mark colour on the page | Navy `#021F40` (login, Home header) |
 | Login mark | 72, 20 above the wordmark |
 | Home header mark | 24, 6 left of the title; header stays 44 tall |
-| Centre button | 60 circle, `#0087E0`, white mark 30, top edge 16 above the tab bar, shadow black 24% radius 8 y 4 (elevation 8) |
+| Centre button | 60 circle, `#0087E0`, white mark 30, centred in the 92 tab bar, no lift, no shadow |
 | Home-screen name | "A-venge-mo" |
 
 | File | What it is |

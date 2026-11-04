@@ -11,7 +11,7 @@ styled to match them. Measured values are in
 | Appearance | Light. The app forces light mode (`preferredColorScheme(.light)`) |
 | Status bar | Pinned to 9:41, full signal and Wi-Fi, charged battery (`simctl status_bar override`) |
 | Data | The app's Debug fixture (`-UITestFixture`), which serves the same users and payments as `backend/lib/seedData.js`, with ages relative to now ("3 hours ago" and so on) |
-| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, raised Pay/Request button) |
+| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, Pay/Request button seated in the tab bar) |
 
 The work order asked for a physical iPhone. These come from the simulator at the
 same pt size and scale as an iPhone 17/18 Pro, because the project owner chose

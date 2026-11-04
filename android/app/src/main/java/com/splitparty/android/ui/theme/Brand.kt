@@ -82,6 +82,4 @@ object Dimens {
     val HeaderMarkSpacing = 6.dp
     val PayButtonDiameter = 60.dp
     val PayButtonMark = 30.dp
-    /** How far the button's top edge sits above the tab bar's top edge. */
-    val PayButtonLift = 16.dp
 }

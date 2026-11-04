@@ -136,11 +136,8 @@ object ShellTestTags {
 /**
  * Floating capsule, 92 tall, 16 from the sides and 4 above the gesture area,
  * with three equal slots: Home and Me are icon-above-label tabs, and the centre
- * slot is covered by the raised Pay/Request button (Venmo-style).
- *
- * The box is [Dimens.PayButtonLift] taller than the capsule so the raised part
- * of the button lies inside it: Compose only delivers taps to children inside
- * their parent's bounds.
+ * slot holds the round Pay/Request button (Venmo-style), seated in the bar and
+ * centred on it rather than lifted above it.
  */
 @Composable
 private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
@@ -152,11 +149,10 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier 
                 bottom = bottomInset() + Dimens.TabBarBottomMargin
             )
             .fillMaxWidth()
-            .height(Dimens.TabBarHeight + Dimens.PayButtonLift)
+            .height(Dimens.TabBarHeight)
     ) {
         Row(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .height(Dimens.TabBarHeight)
                 .dropShadow(
@@ -185,7 +181,7 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier 
         PayRequestButton(
             selected = current == Tab.Pay,
             onClick = { onSelect(Tab.Pay) },
-            modifier = Modifier.align(Alignment.TopCenter).testTag(ShellTestTags.tab(Tab.Pay))
+            modifier = Modifier.align(Alignment.Center).testTag(ShellTestTags.tab(Tab.Pay))
         )
     }
 }
@@ -223,20 +219,16 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit, modifier: 
 }
 
 /**
- * Raised brand-blue circle carrying the white mark, no text. It looks the same
- * whether or not Pay/Request is open (only its selected semantics change) and,
- * like every control here, has no ripple. Its shadow is the iOS one (black 24%,
- * radius 8, y 4), recorded as elevation 8 in the conventions note.
+ * Brand-blue circle carrying the white mark, no text, and no shadow of its own
+ * (it sits in the bar, not over it). It looks the same whether or not
+ * Pay/Request is open (only its selected semantics change) and, like every
+ * control here, has no ripple.
  */
 @Composable
 private fun PayRequestButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(Dimens.PayButtonDiameter)
-            .dropShadow(
-                CircleShape,
-                Shadow(radius = 8.dp, offset = DpOffset(0.dp, 4.dp), color = Brand.Shadow.copy(alpha = 0.24f))
-            )
             .background(Brand.Blue, CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
