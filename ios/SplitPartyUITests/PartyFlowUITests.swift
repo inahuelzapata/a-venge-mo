@@ -96,8 +96,7 @@ final class PartyFlowUITests: XCTestCase {
     func testStartAPartyTwiceReturnsToTheSameParty() {
         launch(resettingSession: true)
         signIn(as: "maxi")
-        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout))
-        startPartyButton.tap()
+        tapStartPartyOnceSettled()
         XCTAssertTrue(partyScreen.waitForExistence(timeout: Self.screenTimeout))
         let firstPartyId = partyScreen.value as? String
         app.navigationBars.buttons.firstMatch.tap()
@@ -115,8 +114,7 @@ final class PartyFlowUITests: XCTestCase {
         XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
         app.terminate()
         launch(scenario: "unreachable", resettingSession: false)
-        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout))
-        startPartyButton.tap()
+        tapStartPartyOnceSettled()
         XCTAssertTrue(element("startPartyError").waitForExistence(timeout: Self.screenTimeout))
         XCTAssertFalse(partyScreen.exists)
         XCTAssertTrue(merchantCard.exists)
@@ -127,8 +125,7 @@ final class PartyFlowUITests: XCTestCase {
     func testHostSeesCodeCountdownSeatsAndFriendsArriveLive() {
         launch(resettingSession: true, extra: ["-UITestFriendsJoinEvery", "3"])
         signIn(as: "maxi")
-        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout))
-        startPartyButton.tap()
+        tapStartPartyOnceSettled()
         XCTAssertTrue(partyScreen.waitForExistence(timeout: Self.screenTimeout))
         XCTAssertTrue(app.navigationBars["Split Party at Tony's"].exists)
         XCTAssertEqual(element("joinCode").label, "Join code: pizza, beer, party popper")
@@ -189,8 +186,11 @@ final class PartyFlowUITests: XCTestCase {
         for attempt in 1...2 {
             let orderBefore = optionLabels
             wrongOption.tap()
-            XCTAssertTrue(element("joinCodeError").waitForExistence(timeout: Self.screenTimeout))
-            XCTAssertTrue(element("joinCodeError").label.contains("\(3 - attempt) tr"), element("joinCodeError").label)
+            // The previous pick's message may still be up: wait for this pick's count.
+            let error = element("joinCodeError")
+            let countUpdated = NSPredicate { _, _ in error.exists && error.label.contains("\(3 - attempt) tr") }
+            expectation(for: countUpdated, evaluatedWith: nil)
+            waitForExpectations(timeout: Self.screenTimeout)
             let reshuffled = NSPredicate { _, _ in self.optionLabels != orderBefore }
             expectation(for: reshuffled, evaluatedWith: nil)
             waitForExpectations(timeout: Self.screenTimeout)
@@ -235,6 +235,19 @@ final class PartyFlowUITests: XCTestCase {
         XCTAssertEqual(labels.count, 4, file: file, line: line)
         XCTAssertEqual(Set(labels).count, 4, "All different", file: file, line: line)
         XCTAssertEqual(labels.filter { $0 == Self.fixtureCodeSpoken }.count, 1, file: file, line: line)
+    }
+
+    /// The merchant card slides in; a tap during the slide can miss the moving
+    /// button, so wait until its frame stops changing first.
+    private func tapStartPartyOnceSettled(file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout), file: file, line: line)
+        var previousFrame = CGRect.null
+        let deadline = Date().addingTimeInterval(Self.screenTimeout)
+        while startPartyButton.frame != previousFrame && Date() < deadline {
+            previousFrame = startPartyButton.frame
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        startPartyButton.tap()
     }
 
     private func element(_ identifier: String) -> XCUIElement {

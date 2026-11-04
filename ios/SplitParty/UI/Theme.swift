@@ -80,6 +80,8 @@ enum Theme {
     static let codeTileCornerRadius: CGFloat = 20
     static let codeEmojiFontSize: CGFloat = 44
     static let memberAvatarSize: CGFloat = 56
+    /// Wide enough for "Christophe" at 14 medium; 3 seats + 2 gaps = 280.
+    static let memberSeatWidth: CGFloat = 84
     static let memberSeatSpacing: CGFloat = 14
     static let hostBadgeFontSize: CGFloat = 11
     static let partySectionSpacing: CGFloat = 16

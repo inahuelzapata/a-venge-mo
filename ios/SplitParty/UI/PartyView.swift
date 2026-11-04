@@ -301,9 +301,11 @@ private struct MemberSeat: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Theme.primaryText)
                 .lineLimit(1)
+                // Long first names shrink a little rather than being cut off.
+                .minimumScaleFactor(0.8)
                 .padding(.top, isHost ? 4 : 0)
         }
-        .frame(width: Theme.memberAvatarSize + 16)
+        .frame(width: Theme.memberSeatWidth)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isHost ? "\(user?.firstName ?? userId), host" : (user?.firstName ?? userId))
         .accessibilityIdentifier("memberSeat")
@@ -325,7 +327,7 @@ private struct EmptySeat: View {
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.secondaryText)
         }
-        .frame(width: Theme.memberAvatarSize + 16)
+        .frame(width: Theme.memberSeatWidth)
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { isPulsing = true }
