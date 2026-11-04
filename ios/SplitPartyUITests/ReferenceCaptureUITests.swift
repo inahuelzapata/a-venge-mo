@@ -56,6 +56,12 @@ final class ReferenceCaptureUITests: XCTestCase {
         XCTAssertTrue(element("homeScreen").waitForExistence(timeout: Self.timeout))
         try capture("home-feed")
 
+        app.buttons["startPartyButton"].tap()
+        XCTAssertTrue(element("splitPartyPlaceholderScreen").waitForExistence(timeout: Self.timeout))
+        try capture("split-party-placeholder")
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(element("homeScreen").waitForExistence(timeout: Self.timeout))
+
         tapTab("Pay or request")
         XCTAssertTrue(element("payRequestScreen").waitForExistence(timeout: Self.timeout))
         try capture("pay-request")

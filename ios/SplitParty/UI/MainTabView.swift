@@ -18,16 +18,19 @@ enum AppTab: CaseIterable {
 /// capsule with a round brand-blue action button, which `TabView` can't draw.
 struct MainTabView: View {
     @State private var selectedTab: AppTab
+    private let initialHomePath: [HomeDestination]
 
-    /// `initialTab` lets snapshot tests open on Me or Pay/Request; the app starts on Home.
-    init(initialTab: AppTab = .home) {
+    /// `initialTab` and `initialHomePath` let snapshot tests open on Me,
+    /// Pay/Request or a screen pushed from Home; the app starts on Home.
+    init(initialTab: AppTab = .home, initialHomePath: [HomeDestination] = []) {
         _selectedTab = State(initialValue: initialTab)
+        self.initialHomePath = initialHomePath
     }
 
     var body: some View {
         ZStack {
             switch selectedTab {
-            case .home: HomeView()
+            case .home: HomeNavigationStack(initialPath: initialHomePath)
             case .payRequest: PayRequestPlaceholderView()
             case .me: MeView()
             }
@@ -36,6 +39,37 @@ struct MainTabView: View {
         .background(Theme.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             BottomBar(selectedTab: $selectedTab)
+        }
+    }
+}
+
+/// Screens pushed on top of Home.
+enum HomeDestination: Hashable {
+    case splitParty
+}
+
+/// Home with standard push navigation. Home keeps no navigation bar of its own;
+/// pushed screens get the system bar and Back. Home stays alive underneath, so
+/// Back returns to the same scroll position.
+private struct HomeNavigationStack: View {
+    @State private var path: [HomeDestination]
+
+    init(initialPath: [HomeDestination]) {
+        _path = State(initialValue: initialPath)
+    }
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            HomeView(onStartParty: { path.append(.splitParty) })
+                .background(Theme.background.ignoresSafeArea())
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: HomeDestination.self) { destination in
+                    switch destination {
+                    // The single navigation target for "Start a party": the real
+                    // party screen replaces the placeholder here.
+                    case .splitParty: SplitPartyPlaceholderView()
+                    }
+                }
         }
     }
 }
