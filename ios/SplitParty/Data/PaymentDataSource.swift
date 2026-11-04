@@ -18,11 +18,12 @@ protocol LiveSubscription {
     func cancel()
 }
 
-/// Where the app shell reads its data. `PaymentRepository` is the real one
+/// Where the app shell reads its data (and, through `PartyDataSource`, the
+/// Split Party documents). `PaymentRepository` is the real one
 /// (Firestore); `FixtureDataSource` (Debug builds only) serves fixed seeded data
 /// to snapshot and UI tests so they need no database.
 @MainActor
-protocol PaymentDataSource: AnyObject {
+protocol PaymentDataSource: PartyDataSource {
     /// Returns the account for a username, or throws `LoginError`.
     func signIn(username: String) async throws -> UserAccount
 

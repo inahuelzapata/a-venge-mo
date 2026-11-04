@@ -91,3 +91,11 @@ What: A while(true){ delay() } ticker in viewModelScope (Dispatchers.Main = the 
 ## Compose testTag after clearAndSetSemantics is lost
 
 What: In a modifier chain, a testTag placed after clearAndSetSemantics is cleared with the rest, so onNodeWithTag finds nothing; put testTag before clearAndSetSemantics · Where: android ui/home/PartyBanners.kt, ui/party/PartyScreen.kt
+
+## Firestore transaction blocks on iOS must not inherit the main actor
+
+What: The party transactions live in PartyWriter, a nonisolated struct, instead of the @MainActor PaymentRepository · Why: Firestore calls the transaction block on its own queue; a closure written inside a main-actor method inherits main-actor isolation and is then called off the main thread · Where: ios/SplitParty/Data/PartyRepository.swift · Learned: keep any SDK callback that runs on a background queue out of @MainActor types
+
+## SwiftUI accessibilityIdentifier on a plain stack overwrites its children's identifiers
+
+What: An .accessibilityIdentifier applied to a VStack that is not an accessibility element is copied onto every child, so the "Back to Home" button lost its own id; UI tests now find the expired state by its text · Why: SwiftUI propagates the modifier when the view is not a single element · Where: ios/SplitParty/UI/PartyView.swift (PartyClosedView), ios/SplitPartyUITests/PartyFlowUITests.swift · Learned: put identifiers on leaf views, or make the container .accessibilityElement(children: .contain) first

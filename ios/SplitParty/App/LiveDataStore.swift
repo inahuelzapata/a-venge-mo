@@ -25,6 +25,9 @@ final class LiveDataStore {
 
     var signedInUser: UserAccount? { usersById[userId] }
 
+    /// Split Party state for this session (open parties, banner, clock).
+    let parties: PartyHub
+
     /// How long a list may stay unconfirmed by the server before it is shown as
     /// unreachable. Long enough for a normal cold connect over Wi-Fi.
     private static let unreachableAfter: Duration = .seconds(4)
@@ -33,24 +36,34 @@ final class LiveDataStore {
     private static let highlightDuration: Duration = .seconds(1.5)
 
     @ObservationIgnored private let repository: any PaymentDataSource
-    @ObservationIgnored private let connection = ConnectionMonitor()
+    @ObservationIgnored private let connection: ConnectionMonitor
     @ObservationIgnored private var subscriptions: [LiveSubscription] = []
     @ObservationIgnored private var feedTracker = ListConnectionTracker()
     @ObservationIgnored private var myTransactionsTracker = ListConnectionTracker()
     @ObservationIgnored private var seenFeedIds: Set<String>?
     @ObservationIgnored private var isStopped = false
 
-    init(userId: String, repository: any PaymentDataSource) {
+    init(userId: String, repository: any PaymentDataSource, isDemoAtMerchant: Bool = true) {
         self.userId = userId
         self.repository = repository
+        let connection = ConnectionMonitor()
+        self.connection = connection
+        parties = PartyHub(userId: userId, repository: repository, connection: connection,
+                           isDemoAtMerchant: isDemoAtMerchant)
         connection.whenNetworkRestored { [weak self] in
             self?.repository.reconnectNow()
         }
         startListening()
     }
 
+    /// The Me tab's demo switch moved.
+    func demoModeChanged(isAtMerchant: Bool) {
+        parties.demoModeChanged(isAtMerchant: isAtMerchant)
+    }
+
     func stop() {
         isStopped = true
+        parties.stop()
         subscriptions.forEach { $0.cancel() }
         subscriptions = []
         feedTracker.cancelTimer()
@@ -71,6 +84,8 @@ final class LiveDataStore {
             switch result {
             case let .success(usersById):
                 self.usersById = usersById
+                let friendIds = Set(usersById[self.userId]?.friendIds ?? [])
+                if friendIds != self.parties.friendIds { self.parties.friendIds = friendIds }
             case .failure:
                 // Rows still render with ids as names; the lists show the error.
                 self.relistenLater { $0.listenToUsers() }
