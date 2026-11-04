@@ -43,8 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.splitparty.android.R
-import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.components.BrandMark
+import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.SplitPartyTheme

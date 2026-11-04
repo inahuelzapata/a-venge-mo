@@ -2,32 +2,40 @@ package com.splitparty.android.ui.shell
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.splitparty.android.di.domainModule
 import com.splitparty.android.di.viewModelModule
+import com.splitparty.android.domain.Clock
 import com.splitparty.android.domain.repository.ConnectivityObserver
+import com.splitparty.android.domain.repository.DemoSettingsRepository
+import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
 import com.splitparty.android.testing.FakeConnectivityObserver
+import com.splitparty.android.testing.FakeDemoSettingsRepository
+import com.splitparty.android.testing.FakePartyRepository
 import com.splitparty.android.testing.FakeSessionRepository
 import com.splitparty.android.testing.FakeSplitPartyRepository
 import com.splitparty.android.testing.TestData
+import com.splitparty.android.testing.TestData.party
 import com.splitparty.android.testing.TestData.server
 import com.splitparty.android.testing.TestData.tx
 import com.splitparty.android.ui.home.HomeTestTags
+import com.splitparty.android.ui.home.PartyBannerTestTags
 import com.splitparty.android.ui.home.SplitPartyCardTestTags
 import com.splitparty.android.ui.me.MeTestTags
-import com.splitparty.android.ui.party.SplitPartyTestTags
+import com.splitparty.android.ui.party.PartyTestTags
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -45,8 +53,13 @@ class MainShellNavigationTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
+    private val parties = FakePartyRepository().apply {
+        // Nobody is in a party at launch (the relaunch check sees this first).
+        open.value = server(emptyList())
+    }
+
     private val repository = FakeSplitPartyRepository().apply {
-        users.value = server(TestData.users.associateBy { it.id })
+        users.value = server(TestData.everyone.associateBy { it.id })
         feed.value = server(listOf(tx("a", memo = "Feed row")))
         user.value = server(TestData.maxi)
         userTransactions.value = server(listOf(tx("b", memo = "My row")))
@@ -58,10 +71,15 @@ class MainShellNavigationTest {
             single<SplitPartyRepository> { repository }
             single<SessionRepository> { FakeSessionRepository("maxi") }
             single<ConnectivityObserver> { FakeConnectivityObserver() }
+            single<PartyRepository> { parties }
+            single<DemoSettingsRepository> { FakeDemoSettingsRepository() }
+            single<Clock> { Clock { NOW } }
         }
         startKoin { modules(fakeData, domainModule, viewModelModule) }
-        compose.setContent { SplitPartyTheme { MainShell(userId = "maxi") } }
     }
+
+    /** Opens the shell signed in as Maxi; set the party snapshots before calling it to test a relaunch. */
+    private fun launch() = compose.setContent { SplitPartyTheme { MainShell(userId = "maxi") } }
 
     @After
     fun stopDi() = stopKoin()
@@ -70,11 +88,13 @@ class MainShellNavigationTest {
 
     @Test
     fun startsOnHomeWithTheFeed() {
+        launch()
         compose.onNodeWithText("Feed row", substring = true).assertIsDisplayed()
     }
 
     @Test
     fun meTabShowsProfileAndBackReturnsHome() {
+        launch()
         compose.onNodeWithTag(ShellTestTags.tab(Tab.Me)).performClick()
         compose.onNodeWithText("@maxi").assertIsDisplayed()
         compose.onNodeWithText("$250.00").assertIsDisplayed()
@@ -88,6 +108,7 @@ class MainShellNavigationTest {
 
     @Test
     fun payTabShowsThePlaceholderAndBackReturnsHome() {
+        launch()
         compose.onNodeWithTag(ShellTestTags.tab(Tab.Pay)).performClick()
         compose.onNodeWithText("Pay or request").assertIsDisplayed()
 
@@ -95,52 +116,114 @@ class MainShellNavigationTest {
         compose.onNodeWithText("Feed row", substring = true).assertIsDisplayed()
     }
 
+    private val maxisParty = party(id = "new-party", host = "maxi")
+    private val anniesParty = party(id = "annies", host = "annie")
+
     @Test
-    fun startAPartyOpensThePlaceholderAndSystemBackReturnsHome() {
+    fun startAPartyOpensThePartyAndSystemBackReturnsHomeWithBackToYourParty() {
+        launch()
+        parties.partyFlow("new-party").value = server(maxisParty)
         compose.onNodeWithText("Start a party").performClick()
-        compose.onNodeWithText("Split Party").assertIsDisplayed()
-        compose.onNodeWithTag(SplitPartyTestTags.BODY).assertTextContains("in progress", substring = true)
+        compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
+        compose.onNodeWithText("Expires in 4:50").assertIsDisplayed()
+
+        parties.open.value = server(listOf(maxisParty))
+        pressBack()
+        compose.onNodeWithTag(PartyBannerTestTags.BACK_TO_PARTY).assertIsDisplayed()
+        compose.onNodeWithText("Start a party").assertDoesNotExist()
+        compose.onNodeWithText("Back to your party").performClick()
+        compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
+
+        // On-screen back too; never further than Home (login is outside the shell).
+        compose.onNodeWithTag(PartyTestTags.BACK).performClick()
+        compose.onNodeWithTag(PartyBannerTestTags.BACK_TO_PARTY).assertIsDisplayed()
+    }
+
+    @Test
+    fun bannerImageStartsAPartyToo() {
+        launch()
+        parties.partyFlow("new-party").value = server(maxisParty)
+        compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).performClick()
+        compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
+    }
+
+    @Test
+    fun joinBannerOpensConfirmationAndBackKeepsTheBanner() {
+        launch()
+        parties.partyFlow("annies").value = server(anniesParty)
+        parties.open.value = server(listOf(anniesParty))
+        compose.onNodeWithTag(PartyBannerTestTags.JOIN).performClick()
+        compose.onNodeWithText("Join Annie's party").assertIsDisplayed()
 
         pressBack()
-        compose.onNodeWithText("Start a party").assertIsDisplayed()
-        compose.onNodeWithText("Feed row", substring = true).assertExists()
+        compose.onNodeWithTag(PartyBannerTestTags.JOIN).assertIsDisplayed()
     }
 
     @Test
-    fun bannerImageOpensThePlaceholderAndOnScreenBackReturnsHome() {
-        compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).performClick()
-        compose.onNodeWithText("Split Party").assertIsDisplayed()
+    fun correctCodeLandsOnThePartyAndBackGoesHomeNotToConfirmation() {
+        launch()
+        parties.partyFlow("annies").value = server(anniesParty)
+        parties.open.value = server(listOf(anniesParty))
+        compose.onNodeWithTag(PartyBannerTestTags.JOIN).performClick()
+        compose.onNode(hasContentDescription("pizza, beer, party popper")).performScrollTo().performClick()
+        compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
+        assertEquals(listOf("annies" to "maxi"), parties.joins)
 
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithText("Start a party").assertIsDisplayed()
+        val joined = party(id = "annies", host = "annie", members = listOf("annie", "maxi"))
+        parties.open.value = server(listOf(joined))
+        pressBack()
+        compose.onNodeWithTag(PartyBannerTestTags.BACK_TO_PARTY).assertIsDisplayed()
+        compose.onNodeWithText("Join Annie's party").assertDoesNotExist()
     }
 
     @Test
-    fun homeTabFromThePlaceholderReturnsHome() {
+    fun relaunchInAnOpenPartyOpensItStraightAway() {
+        val joined = party(id = "annies", host = "annie", members = listOf("annie", "maxi"))
+        parties.partyFlow("annies").value = server(joined)
+        parties.open.value = server(listOf(joined))
+        launch()
+        compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Annie, host").assertExists()
+        pressBack()
+        compose.onNodeWithTag(PartyBannerTestTags.BACK_TO_PARTY).assertIsDisplayed()
+    }
+
+    @Test
+    fun homeTabFromThePartyReturnsHome() {
+        launch()
+        parties.partyFlow("new-party").value = server(maxisParty)
         compose.onNodeWithText("Start a party").performClick()
         compose.onNodeWithTag(ShellTestTags.tab(Tab.Home)).performClick()
-        compose.onNodeWithText("Start a party").assertIsDisplayed()
-        compose.onNodeWithText("Split Party").assertDoesNotExist()
+        compose.onNodeWithText("Split Party at Tony's").assertDoesNotExist()
     }
 
     @Test
-    fun backFromThePlaceholderKeepsTheFeedScrollPosition() {
+    fun backFromThePartyKeepsTheFeedScrollPosition() {
+        launch()
         repository.feed.value = server((1..20).map { tx("r$it", memo = "Row $it") })
-        // Header scrolled off, the card at the top: a position Home only keeps if its state survives.
+        parties.partyFlow("annies").value = server(anniesParty)
+        parties.open.value = server(listOf(anniesParty))
+        // Header scrolled off, the banner at the top: a position Home only keeps if its state survives.
         compose.onNodeWithTag(HomeTestTags.FEED).performScrollToIndex(1)
-        val cardTop = compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).getUnclippedBoundsInRoot().top
+        val bannerTop = compose.onNodeWithTag(PartyBannerTestTags.JOIN).getUnclippedBoundsInRoot().top
 
-        compose.onNodeWithText("Start a party").performClick()
-        compose.onNodeWithText("Split Party").assertIsDisplayed()
+        compose.onNodeWithTag(PartyBannerTestTags.JOIN).performClick()
+        compose.onNodeWithText("Join Annie's party").assertIsDisplayed()
         pressBack()
 
-        assertEquals(cardTop, compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).getUnclippedBoundsInRoot().top)
+        assertEquals(bannerTop, compose.onNodeWithTag(PartyBannerTestTags.JOIN).getUnclippedBoundsInRoot().top)
     }
 
     /** TalkBack reads the content description, so the image-only button is announced by name. */
     @Test
     fun centreButtonIsAnnouncedAsPayOrRequestAndOpensThePlaceholder() {
+        launch()
         compose.onNodeWithContentDescription("Pay or request").performClick()
         compose.onNodeWithText("Pay or request").assertIsDisplayed()
+    }
+
+    private companion object {
+        /** Ten seconds into every test party (created at 0, expiring at 5:00). */
+        const val NOW = 10_000L
     }
 }

@@ -76,7 +76,7 @@ Spacing values used: **4, 6, 8, 12, 14, 16, 20, 24, 28, 32**.
 | Pill button | Black capsule, full width, 52 tall, 18 semibold white text. Disabled: black at 30%. Pressed: 80% opacity, nothing else |
 | Corner radii | Cards 28; field, buttons, chips, capsules and tab bar are full capsules (radius = height / 2) |
 
-## Split Party card and placeholder
+## Split Party card
 
 The Home feed's entry to Split Party: a feed item directly below the header,
 above the first row (and above the loading, empty and error cards). Modelled on
@@ -93,11 +93,36 @@ Android.
 | Button | Pill button (52, black, "Start a party"), 12 below the image, 16 from the card's sides and bottom |
 | Taps | Image and button open Split Party. Nothing else on the card is tappable. No ripple; the button dims to 80% while pressed |
 | Accessibility | The image is announced by the banner's own copy ("Split the check with friends. A faster, easier way to take care of the bill."), the button as "Start a party, button" |
-| Placeholder screen | Header as Home's (44 tall, 8 below the safe area): round 44 white back button with 8% hairline and a chevron on the left, "Split Party" centred (screen title). Body centred above the tab bar: 64 brand-blue circle with white fork-and-knife, "In progress" (placeholder title), explanation (subtitle, secondary), 12 apart. Tab bar stays, Home selected |
+| Demo switch | Shown only while "Demo mode: at Tony's" (Me tab) is on, which it is by default. Enters by sliding up a third of its height and fading in (450 ms), then one white sheen sweeps across it (1 s, 250 ms delay). Off: no item at all, so the feed sits directly below the header with no gap |
 
 The banner artwork is committed once, in `brand/banners/`. Android copies it into
 generated resources at build time (`drawable-nodpi`, see `android/app/build.gradle.kts`),
 so there is no copy under `android/`.
+
+## Split Party screens (PoC-7 to PoC-9)
+
+**Android values, provisional.** No iOS party captures existed when these were
+built. When the iOS slice records its values here, replace these and reconcile
+Android, then commit the comparisons (`join-banner`, `join-confirm`,
+`party-one-member`, `party-three-members`, `party-expired`; the Android renders
+are already in `ParityScreenshotTest`).
+
+| Element | Value |
+| ------- | ----- |
+| Home banner slot | One feed item below the header. Priority: "Back to your party" (the user is in an open party), then the Join banner (newest open party hosted by a friend, not locked out), then the merchant card (demo switch on), else nothing |
+| Join banner | White card, radius 28, 8 gutter, 16 padding. 48 host avatar with a 10 brand-blue live dot (halo pulses 1.1 s) at its top-right, 12 gap, title "Maxi started a Split Party at Tony's" (amount role) over "Tap Join and confirm the code on their phone." (body, secondary), 12 gap, black 36-tall "Join" capsule (amount role, white). Drops in from above with a spring. One TalkBack element: "Maxi started a Split Party at Tony's, Join", button |
+| Back to your party | White card, 16 padding: live dot, "You're in a Split Party at Tony's" (amount role) and the code emojis on one line, then a pill button "Back to your party", 12 apart. Fades in |
+| Start error | Below the merchant card, 24 from the screen sides: 16 red exclamation icon, 6 gap, "Couldn't start the party. Check your connection and try again." (body, error red) |
+| Party header | As Home's (44 tall, 8 below the safe area): round 44 white back button with 8% hairline on the left, "Split Party at Tony's" centred (screen title). Tab bar stays, Home selected |
+| Code card | White card, 20 padding, 14 apart: "Party code" (body, secondary), three 76 tiles (chip grey, radius 20, emoji at 40), 12 apart, then the live dot and "Expires in 4:59" (amount role). Tiles pop in 120 ms apart (spring), then bob ±3 on a 1.8 s cycle, each a third out of phase. TalkBack: "Party code: pizza, beer, party popper" |
+| Members card | "Members" (section heading), then the seats spread evenly, up to 4 a row: 60 avatar, first name below (body). Host: black "Host" capsule (tab label semibold, white, 2 white ring) over the avatar's bottom edge. Empty seats until there are 3: 60 circle outlined 2 in placeholder grey, opacity breathing 1 → 0.45 (0.9 s). A member who joins while the screen is open springs in from 0 |
+| Total area | White card: "Waiting for the total" (section heading) over "The host enters the bill and tip here." (body, secondary). No Pay action in this slice |
+| Reconnecting | White capsule centred above the code card: 14 spinner, 8 gap, "Reconnecting…" (body, secondary). Shown while offline or while the last snapshot came from the cache |
+| Expired / settled | Body replaced by a centred title ("This party has expired", placeholder title), "Nothing was charged. Start a new party from Home." (subtitle, secondary) and a pill button "Back to Home" |
+| Confirmation screen | Same header, title "Join Annie's party". "Pick the code shown on Annie's phone." (subtitle, secondary, centred), a 24-tall line for the error ("That's not the code. Try again.", body, error red), then four white option cards (radius 28, 16 vertical padding, three 60 tiles each). A wrong pick shakes the chosen card sideways (360 ms, ±14 decaying) with a red 2 outline, then the order is reshuffled. Each option is a TalkBack button read by emoji names |
+| Locked | "Too many wrong codes" (placeholder title), "You can't join Annie's party after three wrong picks. Ask them to start a new one." and "Back to Home" |
+| Demo switch row (Me) | White card under the profile card, 20 × 16 padding: "Demo mode: at Tony's" (amount role) over a one-line hint (body, secondary); iOS-style switch 51 × 31 (on #34C759, off #E9E9EA, 27 white knob) |
+| Motion off | With the animator scale at 0 ("Remove animations"), every entrance, pop-in, bob, spring, pulse, sheen and shake is skipped and the end state shows at once. Haptics (join: confirm, wrong code: reject) still fire |
 
 ## Bottom (tab) bar
 

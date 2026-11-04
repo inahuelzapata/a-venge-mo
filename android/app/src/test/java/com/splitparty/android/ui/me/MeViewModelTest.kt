@@ -7,6 +7,7 @@ import com.splitparty.android.domain.usecase.ObserveUserUseCase
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.domain.usecase.SignOutUseCase
 import com.splitparty.android.testing.FakeConnectivityObserver
+import com.splitparty.android.testing.FakeDemoSettingsRepository
 import com.splitparty.android.testing.FakeSessionRepository
 import com.splitparty.android.testing.FakeSplitPartyRepository
 import com.splitparty.android.testing.MainDispatcherRule
@@ -26,6 +27,7 @@ class MeViewModelTest {
     private val repository = FakeSplitPartyRepository()
     private val connectivity = FakeConnectivityObserver()
     private val session = FakeSessionRepository(initial = "maxi")
+    private val demoSettings = FakeDemoSettingsRepository(initial = true)
 
     // Lazy: built inside the test, after MainDispatcherRule has replaced Dispatchers.Main.
     private val viewModel by lazy {
@@ -34,7 +36,8 @@ class MeViewModelTest {
             observeUser = ObserveUserUseCase(repository, connectivity),
             observeUserTransactions = ObserveUserTransactionsUseCase(repository, connectivity),
             observeUsers = ObserveUsersUseCase(repository),
-            signOut = SignOutUseCase(session)
+            signOut = SignOutUseCase(session),
+            demoSettings = demoSettings
         )
     }
 
@@ -67,5 +70,15 @@ class MeViewModelTest {
     fun `log out clears the session`() = runTest {
         viewModel.onAction(MeAction.LogOut)
         assertNull(session.signedInUserId.value)
+    }
+
+    @Test
+    fun `demo switch reads and writes the stored value`() = runTest {
+        viewModel.state.test {
+            assertEquals(true, expectMostRecentItem().demoAtMerchant)
+            viewModel.onAction(MeAction.SetDemoAtMerchant(false))
+            assertEquals(false, awaitItem().demoAtMerchant)
+            assertEquals(false, demoSettings.atMerchant.value)
+        }
     }
 }

@@ -2,12 +2,17 @@ package com.splitparty.android.di
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.splitparty.android.data.AndroidConnectivityObserver
+import com.splitparty.android.data.DataStoreDemoSettingsRepository
 import com.splitparty.android.data.DataStoreSessionRepository
+import com.splitparty.android.data.FirestorePartyRepository
 import com.splitparty.android.data.FirestoreSplitPartyRepository
 import com.splitparty.android.data.firebase.FirebaseConnection
 import com.splitparty.android.data.firebase.FirebaseSetup
 import com.splitparty.android.data.firebase.FirestoreTarget
+import com.splitparty.android.domain.Clock
 import com.splitparty.android.domain.repository.ConnectivityObserver
+import com.splitparty.android.domain.repository.DemoSettingsRepository
+import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
 import com.splitparty.android.domain.usecase.ObserveFeedUseCase
@@ -18,13 +23,16 @@ import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.domain.usecase.SignInUseCase
 import com.splitparty.android.domain.usecase.SignOutUseCase
 import com.splitparty.android.ui.home.HomeViewModel
+import com.splitparty.android.ui.join.JoinViewModel
 import com.splitparty.android.ui.login.LoginViewModel
 import com.splitparty.android.ui.me.MeViewModel
+import com.splitparty.android.ui.party.PartyViewModel
 import com.splitparty.android.ui.root.SessionViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -46,8 +54,11 @@ val firebaseModule = module {
 
 val dataModule = module {
     singleOf(::FirestoreSplitPartyRepository) { bind<SplitPartyRepository>() }
+    single<PartyRepository> { FirestorePartyRepository(get()) }
     singleOf(::DataStoreSessionRepository) { bind<SessionRepository>() }
+    singleOf(::DataStoreDemoSettingsRepository) { bind<DemoSettingsRepository>() }
     singleOf(::AndroidConnectivityObserver) { bind<ConnectivityObserver>() }
+    single<Clock> { Clock.System }
 }
 
 val domainModule = module {
@@ -66,6 +77,9 @@ val viewModelModule = module {
     viewModelOf(::LoginViewModel)
     viewModelOf(::HomeViewModel)
     viewModelOf(::MeViewModel)
+    // Two String parameters (partyId, userId): resolved by position, not by type.
+    viewModel { (partyId: String, userId: String) -> PartyViewModel(partyId, userId, get(), get(), get(), get()) }
+    viewModel { (partyId: String, userId: String) -> JoinViewModel(partyId, userId, get(), get(), get()) }
 }
 
 val appModules = listOf(firebaseModule, dataModule, domainModule, viewModelModule)

@@ -4,7 +4,6 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.Source
@@ -16,12 +15,7 @@ import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.UserLookup
 import com.splitparty.android.domain.repository.SplitPartyRepository
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -66,50 +60,12 @@ class FirestoreSplitPartyRepository(private val db: FirebaseFirestore) : SplitPa
         snapshot.documents.mapNotNull { it.toUser() }.associateBy { it.id }
     }
 
-    private fun <T> listen(query: Query, map: (QuerySnapshot) -> T): Flow<LiveEvent<T>> = retrying {
-        callbackFlow {
-            val registration = query.addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
-                if (error != null) {
-                    trySend(LiveEvent.Failed(error))
-                    close()
-                } else if (snapshot != null) {
-                    trySend(LiveEvent.Data(map(snapshot), snapshot.metadata.isFromCache))
-                }
-            }
-            awaitClose { registration.remove() }
-        }
-    }
+    private fun <T> listen(query: Query, map: (QuerySnapshot) -> T): Flow<LiveEvent<T>> = listenQuery({ query }, map)
 
-    private fun <T> listen(doc: DocumentReference, map: (DocumentSnapshot) -> T): Flow<LiveEvent<T>> = retrying {
-        callbackFlow {
-            val registration = doc.addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
-                if (error != null) {
-                    trySend(LiveEvent.Failed(error))
-                    close()
-                } else if (snapshot != null) {
-                    trySend(LiveEvent.Data(map(snapshot), snapshot.metadata.isFromCache))
-                }
-            }
-            awaitClose { registration.remove() }
-        }
-    }
-
-    /**
-     * A Firestore listener that fails (for example a missing index or rules
-     * error) is dead. Start a new one after a short pause so the screen
-     * recovers by itself.
-     */
-    private fun <T> retrying(listener: () -> Flow<LiveEvent<T>>): Flow<LiveEvent<T>> = flow {
-        while (true) {
-            emit(LiveEvent.Pending)
-            emitAll(listener())
-            delay(RETRY_DELAY_MS)
-        }
-    }
+    private fun <T> listen(doc: DocumentReference, map: (DocumentSnapshot) -> T): Flow<LiveEvent<T>> = listenDocument(doc, map)
 
     private companion object {
         const val FEED_LIMIT = 50L
         const val LOGIN_TIMEOUT_MS = 8_000L
-        const val RETRY_DELAY_MS = 3_000L
     }
 }

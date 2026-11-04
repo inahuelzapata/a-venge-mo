@@ -39,7 +39,7 @@ import com.splitparty.android.ui.theme.SplitPartyTheme
  * generated resources at build time (see app/build.gradle.kts).
  */
 @Composable
-fun SplitPartyCard(onStartParty: () -> Unit, modifier: Modifier = Modifier) {
+fun SplitPartyCard(onStartParty: () -> Unit, modifier: Modifier = Modifier, busy: Boolean = false) {
     val banner = painterResource(R.drawable.split_party_banner)
     val bannerCopy = stringResource(R.string.split_party_banner_description)
     Column(
@@ -68,6 +68,8 @@ fun SplitPartyCard(onStartParty: () -> Unit, modifier: Modifier = Modifier) {
         PillButton(
             text = stringResource(R.string.split_party_start),
             onClick = onStartParty,
+            enabled = !busy,
+            busy = busy,
             modifier = Modifier
                 .padding(horizontal = Dimens.BannerButtonMargin)
                 .testTag(SplitPartyCardTestTags.BUTTON)

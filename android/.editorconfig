@@ -13,4 +13,4 @@ ktlint_code_style = android_studio
 # Composables are PascalCase functions.
 ktlint_function_naming_ignore_when_annotated_with = Composable
 # Compose rules (io.nlopez.compose.rules): theme objects used as CompositionLocal-free tokens.
-compose_allowed_composition_locals = LocalNow,LocalMinimumInsets
+compose_allowed_composition_locals = LocalNow,LocalMinimumInsets,LocalReduceMotion
