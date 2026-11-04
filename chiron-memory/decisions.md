@@ -37,9 +37,9 @@ What: Screens read through the PaymentDataSource protocol; FixtureDataSource (De
 
 What: For FIREBASE_TARGET=emulator the Android app creates a named FirebaseApp from google-services.json options (or placeholder options when the file is absent) with projectId set to FIREBASE_PROJECT_ID, then calls useEmulator; hosted uses the default app and refuses (Setup required screen) if the json's project_id differs · Why: the emulator keeps one database per project id, so the default app (project from google-services.json) would read a different, empty database than the seed script; and an emulator demo should not need a Firebase config file · Where: android/app/src/main/java/com/splitparty/android/data/firebase/FirebaseSetup.kt · Learned: the iOS shell needs the same project-id override for the emulator
 
-## Android icons are local vector drawables, not the Compose icon packs
+## Android icons are local vector drawables drawn as SF Symbol look-alikes
 
-What: The app's 9 icons (home, person, comment, heart, more, search, QR) are Material icon paths in app/src/main/res/drawable/ic_*.xml used via painterResource · Why: material-icons-core/extended are discontinued at 1.7.8 and no longer managed by the Compose BOM · Where: android/app/src/main/res/drawable/
+What: Android's icons (house.fill, person.fill, magnifyingglass, qrcode, bubble.left, heart, tray, wifi.exclamationmark, exclamationmark.circle.fill, cylinder) are hand-drawn res/drawable/ic_*.xml vectors sized so their ink matches the SF Symbols in the iOS captures · Why: SF Symbols can't ship on Android and the Compose icon packs are discontinued; glyph shape is a documented allowed difference, size and position are not · Where: android/app/src/main/res/drawable/, docs/design/visual-conventions.md
 
 ## Android DI uses Koin (DSL, no annotations) rather than Hilt
 
@@ -47,4 +47,16 @@ What: Koin 4.2 with the constructor DSL (singleOf/factoryOf/viewModelOf) and koi
 
 ## Android screenshot tests use Paparazzi 2.0 alpha on the stateless screens
 
-What: Paparazzi snapshots every stateless XScreen in each UI state (plus a 1.5x font-scale pass) on DeviceConfig.PIXEL_5; goldens are committed in android/app/src/test/snapshots/images and `./gradlew check` depends on verifyPaparazziDebug · Why: catches visual regressions the semantics-based Robolectric tests can't; Paparazzi 2.0.0-alpha05.1 is the first release with AGP 9 support (1.3.x stops at AGP 8) · Where: android/app/src/test/java/com/splitparty/android/screenshots/Snapshots.kt, android/app/build.gradle.kts · Learned: plain testDebugUnitTest only renders snapshots and never compares them; stateless screens have no page background, so the shared `screen {}` helper wraps them in SplitPartyTheme + Brand.Page like the app root does
+What: Paparazzi snapshots every stateless XScreen in each UI state (plus a 1.5x font-scale pass) on the reference iPhone geometry (402 x 874 dp at 3x, Snapshots.kt SnapshotDevice); goldens are committed in android/app/src/test/snapshots/images and `./gradlew check` depends on verifyPaparazziDebug · Why: catches visual regressions the semantics-based Robolectric tests can't; Paparazzi 2.0.0-alpha05.1 is the first release with AGP 9 support (1.3.x stops at AGP 8) · Where: android/app/src/test/java/com/splitparty/android/screenshots/Snapshots.kt, android/app/build.gradle.kts · Learned: plain testDebugUnitTest only renders snapshots and never compares them; stateless screens have no page background, so the shared `screen {}` helper wraps them in SplitPartyTheme + Brand.Page like the app root does
+
+## Android bundles Inter as the stand-in for SF Pro
+
+What: Every Android text role uses Inter 4.1 (SIL OFL 1.1, static Regular/Medium/SemiBold/Bold in res/font, licence in assets/licenses/Inter-OFL.txt) at the iOS sizes and weights, with SF's 1.19 line height and per-role negative tracking tuned until line widths match the captures · Why: Apple's SF Pro may not be bundled on Android; Inter is open-licensed and closest in metrics · Where: android/app/src/main/java/com/splitparty/android/ui/theme/Type.kt · Learned: Inter sets wider than SF unless tracked about -0.027em (<=18) / -0.035em (20) / -0.03em (display)
+
+## Android lays out against the reference iPhone's safe area as a minimum
+
+What: Content starts at max(system top inset, 62 dp) and the floating tab bar sits 4 dp above max(navigation inset, 34 dp), the iPhone 18 Pro safe area · Why: keeps header and bar at the same height as the iPhone when phones are placed side by side, while still clearing cutouts and gesture areas · Where: android/app/src/main/java/com/splitparty/android/ui/theme/SplitPartyTheme.kt (topInset/bottomInset, LocalMinimumInsets)
+
+## Android parity renders are Paparazzi goldens at full device resolution
+
+What: ParityScreenshotTest renders one Android image per iOS capture (same state, the iOS fixture data) with useDeviceResolution = true, and docs/design/capture/compare.py copies them to docs/design/android-captures/ and builds the comparisons · Why: deterministic and re-creatable by any reviewer without phones or a database; regular goldens stay as small thumbnails · Where: android/app/src/test/java/com/splitparty/android/screenshots/ParityScreenshotTest.kt · Learned: Paparazzi scales snapshots to 1000 px unless useDeviceResolution is set, too coarse for 1 dp checks

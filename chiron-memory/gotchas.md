@@ -60,3 +60,8 @@ What: Robolectric 4.17 tests failed with "Failed to interact with raw FileDescri
 ## Paparazzi and Robolectric run together in android/app unit tests
 
 What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDebugUnitTest task without conflicts (69 tests pass together), although older Paparazzi docs advise keeping them in separate modules · Why: avoids a separate screenshot module, which could not depend on the application module's screens anyway · Where: android/app/build.gradle.kts, app/src/test/resources/robolectric.properties · Learned: if they start clashing after an upgrade, check this first; the fallback is moving screens into an Android library module
+
+## Headless iOS simulators always show the software keyboard
+
+What: Without Simulator.app (not shipped with this Xcode), simctl offers no hardware-keyboard toggle, so a focused field always brings up the iOS keyboard, plus a "slide to type" tutorial card on first use; capture-ios.sh disables the card via `defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true` · Why: the login field autofocuses, so login captures include the keyboard · Where: docs/design/capture/capture-ios.sh, android ParityScreenshotTest (329 dp keyboard stand-in)
+
