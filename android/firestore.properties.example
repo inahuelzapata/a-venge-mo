@@ -1,15 +1,17 @@
-# Copy to android/firestore.properties (git-ignored) and edit.
-# This is the ONE place to switch the Android app between the emulator and the
-# hosted project. Rebuild after changing it. Convention: docs/firestore-target.md
+# Copy to android/firestore.properties (git-ignored) and fill in your project id.
+# This is the ONE place to switch the Android app between the hosted project and
+# the emulator; there is a single build, no flavours. Rebuild after changing it.
+# Convention: docs/firestore-target.md · Guide: docs/integration-setup-guide.md
 
-# --- Local emulator started from backend/ (npm run emulators) ---------------
-FIREBASE_TARGET=emulator
-FIREBASE_PROJECT_ID=demo-split-party
+# --- Hosted Firestore (default; also needs app/google-services.json) ---------
+FIREBASE_TARGET=hosted
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIRESTORE_EMULATOR_HOST=
+
+# --- Local emulator started from backend/ (opt-in, offline) ------------------
+# Comment out the hosted block above and use:
+# FIREBASE_TARGET=emulator
+# FIREBASE_PROJECT_ID=demo-split-party
 # A physical phone cannot use 127.0.0.1: use the laptop's LAN IP
 # (ipconfig getifaddr en0). An Android Studio emulator (AVD) uses 10.0.2.2:8080.
-FIRESTORE_EMULATOR_HOST=192.168.1.20:8080
-
-# --- Hosted Firestore (also needs app/google-services.json) ------------------
-# FIREBASE_TARGET=hosted
-# FIREBASE_PROJECT_ID=your-firebase-project-id
-# FIRESTORE_EMULATOR_HOST=
+# FIRESTORE_EMULATOR_HOST=192.168.1.20:8080

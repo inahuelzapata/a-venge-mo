@@ -68,3 +68,7 @@ What: Content starts at max(system top inset, 62 dp) and the floating tab bar si
 ## Android parity renders are Paparazzi goldens at full device resolution
 
 What: ParityScreenshotTest renders one Android image per iOS capture (same state, the iOS fixture data) with useDeviceResolution = true, and docs/design/capture/compare.py copies them to docs/design/android-captures/ and builds the comparisons · Why: deterministic and re-creatable by any reviewer without phones or a database; regular goldens stay as small thumbnails · Where: android/app/src/test/java/com/splitparty/android/screenshots/ParityScreenshotTest.kt · Learned: Paparazzi scales snapshots to 1000 px unless useDeviceResolution is set, too coarse for 1 dp checks
+
+## Firebase config files are shared outside git, one service-account key per person
+
+What: google-services.json, GoogleService-Info.plist and service-account keys stay git-ignored; colleagues are preferably added to the Firebase project and download configs themselves (own key or gcloud ADC), otherwise app configs go through the team password-manager vault and an owner generates a separate key per person · Why: the GitHub repo is public and the rules are shape-only, so committed configs would let anyone read/write the demo database; a shared key can't be revoked for one person · Where: docs/integration-setup-guide.md "Sharing the config files with colleagues" · Learned: ignored files exist only in the checkout where they were placed, so each git worktree needs them copied in (keep a master copy in ~/secrets/a-venge-mo)

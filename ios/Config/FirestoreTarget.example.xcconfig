@@ -1,18 +1,21 @@
 // Copy to FirestoreTarget.local.xcconfig (same folder, git-ignored) and edit.
-// This is the ONE place to switch the iOS app between the emulator and the
-// hosted project. Convention: docs/firestore-target.md
+// This is the ONE place to switch the iOS app between the hosted project and
+// the emulator. Convention: docs/firestore-target.md
+// Guide: docs/integration-setup-guide.md
 
 // Signing for a physical iPhone: your Apple team id, and a bundle id that is
-// unique to you if you use a free (personal) team.
+// unique to you if you use a free (personal) team. Hosted reads the
+// GoogleService-Info.plist of the iOS app registered as com.splitparty.ios.
 DEVELOPMENT_TEAM = ABCDE12345
 PRODUCT_BUNDLE_IDENTIFIER = com.splitparty.ios
 
-// --- Local emulator started from backend/ (npm run emulators) ---------------
-FIREBASE_TARGET = emulator
-FIREBASE_PROJECT_ID = demo-split-party
-FIRESTORE_EMULATOR_HOST = 192.168.1.20:8080
+// --- Hosted Firestore (default; also needs SplitParty/GoogleService-Info.plist)
+FIREBASE_TARGET = hosted
+FIREBASE_PROJECT_ID = your-firebase-project-id
+FIRESTORE_EMULATOR_HOST =
 
-// --- Hosted Firestore -------------------------------------------------------
-// FIREBASE_TARGET = hosted
-// FIREBASE_PROJECT_ID = your-firebase-project-id
-// FIRESTORE_EMULATOR_HOST =
+// --- Local emulator started from backend/ (opt-in, offline) -----------------
+// Comment out the hosted block above and use (a phone needs the laptop's LAN IP):
+// FIREBASE_TARGET = emulator
+// FIREBASE_PROJECT_ID = demo-split-party
+// FIRESTORE_EMULATOR_HOST = 192.168.1.20:8080

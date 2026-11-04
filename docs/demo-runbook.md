@@ -5,36 +5,34 @@ runs from `backend/` unless it says otherwise.
 
 ## 0. One-time setup
 
-```sh
-cd backend
-npm install
-cp .env.example .env      # keep the emulator block, or switch to the hosted block
-```
+Follow the [Integration & Setup Guide](integration-setup-guide.md): config
+files for the backend and both apps, the service-account key, and
+`npm run deploy:firestore` so the hosted project has the repo's rules and
+indexes.
 
-Requirements: Node 20.12+, and for the emulator a JDK 21+ on `PATH`.
-For the apps, see [`ios/README.md`](../ios/README.md) and
-[`android/README.md`](../android/README.md).
+## 1. One database for everything
 
-## 1. Pick one database for everything
+Phones and scripts must point at the **same** Firestore. By default that is the
+hosted project: `FIREBASE_TARGET=hosted` and the same `FIREBASE_PROJECT_ID` in
+`backend/.env` and in each phone's config. Phones can be on any network,
+including mobile data, and the laptop is only needed to run seed/reset.
 
-Phones and scripts must point at the **same** Firestore. The switch works the
-same way everywhere; see [Firestore target](firestore-target.md).
+**Before the demo**, don't run `npm run test:hosted`: it wipes every live party
+on this same database. If it was run, it has already put the database back in
+the seeded state.
 
-| Demo on…          | `backend/.env`                                          | Each phone's config |
-| ----------------- | ------------------------------------------------------- | ------------------- |
-| Local emulator    | `FIREBASE_TARGET=emulator`, `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` | `FIREBASE_TARGET=emulator`, `FIRESTORE_EMULATOR_HOST=<laptop LAN IP>:8080` |
-| Hosted project    | `FIREBASE_TARGET=hosted`, project id, key path           | `FIREBASE_TARGET=hosted`, same project id |
+## 2. Offline alternative: the emulator (opt-in)
 
-Find the laptop's LAN IP with `ipconfig getifaddr en0` (macOS). Phones and
-laptop must be on the same Wi-Fi network, and that network must allow
-device-to-device traffic (guest networks often block it; use a phone hotspot
-if so).
-
-## 2. Start the emulator (emulator demo only)
+If there is no internet, switch every config file to its emulator block (see
+[Firestore target](firestore-target.md)) and start the emulator:
 
 ```sh
 npm run emulators         # leave running; listens on 0.0.0.0:8080
 ```
+
+Phones use `FIRESTORE_EMULATOR_HOST=<laptop LAN IP>:8080` (`ipconfig getifaddr en0`)
+and must share the laptop's Wi-Fi, on a network that allows
+device-to-device traffic (guest networks often block it; use a phone hotspot).
 
 ## 3. Seed
 
@@ -58,8 +56,8 @@ to run again.
 ## 5. Reset between runs
 
 ```sh
+npm run reset -- --yes    # hosted (refuses without --yes)
 npm run reset             # emulator
-npm run reset -- --yes    # hosted (asks for explicit confirmation)
 ```
 
 Reset deletes every party, join-code lock and party transaction, and restores
@@ -72,5 +70,11 @@ balances and the feed exactly as after a fresh seed.
   variable.
 - **Phone shows "Firestore target not configured"**: the app's local config
   file is missing; see the app's README.
+- **Phone shows "Setup required" / a config-file message**: the Firebase
+  config file is missing or from another project; see the app's README.
+- **Script says the key file does not exist / is for another project**: put the
+  key from the console at `backend/service-account.json` (see the guide).
+- **A query fails with a missing-index error**: run `npm run deploy:firestore`
+  and wait for the indexes to finish building in the console.
 - **Phone cannot reach the emulator**: check the LAN IP, that the emulator is
   running, and that the macOS firewall allows incoming connections to Java.

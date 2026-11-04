@@ -68,3 +68,11 @@ What: After capture-ios.sh (status bar override) and a simulator shutdown/reboot
 ## iOS reference captures need the simulator's hardware keyboard disconnected
 
 What: With I/O ▸ Keyboard ▸ Connect Hardware Keyboard on (com.apple.iphonesimulator ConnectHardwareKeyboard), the login captures come out without the software keyboard, unlike the reference set and Android's keyboard stand-in · Why: the focused field only shows the on-screen keyboard when no hardware keyboard is attached · Where: docs/design/capture/capture-ios.sh, docs/design/ios-captures/README.md
+## Hosted deploy needs extra IAM roles on the Admin SDK service account
+
+What: With only the default roles, `firebase deploy --only firestore` with the firebase-adminsdk key fails with 403 on serviceusage (API-enabled check) and then on firebaserules.googleapis.com:test; granting "Firebase Admin" + "Service Usage Consumer" in Cloud IAM fixes it after 1-2 minutes of propagation · Why: the Admin SDK service agent role covers Firestore data, not deploys · Where: backend/lib/deploy.js (prints the hint), docs/integration-setup-guide.md step 1 · Learned: seed/reset work with the default roles; a fresh production-mode database denies all client reads until the repo rules are deployed, so phones show "Can't load payments" (PERMISSION_DENIED)
+
+## Probing a composite index with a query is unreliable
+
+What: While the transactions(participantIds, createdAt desc) index was still building, the Me query with limit(1) succeeded but the same query without a limit failed FAILED_PRECONDITION; a query on an empty collection also succeeds. test-hosted therefore lists indexes through the Firestore admin REST API (collectionGroups/-/indexes) and waits for state READY · Where: backend/scripts/test-hosted.js waitForIndexes
+

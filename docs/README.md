@@ -5,9 +5,10 @@ exists here once; platform READMEs link to it and never copy it.
 
 | Document | What it is |
 | -------- | ---------- |
+| [Integration & Setup Guide](integration-setup-guide.md) | Fresh clone to phones on the hosted project, deploy, seed, tests, emulator opt-in |
 | [PRD](prd.md) | What Split Party is and what the PoC must do |
 | [Firestore schema](firestore-schema.md) | The data contract that the iOS app, the Android app and the backend scripts implement |
-| [Firestore target](firestore-target.md) | How every piece picks the hosted project or the local emulator |
+| [Firestore target](firestore-target.md) | How every piece picks the hosted project (default) or the local emulator |
 | [Demo runbook](demo-runbook.md) | Seed, reset and run the 3-phone demo |
 | [Repository structure](repo-structure.md) | Where new work goes; nothing is shared at build time |
 | [Design](design/) | iOS reference captures (the visual contract for both apps), the measured [visual conventions](design/visual-conventions.md) and iOS/Android side-by-side comparisons |
