@@ -1,6 +1,14 @@
 package com.splitparty.android.ui.home
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -17,18 +25,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
@@ -37,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.splitparty.android.R
 import com.splitparty.android.domain.live.LiveState
 import com.splitparty.android.domain.live.OFFLINE_MESSAGE
+import com.splitparty.android.domain.party.BannerSlot
 import com.splitparty.android.ui.components.Avatar
 import com.splitparty.android.ui.components.BrandMark
 import com.splitparty.android.ui.components.EmptyCard
@@ -46,8 +60,11 @@ import com.splitparty.android.ui.components.MessageCard
 import com.splitparty.android.ui.components.PreviewData
 import com.splitparty.android.ui.components.UnreachableCard
 import com.splitparty.android.ui.components.rememberNow
+import com.splitparty.android.ui.components.rememberShimmerProgress
+import com.splitparty.android.ui.components.shimmer
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
+import com.splitparty.android.ui.theme.LocalReduceMotion
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import com.splitparty.android.ui.theme.Type
 import com.splitparty.android.ui.theme.topInset
@@ -61,16 +78,39 @@ import org.koin.core.parameter.parametersOf
 fun HomeRoute(
     userId: String,
     contentPadding: PaddingValues,
-    onStartParty: () -> Unit,
+    onOpenParty: (partyId: String) -> Unit,
+    onJoin: (partyId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel { parametersOf(userId) }
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    HomeScreen(state = state, contentPadding = contentPadding, onStartParty = onStartParty, modifier = modifier)
+    val openParty by rememberUpdatedState(onOpenParty)
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is HomeEvent.OpenParty -> openParty(event.partyId)
+            }
+        }
+    }
+    HomeScreen(
+        state = state,
+        contentPadding = contentPadding,
+        onStartParty = viewModel::startParty,
+        onJoin = onJoin,
+        onOpenParty = onOpenParty,
+        modifier = modifier
+    )
 }
 
 @Composable
-fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modifier = Modifier, onStartParty: () -> Unit = {}) {
+fun HomeScreen(
+    state: HomeUiState,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+    onStartParty: () -> Unit = {},
+    onJoin: (partyId: String) -> Unit = {},
+    onOpenParty: (partyId: String) -> Unit = {}
+) {
     val now = rememberNow()
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag(HomeTestTags.FEED),
@@ -90,10 +130,10 @@ fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modi
                 Spacer(Modifier.height(Dimens.ContentSpacing - Dimens.CardGap))
             }
         }
-        // The banner slot (PoC-7): a feed item that scrolls with the rows, shown
-        // in every feed state. It takes nothing from the state, so arriving rows
-        // never recompose it.
-        item(key = "split_party_card") { SplitPartyCard(onStartParty = onStartParty) }
+        // The banner slot (PoC-7/8): a feed item that scrolls with the rows, in
+        // every feed state. Absent when empty, so the feed moves up with no gap.
+        // Each kind has its own key: a change swaps the item with its entrance.
+        bannerSlot(state, onStartParty, onJoin, onOpenParty)
         when (val feed = state.feed) {
             LiveState.Loading -> item(key = "loading") { LoadingCard() }
 
@@ -116,6 +156,85 @@ fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modi
                     }
                 }
         }
+    }
+}
+
+private fun LazyListScope.bannerSlot(
+    state: HomeUiState,
+    onStartParty: () -> Unit,
+    onJoin: (String) -> Unit,
+    onOpenParty: (String) -> Unit
+) {
+    when (val slot = state.bannerSlot) {
+        BannerSlot.None -> Unit
+
+        BannerSlot.Merchant -> {
+            item(key = "split_party_card") {
+                Entrance(BannerEntrance.SlideUp, Modifier.animateItem()) {
+                    val sheen = rememberShimmerProgress()
+                    SplitPartyCard(
+                        onStartParty = onStartParty,
+                        busy = state.startingParty,
+                        modifier = Modifier.shimmer(sheen, horizontalInset = Dimens.Gutter, radius = Dimens.CardRadius)
+                    )
+                }
+            }
+            if (state.startPartyFailed) {
+                item(key = "start_party_error") { StartPartyError() }
+            }
+        }
+
+        is BannerSlot.Join -> item(key = "join_${slot.party.id}") {
+            Entrance(BannerEntrance.Drop, Modifier.animateItem()) {
+                JoinBanner(state.users[slot.party.hostId], slot.party.hostId, onJoin = { onJoin(slot.party.id) })
+            }
+        }
+
+        is BannerSlot.BackToParty -> item(key = "back_${slot.party.id}") {
+            Entrance(BannerEntrance.Fade, Modifier.animateItem()) {
+                BackToPartyCard(slot.party.joinCode, onOpen = { onOpenParty(slot.party.id) })
+            }
+        }
+    }
+}
+
+private enum class BannerEntrance { SlideUp, Drop, Fade }
+
+/** Plays [entrance] once when the item first appears; without motion it is simply there. */
+@Composable
+private fun Entrance(entrance: BannerEntrance, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val reduce = LocalReduceMotion.current
+    // Without motion it starts visible, so there is nothing to animate.
+    val visible = remember { MutableTransitionState(reduce) }.apply { targetState = true }
+    val enter = if (reduce) {
+        EnterTransition.None
+    } else {
+        when (entrance) {
+            BannerEntrance.SlideUp -> slideInVertically(tween(450)) { it / 3 } + fadeIn(tween(450))
+
+            BannerEntrance.Drop -> slideInVertically(spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) { -it } +
+                fadeIn(tween(200))
+
+            BannerEntrance.Fade -> fadeIn(tween(250))
+        }
+    }
+    AnimatedVisibility(visibleState = visible, enter = enter, modifier = modifier) { content() }
+}
+
+@Composable
+private fun StartPartyError(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.padding(horizontal = 24.dp).fillMaxWidth().testTag(PartyBannerTestTags.START_ERROR),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_exclamationmark_circle_fill),
+            contentDescription = null,
+            tint = Brand.Error,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(stringResource(R.string.start_party_failed), style = Type.Body, color = Brand.Error)
     }
 }
 

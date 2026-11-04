@@ -2,6 +2,7 @@ package com.splitparty.android.ui.components
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -14,6 +15,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -23,16 +25,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.Type
+import com.splitparty.android.ui.theme.motionSpec
 
 private const val PRESSED_ALPHA = 0.8f
 private const val DISABLED_ALPHA = 0.3f
@@ -89,5 +95,31 @@ fun ActivitySpinner(modifier: Modifier = Modifier, color: Color = Brand.InkSecon
                 )
             }
         }
+    }
+}
+
+private val SwitchOn = Color(0xFF34C759)
+private val SwitchOff = Color(0xFFE9E9EA)
+
+/**
+ * The iOS switch (51 × 31 track, 27 white knob): drawn by hand so no Material
+ * Switch colours, ripple or thumb icon leak in. Purely visual; the row around
+ * it carries the toggle semantics.
+ */
+@Composable
+fun IosSwitch(on: Boolean, modifier: Modifier = Modifier) {
+    val knobX by animateDpAsState(if (on) 22.dp else 2.dp, motionSpec(tween(200)), label = "switchKnob")
+    Box(
+        modifier = modifier
+            .size(51.dp, 31.dp)
+            .background(if (on) SwitchOn else SwitchOff, CircleShape)
+    ) {
+        Box(
+            Modifier
+                .offset(x = knobX, y = 2.dp)
+                .size(27.dp)
+                .dropShadow(CircleShape, Shadow(radius = 4.dp, offset = DpOffset(0.dp, 2.dp), color = Color.Black.copy(alpha = 0.15f)))
+                .background(Color.White, CircleShape)
+        )
     }
 }
