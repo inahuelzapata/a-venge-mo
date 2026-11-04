@@ -23,88 +23,43 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.splitparty.android.data.SessionStore
-import com.splitparty.android.data.SplitPartyRepository
-import com.splitparty.android.data.Username
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.splitparty.android.ui.theme.Brand
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.launch
+import com.splitparty.android.ui.theme.SplitPartyTheme
+import org.koin.compose.viewmodel.koinViewModel
 
-class LoginViewModel(
-    private val repository: SplitPartyRepository,
-    private val session: SessionStore,
-) : ViewModel() {
-    var username by mutableStateOf("")
-        private set
-    var error by mutableStateOf<String?>(null)
-        private set
-    var busy by mutableStateOf(false)
-        private set
-
-    val canSubmit: Boolean get() = username.isNotBlank() && !busy
-
-    fun onUsernameChange(value: String) {
-        username = value
-        error = null
-    }
-
-    fun submit() {
-        if (!canSubmit) return
-        val id = Username.normalize(username)
-        if (!Username.isValid(id)) {
-            error = noAccount()
-            return
-        }
-        busy = true
-        viewModelScope.launch {
-            try {
-                val user = repository.findUser(id)
-                if (user == null) error = noAccount() else session.signIn(user.id)
-            } catch (e: TimeoutCancellationException) {
-                error = UNREACHABLE
-            } catch (e: Exception) {
-                error = UNREACHABLE
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    private fun noAccount() = "No account named \"${username.trim()}\". Try maxi, annie or christophe."
-
-    private companion object {
-        const val UNREACHABLE = "Can't reach the server. Check the connection and try again."
-    }
+@Composable
+fun LoginRoute(modifier: Modifier = Modifier, viewModel: LoginViewModel = koinViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LoginScreen(state = state, onAction = viewModel::onAction, modifier = modifier)
 }
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel, targetSummary: String) {
+fun LoginScreen(state: LoginUiState, onAction: (LoginAction) -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(Brand.Card)
             .safeDrawingPadding()
             .imePadding()
             .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Column(
             modifier = Modifier.size(72.dp).background(Brand.Blue, CircleShape),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("$", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
         }
@@ -115,37 +70,61 @@ fun LoginScreen(viewModel: LoginViewModel, targetSummary: String) {
         Spacer(Modifier.height(28.dp))
 
         OutlinedTextField(
-            value = viewModel.username,
-            onValueChange = viewModel::onUsernameChange,
-            modifier = Modifier.fillMaxWidth(),
+            value = state.username,
+            onValueChange = { onAction(LoginAction.UsernameChanged(it)) },
+            modifier = Modifier.fillMaxWidth().testTag(LoginTestTags.USERNAME),
             label = { Text("Username") },
             singleLine = true,
-            isError = viewModel.error != null,
-            supportingText = viewModel.error?.let { message -> { Text(message) } },
+            isError = state.error != null,
+            supportingText = state.error?.let { message -> { Text(message) } },
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Brand.Blue, focusedLabelColor = Brand.Blue),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,
                 autoCorrectEnabled = false,
-                imeAction = ImeAction.Go,
+                imeAction = ImeAction.Go
             ),
-            keyboardActions = KeyboardActions(onGo = { viewModel.submit() }),
+            keyboardActions = KeyboardActions(onGo = { onAction(LoginAction.Submit) })
         )
         Spacer(Modifier.height(16.dp))
         Button(
-            onClick = viewModel::submit,
-            enabled = viewModel.canSubmit,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            onClick = { onAction(LoginAction.Submit) },
+            enabled = state.canSubmit,
+            modifier = Modifier.fillMaxWidth().height(56.dp).testTag(LoginTestTags.SUBMIT),
             shape = RoundedCornerShape(28.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Brand.Ink, contentColor = Color.White),
+            // While busy the button is disabled but stays dark, so the white spinner is visible.
+            colors = ButtonDefaults.buttonColors(containerColor = Brand.Ink, contentColor = Color.White).let { colors ->
+                if (state.busy) colors.copy(disabledContainerColor = Brand.Ink, disabledContentColor = Color.White) else colors
+            }
         ) {
-            if (viewModel.busy) {
+            if (state.busy) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
             } else {
                 Text("Sign in", fontSize = 17.sp, fontWeight = FontWeight.Medium)
             }
         }
         Spacer(Modifier.height(32.dp))
-        Text(targetSummary, color = Brand.InkSecondary, fontSize = 12.sp)
+        Text(state.targetSummary, color = Brand.InkSecondary, fontSize = 12.sp)
+    }
+}
+
+object LoginTestTags {
+    const val USERNAME = "login_username"
+    const val SUBMIT = "login_submit"
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LoginScreenPreview() {
+    SplitPartyTheme {
+        LoginScreen(LoginUiState(targetSummary = "Emulator 10.0.2.2:8080 (project demo-split-party)"), onAction = {})
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LoginScreenErrorPreview() {
+    SplitPartyTheme {
+        LoginScreen(LoginUiState(username = "thor", error = LoginViewModel.noAccount("thor")), onAction = {})
     }
 }

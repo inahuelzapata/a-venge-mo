@@ -23,32 +23,32 @@ import com.splitparty.android.ui.theme.Brand
 private val avatarColors = mapOf(
     "avatar_maxi" to Color(0xFF3D7BE0),
     "avatar_annie" to Color(0xFFE86A5C),
-    "avatar_christophe" to Color(0xFF2FA37A),
+    "avatar_christophe" to Color(0xFF2FA37A)
 )
 private val fallbackColor = Color(0xFF9E9EA6)
 
 @Composable
-fun Avatar(avatarKey: String?, name: String, size: Dp = 40.dp, modifier: Modifier = Modifier) {
+fun Avatar(avatarKey: String?, name: String, modifier: Modifier = Modifier, size: Dp = 40.dp) {
     Box(
         modifier = modifier.size(size).background(avatarColors[avatarKey] ?: fallbackColor, CircleShape),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = name.firstOrNull()?.uppercase() ?: "?",
             color = Color.White,
             fontWeight = FontWeight.SemiBold,
             fontSize = (size.value * 0.45f).sp,
-            lineHeight = (size.value * 0.45f).sp,
+            lineHeight = (size.value * 0.45f).sp
         )
     }
 }
 
 /** The white outlined initial circle at the top-left of the reference header. */
 @Composable
-fun InitialBadge(name: String, size: Dp = 52.dp, modifier: Modifier = Modifier) {
+fun InitialBadge(name: String, modifier: Modifier = Modifier, size: Dp = 52.dp) {
     Box(
         modifier = modifier.size(size).background(Brand.Outline, CircleShape),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.Center
     ) {
         Box(Modifier.size(size - 2.dp).background(Brand.Card, CircleShape), contentAlignment = Alignment.Center) {
             Text(name.firstOrNull()?.uppercase() ?: "", fontSize = 24.sp, color = Brand.Ink)

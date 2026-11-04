@@ -100,17 +100,75 @@ console (Android app `com.splitparty.android`) and put it at
 The Google Services Gradle plugin is applied only when that file exists, so
 builds without it still work.
 
-## Code map
+## Architecture
 
-| Path (under `app/src/main/java/com/splitparty/android/`) | What |
+Single `:app` module, layered by package (under `app/src/main/java/com/splitparty/android/`):
+
+```
+ui/      Compose screens + ViewModels (one package per feature)
+  └─ uses domain/ use cases
+domain/  models, repository interfaces, use cases, LiveState (no Android or Firebase imports)
+  └─ implemented by data/
+data/    Firestore, DataStore and ConnectivityManager implementations
+di/      Koin modules wiring the three layers
+```
+
+- **DI: Koin** (`di/AppModules.kt`, started in `SplitPartyApplication`). Screens get
+  ViewModels with `koinViewModel()`; ViewModels that need the signed-in user take it
+  as a parameter: `koinViewModel { parametersOf(userId) }`.
+- **Unidirectional data flow**: each ViewModel exposes one `StateFlow<XUiState>`
+  (immutable) and, where the screen has input, one `onAction(XAction)` entry point.
+- **Route / Screen split**: `XRoute` gets the ViewModel and collects state;
+  `XScreen(state, onAction, modifier)` is stateless, has `@Preview`s, and is what
+  UI tests render.
+- **Navigation**: type-safe `@Serializable` destinations (`ui/shell/ShellRoutes.kt`).
+- **Live data**: repositories emit `LiveEvent`s; `toLiveState()` (`domain/live`) turns
+  them into Loading / Ready / Unreachable using connectivity plus a 5 s server timeout.
+
+| Path | What |
 | ---- | ---- |
-| `FirestoreTarget.kt`, `data/FirebaseSetup.kt` | Reads `BuildConfig`, connects to the emulator or hosted project |
-| `data/Repository.kt`, `data/Models.kt` | Schema queries (feed, Me, users) as live Flows; money as `Long` cents |
-| `data/SessionStore.kt` | Signed-in username in DataStore |
-| `data/NetworkMonitor.kt`, `ui/LiveState.kt` | Offline/unreachable detection for the error states |
-| `ui/MainShell.kt` | Bottom bar and tab navigation (back from a tab returns to Home) |
-| `ui/home`, `ui/me`, `ui/pay`, `ui/login`, `ui/components` | Screens and the shared feed row |
-| `format/` | Integer-cents money formatting, relative times |
+| `di/AppModules.kt` | All Koin bindings |
+| `data/firebase/` | `FirestoreTarget` (BuildConfig), `FirebaseSetup` (emulator or hosted), schema mapping |
+| `data/` | `FirestoreSplitPartyRepository`, `DataStoreSessionRepository`, `AndroidConnectivityObserver` |
+| `domain/model`, `domain/repository`, `domain/usecase`, `domain/live` | Models (money as `Long` cents), interfaces, use cases, live state |
+| `ui/root` | App root: setup / login / shell, session ViewModel |
+| `ui/shell` | Bottom bar and tab navigation (back from a tab returns to Home) |
+| `ui/login`, `ui/home`, `ui/me`, `ui/pay`, `ui/gate`, `ui/setup` | Feature screens |
+| `ui/components`, `ui/theme`, `format/` | Shared feed row and cards, palette, money and time formatting |
 | `app/src/main/res/drawable/ic_*.xml` | Material icons as local vectors (the Compose icon packs are discontinued) |
 
-Unit tests: `./gradlew testDebugUnitTest`.
+### Adding a screen
+
+1. Write `XUiState`/`XAction` and `XViewModel` (use cases in, `StateFlow` out).
+2. Write `XRoute` (koinViewModel) and a stateless `XScreen` with previews.
+3. Bind the ViewModel in `viewModelModule` (and any new use case in `domainModule`).
+4. Add a `@Serializable` destination and a `composable<…>` entry if it's a tab.
+5. Add a ViewModel test with the fakes in `app/src/test/.../testing/`, and a
+   screenshot test per state, then run `recordPaparazziDebug`.
+
+## Tests and code quality
+
+```
+./gradlew check            # ktlint, detekt, Android lint, all unit + UI tests, screenshot goldens
+./gradlew testDebugUnitTest
+./gradlew ktlintFormat     # auto-fix formatting
+./gradlew recordPaparazziDebug   # re-record screenshot goldens after an intended UI change
+./gradlew verifyPaparazziDebug   # compare against the goldens (also part of check)
+```
+
+- **Unit tests (JVM)**: use cases, `LiveState`, ViewModels and the Koin graph
+  (`KoinModulesTest`). They use hand-written fakes (`testing/Fakes.kt`), Turbine and
+  `kotlinx-coroutines-test` with `MainDispatcherRule`.
+- **Compose UI tests (Robolectric, JVM)**: Login, Home and shell navigation (with the
+  real ViewModels and fake data sources). No device needed.
+- **Screenshot tests (Paparazzi, JVM)**: every stateless screen in each of its states
+  (`app/src/test/.../screenshots/`), on a fixed Pixel 5 config, plus a 1.5× font-size
+  pass. Goldens live in `app/src/test/snapshots/images/` and are committed; on a
+  mismatch the expected, actual and diff images are in `app/build/paparazzi/failures/`.
+  After an intended UI change, run `recordPaparazziDebug`, look at the new PNGs, and
+  commit them with the change. Snapshot names come from the test class and method,
+  so renaming a test means re-recording. New screens: add a test that calls
+  `paparazzi.screen { XScreen(state, …) }` for each state.
+- **ktlint** (Android Studio style plus Compose rules, `.editorconfig`) and **detekt 2**
+  (`config/detekt/detekt.yml`, Compose rules). detekt is a 2.0 alpha because 1.23 can't
+  run on the Java 25 Gradle JVM.

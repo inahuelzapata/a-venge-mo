@@ -20,14 +20,20 @@ import androidx.compose.ui.unit.sp
 import com.splitparty.android.ui.theme.Brand
 
 @Composable
-fun MessageCard(emoji: String, title: String, message: String, titleColor: Color = Brand.Ink, modifier: Modifier = Modifier) {
+fun MessageCard(emoji: String, title: String, message: String, modifier: Modifier = Modifier, titleColor: Color = Brand.Ink) {
     Column(
         modifier = modifier.fillMaxWidth().background(Brand.Card, RoundedCornerShape(28.dp)).padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(emoji, fontSize = 36.sp)
-        Text(title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = titleColor, textAlign = TextAlign.Center)
+        Text(
+            text = title,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = titleColor,
+            textAlign = TextAlign.Center
+        )
         Text(message, color = Brand.InkSecondary, textAlign = TextAlign.Center)
     }
 }
@@ -36,7 +42,7 @@ fun MessageCard(emoji: String, title: String, message: String, titleColor: Color
 fun LoadingCard(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxWidth().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         CircularProgressIndicator(Modifier.size(28.dp), color = Brand.Blue, strokeWidth = 3.dp)
     }

@@ -1,0 +1,34 @@
+# Builds on detekt's default config (buildUponDefaultConfig = true): only overrides live here.
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+
+complexity:
+  LongParameterList:
+    allowedFunctionParameters: 8
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    ignorePrivate: true
+
+style:
+  MaxLineLength:
+    maxLineLength: 140 # same as .editorconfig (ktlint)
+  MagicNumber:
+    # Layout sizes, colours and preview data are named by their call site.
+    ignoreAnnotated: ['Composable', 'Preview']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    excludes: ['**/test/**', '**/ui/theme/**']
+  UnusedPrivateFunction:
+    ignoreAnnotated: ['Preview']
+
+Compose:
+  ModifierMissing:
+    active: true
+  ViewModelForwarding:
+    active: true

@@ -11,20 +11,21 @@ object RelativeTime {
     private const val MINUTE = 60_000L
     private const val HOUR = 60 * MINUTE
     private const val DAY = 24 * HOUR
+    private const val WEEK = 7 * DAY
 
-    fun format(
-        thenMillis: Long?,
-        nowMillis: Long,
-        timeZone: TimeZone = TimeZone.getDefault(),
-        locale: Locale = Locale.US,
-    ): String {
+    fun format(thenMillis: Long?, nowMillis: Long, timeZone: TimeZone = TimeZone.getDefault(), locale: Locale = Locale.US): String {
         if (thenMillis == null) return "just now"
         val diff = nowMillis - thenMillis
         return when {
-            diff < MINUTE -> "just now" // includes small clock skew into the future
+            diff < MINUTE -> "just now"
+
+            // includes small clock skew into the future
             diff < HOUR -> plural(diff / MINUTE, "minute")
+
             diff < DAY -> plural(diff / HOUR, "hour")
-            diff < 7 * DAY -> plural(diff / DAY, "day")
+
+            diff < WEEK -> plural(diff / DAY, "day")
+
             else -> {
                 val sameYear = year(thenMillis, timeZone) == year(nowMillis, timeZone)
                 SimpleDateFormat(if (sameYear) "MMM d" else "MMM d, yyyy", locale)
@@ -36,6 +37,5 @@ object RelativeTime {
 
     private fun plural(n: Long, unit: String) = if (n == 1L) "1 $unit ago" else "$n ${unit}s ago"
 
-    private fun year(millis: Long, tz: TimeZone) =
-        Calendar.getInstance(tz).apply { timeInMillis = millis }.get(Calendar.YEAR)
+    private fun year(millis: Long, tz: TimeZone) = Calendar.getInstance(tz).apply { timeInMillis = millis }.get(Calendar.YEAR)
 }

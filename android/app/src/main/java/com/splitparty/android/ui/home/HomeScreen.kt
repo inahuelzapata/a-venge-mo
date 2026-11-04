@@ -1,5 +1,6 @@
 package com.splitparty.android.ui.home
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,124 +23,62 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.splitparty.android.R
-import com.splitparty.android.data.LiveEvent
-import com.splitparty.android.data.NetworkMonitor
-import com.splitparty.android.data.SplitPartyRepository
-import com.splitparty.android.data.Transaction
-import com.splitparty.android.data.User
-import com.splitparty.android.data.Username
-import com.splitparty.android.ui.LiveState
+import com.splitparty.android.domain.live.LiveState
+import com.splitparty.android.domain.live.OFFLINE_MESSAGE
 import com.splitparty.android.ui.components.FeedRow
 import com.splitparty.android.ui.components.InitialBadge
 import com.splitparty.android.ui.components.LoadingCard
 import com.splitparty.android.ui.components.MessageCard
+import com.splitparty.android.ui.components.PreviewData
 import com.splitparty.android.ui.components.UnreachableCard
 import com.splitparty.android.ui.components.rememberNow
 import com.splitparty.android.ui.theme.Brand
-import com.splitparty.android.ui.toLiveState
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-
-class HomeViewModel(repository: SplitPartyRepository, network: NetworkMonitor) : ViewModel() {
-    val users: StateFlow<Map<String, User>> = repository.users()
-        .filterIsInstance<LiveEvent.Data<Map<String, User>>>()
-        .map { it.value }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
-
-    private val _highlighted = MutableStateFlow<Set<String>>(emptySet())
-    /** Ids of rows that just arrived; each stays here briefly, then its highlight fades. */
-    val highlighted: StateFlow<Set<String>> = _highlighted.asStateFlow()
-    private var knownIds: Set<String>? = null
-
-    // Eagerly: the listener stays on while another tab is open, so rows that
-    // arrive meanwhile are already there (and highlighted) on return.
-    val feed: StateFlow<LiveState<List<Transaction>>> = repository.feed()
-        .toLiveState(network.isOnline)
-        .onEach(::markNewRows)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, LiveState.Loading)
-
-    private fun markNewRows(state: LiveState<List<Transaction>>) {
-        if (state !is LiveState.Ready) return
-        val ids = state.value.mapTo(HashSet()) { it.id }
-        val previous = knownIds
-        knownIds = ids
-        if (previous == null) return // first load: nothing is "new"
-        val fresh = ids - previous
-        if (fresh.isEmpty()) return
-        _highlighted.update { it + fresh }
-        viewModelScope.launch {
-            delay(HIGHLIGHT_HOLD_MS)
-            _highlighted.update { it - fresh }
-        }
-    }
-
-    private companion object {
-        const val HIGHLIGHT_HOLD_MS = 900L
-    }
-}
-
+import com.splitparty.android.ui.theme.SplitPartyTheme
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.collections.immutable.toImmutableList
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 @Composable
-fun HomeRoute(userId: String, repository: SplitPartyRepository, network: NetworkMonitor, contentPadding: PaddingValues) {
-    val viewModel: HomeViewModel = viewModel(factory = viewModelFactory {
-        initializer { HomeViewModel(repository, network) }
-    })
-    val feed by viewModel.feed.collectAsStateWithLifecycle()
-    val users by viewModel.users.collectAsStateWithLifecycle()
-    val highlighted by viewModel.highlighted.collectAsStateWithLifecycle()
-    HomeScreen(
-        currentUserName = users[userId]?.displayName ?: Username.fallbackName(userId),
-        feed = feed,
-        users = users,
-        highlighted = highlighted,
-        contentPadding = contentPadding,
-    )
-}
-
-@Composable
-fun HomeScreen(
-    currentUserName: String,
-    feed: LiveState<List<Transaction>>,
-    users: Map<String, User>,
-    highlighted: Set<String>,
+fun HomeRoute(
+    userId: String,
     contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = koinViewModel { parametersOf(userId) }
 ) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    HomeScreen(state = state, contentPadding = contentPadding, modifier = modifier)
+}
+
+@Composable
+fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modifier = Modifier) {
     val now = rememberNow()
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().testTag(HomeTestTags.FEED),
         contentPadding = PaddingValues(
             start = 12.dp,
             end = 12.dp,
             top = top + 8.dp,
-            bottom = contentPadding.calculateBottomPadding(),
+            bottom = contentPadding.calculateBottomPadding()
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // The header is the first item, so while it is visible a new row is
         // inserted below it and stays on screen.
-        item(key = "header") { HomeHeader(currentUserName) }
+        item(key = "header") { HomeHeader(state.currentUserName) }
         item(key = "banner-slot") { BannerSlot() }
-        when (feed) {
+        when (val feed = state.feed) {
             LiveState.Loading -> item(key = "loading") { LoadingCard() }
+
             is LiveState.Unreachable -> item(key = "error") { UnreachableCard(feed.message) }
+
             is LiveState.Ready ->
                 if (feed.value.isEmpty()) {
                     item(key = "empty") {
@@ -149,10 +88,10 @@ fun HomeScreen(
                     items(feed.value, key = { it.id }) { transaction ->
                         FeedRow(
                             transaction = transaction,
-                            users = users,
+                            users = state.users,
                             nowMillis = now,
-                            highlighted = transaction.id in highlighted,
-                            modifier = Modifier.animateItem(),
+                            highlighted = transaction.id in state.highlighted,
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -160,26 +99,30 @@ fun HomeScreen(
     }
 }
 
+object HomeTestTags {
+    const val FEED = "home_feed"
+}
+
 /** Initial badge on the left, search/QR pill on the right (decorative), as in the reference. */
 @Composable
-private fun HomeHeader(currentUserName: String) {
+private fun HomeHeader(currentUserName: String, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         InitialBadge(currentUserName)
         Spacer(Modifier.weight(1f))
         Surface(
             shape = RoundedCornerShape(50),
             color = Brand.Card,
-            border = BorderStroke(1.dp, Brand.Outline),
+            border = BorderStroke(1.dp, Brand.Outline)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(22.dp),
+                horizontalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                Icon(painterResource(R.drawable.ic_search), contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
-                Icon(painterResource(R.drawable.ic_qr_code), contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
+                HeaderIcon(R.drawable.ic_search)
+                HeaderIcon(R.drawable.ic_qr_code)
             }
         }
     }
@@ -190,6 +133,43 @@ private fun HomeHeader(currentUserName: String) {
  * later slices place here. Empty in this slice.
  */
 @Composable
-private fun BannerSlot() {
-    Box(Modifier.fillMaxWidth())
+private fun BannerSlot(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth())
+}
+
+@Composable
+private fun HeaderIcon(@DrawableRes icon: Int, modifier: Modifier = Modifier) {
+    Icon(painterResource(icon), contentDescription = null, tint = Brand.Ink, modifier = modifier.size(26.dp))
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFF2F3F5)
+@Composable
+private fun HomeScreenLoadedPreview() {
+    SplitPartyTheme {
+        HomeScreen(
+            HomeUiState(
+                currentUserName = "Maxi",
+                feed = LiveState.Ready(PreviewData.transactions.toImmutableList()),
+                users = PreviewData.users,
+                highlighted = persistentSetOf(PreviewData.transactions.first().id)
+            ),
+            contentPadding = PaddingValues()
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFF2F3F5)
+@Composable
+private fun HomeScreenEmptyPreview() {
+    SplitPartyTheme {
+        HomeScreen(HomeUiState("Maxi", feed = LiveState.Ready(persistentListOf())), contentPadding = PaddingValues())
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFF2F3F5)
+@Composable
+private fun HomeScreenOfflinePreview() {
+    SplitPartyTheme {
+        HomeScreen(HomeUiState("Maxi", feed = LiveState.Unreachable(OFFLINE_MESSAGE)), contentPadding = PaddingValues())
+    }
 }
