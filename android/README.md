@@ -1,56 +1,103 @@
 # android — Split Party Android app
 
-Native Kotlin + Jetpack Compose app, minimum API 26. Self-contained: the
-Gradle build references nothing outside this folder. It implements the data
-contract in [`docs/firestore-schema.md`](../docs/firestore-schema.md) (linked,
-never copied).
+Native Kotlin + Jetpack Compose app, minimum API 26 (Android 8.0). Self-contained:
+the Gradle build references nothing outside this folder. It reads exactly the
+collections and fields in [`docs/firestore-schema.md`](../docs/firestore-schema.md)
+(linked, never copied).
 
-Today it shows a placeholder screen with the configured Firestore target. The
-app-shell Work Order builds on this project.
+What it does today (PoC-1 to PoC-6):
 
-## Layout
+- **Login**: one username field, no password. `maxi`, `annie` and `christophe`
+  sign in (case and surrounding spaces are ignored); anything else shows an
+  inline error. The phone stays signed in across restarts until **Log out** on Me.
+- **Home**: the live feed (`transactions`, newest first, all users). New rows
+  appear at the top with a short fading highlight. Shows an empty state, and an
+  error state when the database can't be reached (it recovers by itself). A
+  banner slot above the feed is reserved for the merchant/Join banners.
+- **Me**: display name, avatar, live mock balance and the user's own payments.
+- **Pay/Request**: placeholder tab.
 
-| Path | What |
-| ---- | ---- |
-| `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml` | Gradle setup and version catalog |
-| `app/` | The app module (`com.splitparty.android`) |
-| `firestore.properties.example` | Template for your git-ignored `firestore.properties` |
+The look follows the reference screenshots in
+[`docs/design/`](../docs/design) (shared with the iOS app).
 
-## Run on a physical Android phone (API 26+)
+## Run it on a phone, step by step
 
-Requires Android Studio (or a JDK 17+ and the Android SDK with platform 35).
+You need Android Studio (it includes the SDK), or a **JDK 17–21** plus the
+Android SDK. Gradle 8.11 does not run on JDK 22+; if `./gradlew` fails with a
+bare version number such as `25.0.4`, point `JAVA_HOME` at a JDK 21 (for example
+`/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`).
 
-1. `cp firestore.properties.example firestore.properties` and set the target
-   (below).
-2. Enable USB debugging on the phone and connect it.
-3. Open **this `android/` folder** in Android Studio, select the phone, press
-   Run. Or from a terminal: `./gradlew installDebug` (needs `ANDROID_HOME` or
-   a `local.properties` with `sdk.dir`; Android Studio writes that for you).
+1. **Choose the database** (next section): `cp firestore.properties.example firestore.properties`
+   and edit it.
+2. **Start that database with data in it.** For the emulator, run from
+   [`backend/`](../backend): `npm run emulators`, then `npm run seed` in another
+   terminal. For hosted, seed it as the backend README says.
+3. **Connect the phone**: enable Developer options → USB debugging, plug it in,
+   accept the prompt. For the emulator target the phone must be on the **same
+   Wi-Fi** as the laptop.
+4. **Install**: open **this `android/` folder** in Android Studio, select the
+   phone, press Run. Or from a terminal in `android/`: `./gradlew installDebug`
+   (needs `ANDROID_HOME`, or a `local.properties` with `sdk.dir`; Android Studio
+   writes that file for you).
+5. Open **Split Party** and sign in as `maxi`, `annie` or `christophe`. The login
+   screen shows which database the build points at.
 
-Without `firestore.properties` the app still builds; the screen says the
-target is not configured.
+Building leaves `git status` clean: `firestore.properties`, `local.properties`,
+`google-services.json` and build output are git-ignored.
 
 ## Firestore target: the one place to switch
 
-`android/firestore.properties` (git-ignored):
+`android/firestore.properties` (git-ignored). Same keys as iOS and
+`backend/.env`; see [Firestore target](../docs/firestore-target.md).
+
+**Emulator** (started from `backend/`):
 
 ```
-FIREBASE_TARGET=emulator                  # or hosted
-FIREBASE_PROJECT_ID=demo-split-party      # or your hosted project id
-FIRESTORE_EMULATOR_HOST=192.168.1.20:8080 # laptop LAN IP; empty for hosted
+FIREBASE_TARGET=emulator
+FIREBASE_PROJECT_ID=demo-split-party      # must match backend/.env
+FIRESTORE_EMULATOR_HOST=192.168.1.20:8080 # laptop LAN IP: ipconfig getifaddr en0
 ```
 
-Rebuild after changing it. The values end up in `BuildConfig`; code reads them
-via `FirestoreTarget.fromBuildConfig()`. Debug builds allow cleartext traffic
-so the phone can reach the emulator. The keys and the demo setup are the same
-as iOS and the backend: see [Firestore target](../docs/firestore-target.md).
-The emulator itself is started from [`backend/`](../backend); this app never
-runs its own.
+A physical phone can't use `127.0.0.1`. An Android Studio emulator (AVD) reaches
+the laptop at `10.0.2.2:8080`. Debug builds allow cleartext HTTP so the phone can
+talk to the emulator. **No `google-services.json` is needed** for this target.
 
-## Firebase config file
+**Hosted**:
 
-`google-services.json` is **not committed**. Download it from the Firebase
+```
+FIREBASE_TARGET=hosted
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIRESTORE_EMULATOR_HOST=
+```
+
+Hosted needs `app/google-services.json` **from that same project** (below), and
+the composite index from `backend/firestore.indexes.json` deployed (the Me tab
+query uses it).
+
+**Rebuild and reinstall after any change** (the values are compiled into
+`BuildConfig`). No code change is needed to switch. If something is missing or
+inconsistent (no target, an emulator target with no host, hosted with no
+`google-services.json`, or a config file from a different project), the app
+opens on a **Setup required** screen that says what to fix.
+
+## Firebase config file (hosted only)
+
+`google-services.json` is **never committed**. Download it from the Firebase
 console (Android app `com.splitparty.android`) and put it at
-`app/google-services.json`. Steps:
-[`app/GoogleServices.README.md`](app/GoogleServices.README.md). Until it is
-there, the placeholder screen shows a warning.
+`app/google-services.json`: see [`app/GoogleServices.README.md`](app/GoogleServices.README.md).
+The Google Services Gradle plugin is applied only when that file exists, so
+builds without it still work.
+
+## Code map
+
+| Path (under `app/src/main/java/com/splitparty/android/`) | What |
+| ---- | ---- |
+| `FirestoreTarget.kt`, `data/FirebaseSetup.kt` | Reads `BuildConfig`, connects to the emulator or hosted project |
+| `data/Repository.kt`, `data/Models.kt` | Schema queries (feed, Me, users) as live Flows; money as `Long` cents |
+| `data/SessionStore.kt` | Signed-in username in DataStore |
+| `data/NetworkMonitor.kt`, `ui/LiveState.kt` | Offline/unreachable detection for the error states |
+| `ui/MainShell.kt` | Bottom bar and tab navigation (back from a tab returns to Home) |
+| `ui/home`, `ui/me`, `ui/pay`, `ui/login`, `ui/components` | Screens and the shared feed row |
+| `format/` | Integer-cents money formatting, relative times |
+
+Unit tests: `./gradlew testDebugUnitTest`.

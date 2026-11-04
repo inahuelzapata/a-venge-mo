@@ -3,73 +3,97 @@ package com.splitparty.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.splitparty.android.data.FirebaseConnection
+import com.splitparty.android.data.SessionStore
+import com.splitparty.android.data.SplitPartyRepository
+import com.splitparty.android.ui.MainShell
+import com.splitparty.android.ui.SetupRequiredScreen
+import com.splitparty.android.ui.login.LoginScreen
+import com.splitparty.android.ui.login.LoginViewModel
+import com.splitparty.android.ui.theme.Brand
+import com.splitparty.android.ui.theme.SplitPartyTheme
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        val container = (application as SplitPartyApplication).container
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    PlaceholderScreen(
-                        target = FirestoreTarget.fromBuildConfig(),
-                        hasFirebaseConfigFile = BuildConfig.HAS_GOOGLE_SERVICES_JSON,
-                    )
+            SplitPartyTheme {
+                Box(Modifier.fillMaxSize().background(Brand.Page)) {
+                    Root(container)
                 }
             }
         }
     }
 }
 
-private val warningColor = Color(0xFFE65100)
+sealed interface SessionState {
+    data object Restoring : SessionState
+    data object SignedOut : SessionState
+    data class SignedIn(val userId: String) : SessionState
+}
+
+class SessionViewModel(private val session: SessionStore) : ViewModel() {
+    val state: StateFlow<SessionState> = session.signedInUserId
+        .map { id -> if (id == null) SessionState.SignedOut else SessionState.SignedIn(id) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SessionState.Restoring)
+
+    fun logOut() {
+        viewModelScope.launch { session.signOut() }
+    }
+}
 
 /**
- * Temporary first screen. The app-shell Work Order replaces it with the real
- * navigation; it exists so the project builds and runs on a device, and so a
- * missing local setup step is visible instead of silent.
+ * Picks setup / login / signed-in shell. Login is never on the navigation back
+ * stack, so system back from Home cannot return to it while signed in.
  */
 @Composable
-fun PlaceholderScreen(target: FirestoreTarget, hasFirebaseConfigFile: Boolean) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("🎉", fontSize = 64.sp)
-        Text("Split Party", style = MaterialTheme.typography.headlineLarge)
-        Text("Android placeholder", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Card {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(target.summary)
-                if (target is FirestoreTarget.NotConfigured) {
-                    Text(target.reason, color = warningColor, style = MaterialTheme.typography.bodySmall)
-                }
-                if (!hasFirebaseConfigFile) {
-                    Text("google-services.json missing (see android/README.md)", color = warningColor)
-                }
-            }
-        }
+private fun Root(container: AppContainer) {
+    val connection = container.connection
+    if (connection is FirebaseConnection.SetupRequired) {
+        SetupRequiredScreen(connection.target, connection.problems)
+        return
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PlaceholderScreenPreview() {
-    MaterialTheme {
-        PlaceholderScreen(FirestoreTarget.Emulator("demo-split-party", "192.168.1.20:8080"), hasFirebaseConfigFile = false)
+    val repository: SplitPartyRepository = container.repository!!
+    val sessionViewModel: SessionViewModel = viewModel(factory = viewModelFactory {
+        initializer { SessionViewModel(container.session) }
+    })
+    val state by sessionViewModel.state.collectAsStateWithLifecycle()
+    when (val s = state) {
+        SessionState.Restoring -> Unit // DataStore answers in a few ms; keep the page background meanwhile.
+        SessionState.SignedOut -> {
+            val loginViewModel: LoginViewModel = viewModel(factory = viewModelFactory {
+                initializer { LoginViewModel(repository, container.session) }
+            })
+            LoginScreen(loginViewModel, connection.target.summary)
+        }
+        is SessionState.SignedIn -> key(s.userId) {
+            MainShell(
+                userId = s.userId,
+                repository = repository,
+                network = container.network,
+                onLogOut = sessionViewModel::logOut,
+            )
+        }
     }
 }

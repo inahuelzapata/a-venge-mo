@@ -6,6 +6,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// google-services.json is git-ignored. When it is present the plugin turns it
+// into resources (the hosted target needs it); without it the build still works
+// and the emulator target runs with placeholder Firebase options.
+val hasGoogleServicesJson = file("google-services.json").exists()
+if (hasGoogleServicesJson) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Firestore target: the ONE place to switch is android/firestore.properties
 // (git-ignored; copy firestore.properties.example). Missing file or keys become
 // empty strings, and the app shows "not configured" instead of guessing.
@@ -32,8 +40,6 @@ android {
         buildConfigField("String", "FIREBASE_TARGET", firestoreSetting("FIREBASE_TARGET"))
         buildConfigField("String", "FIREBASE_PROJECT_ID", firestoreSetting("FIREBASE_PROJECT_ID"))
         buildConfigField("String", "FIRESTORE_EMULATOR_HOST", firestoreSetting("FIRESTORE_EMULATOR_HOST"))
-        // Lets the placeholder screen say when the Firebase config file was not added.
-        buildConfigField("boolean", "HAS_GOOGLE_SERVICES_JSON", file("google-services.json").exists().toString())
     }
 
     buildTypes {
@@ -61,5 +67,14 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
 }

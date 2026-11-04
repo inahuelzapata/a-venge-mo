@@ -5,10 +5,11 @@
 # --- Local emulator started from backend/ (npm run emulators) ---------------
 FIREBASE_TARGET=emulator
 FIREBASE_PROJECT_ID=demo-split-party
-# A physical phone cannot use 127.0.0.1: use the laptop's LAN IP.
+# A physical phone cannot use 127.0.0.1: use the laptop's LAN IP
+# (ipconfig getifaddr en0). An Android Studio emulator (AVD) uses 10.0.2.2:8080.
 FIRESTORE_EMULATOR_HOST=192.168.1.20:8080
 
-# --- Hosted Firestore -------------------------------------------------------
+# --- Hosted Firestore (also needs app/google-services.json) ------------------
 # FIREBASE_TARGET=hosted
 # FIREBASE_PROJECT_ID=your-firebase-project-id
 # FIRESTORE_EMULATOR_HOST=
