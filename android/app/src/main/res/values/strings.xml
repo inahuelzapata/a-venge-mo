@@ -1,11 +1,47 @@
 <resources>
     <string name="app_name">A-venge-mo</string>
 
-    <!-- Split Party entry card on Home and its placeholder screen -->
+    <!-- Split Party entry card on Home -->
     <string name="split_party_banner_description">Split the check with friends. A faster, easier way to take care of the bill.</string>
     <string name="split_party_start">Start a party</string>
-    <string name="split_party_title">Split Party</string>
-    <string name="split_party_in_progress_title">In progress</string>
-    <string name="split_party_in_progress">Splitting the check is in progress. Starting a party will open here soon.</string>
     <string name="back">Back</string>
+
+    <!-- Demo switch on Me (stands in for the geofence) -->
+    <string name="demo_at_merchant">Demo mode: at Tony\'s</string>
+    <string name="demo_at_merchant_hint">Shows Tony\'s card on Home as if you were there.</string>
+
+    <!-- Home banner slot -->
+    <string name="start_party_failed">Couldn\'t start the party. Check your connection and try again.</string>
+    <string name="join_banner_title">%1$s started a Split Party at %2$s</string>
+    <string name="join_banner_subtitle">Tap Join and confirm the code on their phone.</string>
+    <string name="join">Join</string>
+    <string name="back_to_party_title">You\'re in a Split Party at %1$s</string>
+    <string name="back_to_party_action">Back to your party</string>
+
+    <!-- Party screen -->
+    <string name="party_title">Split Party at %1$s</string>
+    <string name="party_code_label">Party code</string>
+    <string name="party_code_description">Party code: %1$s</string>
+    <string name="party_expires_in">Expires in %1$s</string>
+    <string name="party_members">Members</string>
+    <string name="party_host_badge">Host</string>
+    <string name="party_member_host_description">%1$s, host</string>
+    <string name="party_empty_seat">Waiting for a friend</string>
+    <string name="party_waiting_for_total">Waiting for the total</string>
+    <string name="party_waiting_for_total_hint">The host enters the bill and tip here.</string>
+    <string name="party_reconnecting">Reconnecting…</string>
+    <string name="party_expired_title">This party has expired</string>
+    <string name="party_expired_body">Nothing was charged. Start a new party from Home.</string>
+    <string name="party_settled_title">This party is settled</string>
+    <string name="party_back_home">Back to Home</string>
+    <string name="party_not_found">This party is no longer available.</string>
+
+    <!-- Code confirmation -->
+    <string name="join_title">Join %1$s\'s party</string>
+    <string name="join_prompt">Pick the code shown on %1$s\'s phone.</string>
+    <string name="join_wrong">That\'s not the code. Try again.</string>
+    <string name="join_locked_title">Too many wrong codes</string>
+    <string name="join_locked_body">You can\'t join %1$s\'s party after three wrong picks. Ask them to start a new one.</string>
+    <string name="join_failed">Couldn\'t join. Check your connection and try again.</string>
+    <string name="join_unavailable">This party is no longer open.</string>
 </resources>

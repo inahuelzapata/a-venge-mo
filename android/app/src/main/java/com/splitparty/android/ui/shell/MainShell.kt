@@ -46,11 +46,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.splitparty.android.R
 import com.splitparty.android.ui.components.BrandMark
 import com.splitparty.android.ui.home.HomeRoute
+import com.splitparty.android.ui.join.JoinRoute
 import com.splitparty.android.ui.me.MeRoute
-import com.splitparty.android.ui.party.SplitPartyPlaceholderScreen
+import com.splitparty.android.ui.party.PartyRoute
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
@@ -83,17 +85,38 @@ fun MainShell(userId: String, modifier: Modifier = Modifier) {
             popExitTransition = { ExitTransition.None }
         ) {
             composable<HomeDestination> {
-                HomeRoute(userId, contentPadding, onStartParty = {
-                    navController.navigate(SplitPartyDestination) { launchSingleTop = true }
-                })
+                HomeRoute(
+                    userId,
+                    contentPadding,
+                    onOpenParty = navController::openParty,
+                    onJoin = { partyId -> navController.navigate(JoinDestination(partyId)) { launchSingleTop = true } }
+                )
             }
             // Forward from Home, so system back pops to Home with its scroll intact.
-            composable<SplitPartyDestination> {
-                SplitPartyPlaceholderScreen(contentPadding, onBack = { navController.popBackStack(HomeDestination, inclusive = false) })
+            composable<PartyDestination> { entry ->
+                val partyId = entry.toRoute<PartyDestination>().partyId
+                PartyRoute(partyId, userId, contentPadding, onHome = navController::backToHome)
+            }
+            composable<JoinDestination> { entry ->
+                val partyId = entry.toRoute<JoinDestination>().partyId
+                JoinRoute(partyId, userId, contentPadding, onOpenParty = navController::openParty, onHome = navController::backToHome)
             }
             composable<PayDestination> { PayRequestScreen(contentPadding) }
             composable<MeDestination> { MeRoute(userId, contentPadding) }
         }
+    }
+}
+
+/** Back to Home from a screen pushed over it (never further: login is not in this graph). */
+private fun NavHostController.backToHome() {
+    popBackStack(HomeDestination, inclusive = false)
+}
+
+/** The party screen sits directly on Home: opening it from the confirmation screen replaces that screen. */
+private fun NavHostController.openParty(partyId: String) {
+    navigate(PartyDestination(partyId)) {
+        popUpTo(HomeDestination) { inclusive = false }
+        launchSingleTop = true
     }
 }
 

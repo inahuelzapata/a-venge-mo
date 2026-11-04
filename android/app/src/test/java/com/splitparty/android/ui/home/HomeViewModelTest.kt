@@ -5,6 +5,8 @@ import com.splitparty.android.domain.live.OFFLINE_MESSAGE
 import com.splitparty.android.domain.usecase.ObserveFeedUseCase
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.testing.FakeConnectivityObserver
+import com.splitparty.android.testing.FakeDemoSettingsRepository
+import com.splitparty.android.testing.FakePartyRepository
 import com.splitparty.android.testing.FakeSplitPartyRepository
 import com.splitparty.android.testing.MainDispatcherRule
 import com.splitparty.android.testing.TestData
@@ -24,13 +26,20 @@ class HomeViewModelTest {
 
     private val repository = FakeSplitPartyRepository()
     private val connectivity = FakeConnectivityObserver()
+    private val parties = FakePartyRepository()
+    private val demoSettings = FakeDemoSettingsRepository()
+    private var now = 1_000L
 
     // Lazy: built inside the test, after MainDispatcherRule has replaced Dispatchers.Main.
     private val viewModel by lazy {
         HomeViewModel(
             userId = "maxi",
             observeFeed = ObserveFeedUseCase(repository, connectivity),
-            observeUsers = ObserveUsersUseCase(repository)
+            observeUsers = ObserveUsersUseCase(repository),
+            parties = parties,
+            demoSettings = demoSettings,
+            connectivity = connectivity,
+            clock = { now }
         )
     }
 

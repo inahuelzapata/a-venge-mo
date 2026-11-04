@@ -2,10 +2,18 @@ package com.splitparty.android.domain.model
 
 /**
  * Domain shapes of the documents in docs/firestore-schema.md. Only the fields
- * this slice needs; nothing is written from them. Money is always a Long number
+ * the app reads. Money is always a Long number
  * of cents, never a floating-point value.
  */
-data class User(val id: String, val username: String, val displayName: String, val avatar: String, val balanceCents: Long)
+data class User(
+    val id: String,
+    val username: String,
+    val displayName: String,
+    val avatar: String,
+    val balanceCents: Long,
+    /** Mutual friends; a Join banner only shows parties hosted by one of them. */
+    val friendIds: List<String> = emptyList()
+)
 
 data class Transaction(
     val id: String,

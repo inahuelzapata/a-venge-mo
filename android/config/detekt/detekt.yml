@@ -35,4 +35,5 @@ Compose:
   CompositionLocalAllowlist:
     active: true
     # Screenshot tests shrink the reference-iPhone minimum insets (ui/theme/SplitPartyTheme.kt).
-    allowedCompositionLocals: ['LocalMinimumInsets']
+    # LocalReduceMotion: the system animator scale; snapshots set it to render settled frames (ui/theme/Motion.kt).
+    allowedCompositionLocals: ['LocalMinimumInsets', 'LocalReduceMotion']

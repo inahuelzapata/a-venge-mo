@@ -1,24 +1,31 @@
 package com.splitparty.android.ui.me
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,6 +35,7 @@ import com.splitparty.android.format.Money
 import com.splitparty.android.ui.components.Avatar
 import com.splitparty.android.ui.components.EmptyCard
 import com.splitparty.android.ui.components.FeedRow
+import com.splitparty.android.ui.components.IosSwitch
 import com.splitparty.android.ui.components.LoadingCard
 import com.splitparty.android.ui.components.MessageCard
 import com.splitparty.android.ui.components.PillButton
@@ -84,6 +92,13 @@ fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeActio
             ProfileCard(state.displayName, state.userId, state.avatar, balance, onLogOut = { onAction(MeAction.LogOut) })
             Spacer(Modifier.height(extra))
         }
+        item(key = "demo") {
+            DemoSwitchCard(
+                on = state.demoAtMerchant ?: true,
+                onChange = { onAction(MeAction.SetDemoAtMerchant(it)) }
+            )
+            Spacer(Modifier.height(extra))
+        }
         val profile = state.profile
         if (profile is LiveState.Ready && profile.value == null) {
             item(key = "account-missing") {
@@ -125,6 +140,38 @@ fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeActio
 
 object MeTestTags {
     const val LIST = "me_list"
+    const val DEMO_SWITCH = "me_demo_switch"
+}
+
+/**
+ * The demo stand-in for the geofence (PoC-7): on, Home shows Tony's card as if
+ * the phone were at the venue. A white card row with an iOS-style switch.
+ */
+@Composable
+private fun DemoSwitchCard(on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .padding(horizontal = Dimens.Gutter)
+            .fillMaxWidth()
+            .background(Brand.Card, RoundedCornerShape(Dimens.CardRadius))
+            .toggleable(
+                value = on,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Switch,
+                onValueChange = onChange
+            )
+            .padding(horizontal = Dimens.CardPadding, vertical = 16.dp)
+            .testTag(MeTestTags.DEMO_SWITCH),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.demo_at_merchant), style = Type.Amount, color = Brand.Ink)
+            Text(stringResource(R.string.demo_at_merchant_hint), style = Type.Body, color = Brand.InkSecondary)
+        }
+        Spacer(Modifier.width(12.dp))
+        IosSwitch(on = on)
+    }
 }
 
 /** Placeholder dash until the user document has loaded (or while it can't be read), as on iOS. */

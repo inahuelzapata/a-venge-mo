@@ -13,16 +13,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.splitparty.android.domain.live.LiveState
 import com.splitparty.android.domain.live.OFFLINE_MESSAGE
+import com.splitparty.android.domain.model.DemoMerchant
+import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyMember
+import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
+import com.splitparty.android.domain.party.BannerSlot
 import com.splitparty.android.ui.home.HomeScreen
 import com.splitparty.android.ui.home.HomeUiState
+import com.splitparty.android.ui.join.JoinPhase
+import com.splitparty.android.ui.join.JoinScreen
+import com.splitparty.android.ui.join.JoinUiState
 import com.splitparty.android.ui.login.LoginScreen
 import com.splitparty.android.ui.login.LoginUiState
 import com.splitparty.android.ui.login.LoginViewModel
 import com.splitparty.android.ui.me.MeScreen
 import com.splitparty.android.ui.me.MeUiState
-import com.splitparty.android.ui.party.SplitPartyPlaceholderScreen
+import com.splitparty.android.ui.party.MemberUi
+import com.splitparty.android.ui.party.PartyPhase
+import com.splitparty.android.ui.party.PartyScreen
+import com.splitparty.android.ui.party.PartyUiState
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.shell.ShellFrame
 import com.splitparty.android.ui.shell.Tab
@@ -107,9 +118,72 @@ class ParityScreenshotTest {
     @Test
     fun payRequest() = shell("pay-request", Tab.Pay) { PayRequestScreen(it) }
 
-    /** Pushed over Home, so the bar shows Home selected. */
+    // Split Party (PoC-7..9). No iOS captures yet: compare.py pairs these once
+    // join-banner.png etc. land in docs/design/ios-captures/.
+    private val anniesParty = Party(
+        "p1", "annie", DemoMerchant.ID, listOf("🍕", "🍺", "🎉"), PartyStatus.Open, 0L, Party.TTL_MILLIS,
+        listOf(PartyMember("annie", 0L, false)), emptyMap()
+    )
+
     @Test
-    fun splitPartyPlaceholder() = shell("split-party-placeholder", Tab.Home) { SplitPartyPlaceholderScreen(it, onBack = {}) }
+    fun joinBanner() = shell("join-banner", Tab.Home) {
+        HomeScreen(home(Fixture.feed).copy(bannerSlot = BannerSlot.Join(anniesParty)), contentPadding = it)
+    }
+
+    @Test
+    fun homeDemoOff() = shell("home-demo-off", Tab.Home) {
+        HomeScreen(home(Fixture.feed).copy(bannerSlot = BannerSlot.None), contentPadding = it)
+    }
+
+    @Test
+    fun joinConfirm() = shell("join-confirm", Tab.Home) {
+        JoinScreen(
+            JoinUiState(
+                phase = JoinPhase.Choosing,
+                hostName = "Annie",
+                options = persistentListOf(
+                    persistentListOf("🌮", "🔥", "🐶"),
+                    persistentListOf("🍕", "🍺", "🎉"),
+                    persistentListOf("🍣", "🍺", "🚀"),
+                    persistentListOf("🎸", "🍩", "🌵")
+                )
+            ),
+            contentPadding = it,
+            onPick = {},
+            onBack = {}
+        )
+    }
+
+    private val partyOpen = PartyUiState(
+        phase = PartyPhase.Open,
+        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        members = persistentListOf(MemberUi("annie", "Annie", "avatar_annie", isHost = true)),
+        millisLeft = Party.TTL_MILLIS
+    )
+
+    @Test
+    fun partyOneMember() = shell("party-one-member", Tab.Home) { PartyScreen(partyOpen, it, onBack = {}) }
+
+    @Test
+    fun partyThreeMembers() = shell("party-three-members", Tab.Home) {
+        PartyScreen(
+            partyOpen.copy(
+                members = persistentListOf(
+                    MemberUi("annie", "Annie", "avatar_annie", isHost = true),
+                    MemberUi("maxi", "Maxi", "avatar_maxi", isHost = false),
+                    MemberUi("christophe", "Christophe", "avatar_christophe", isHost = false)
+                ),
+                millisLeft = 241_000
+            ),
+            it,
+            onBack = {}
+        )
+    }
+
+    @Test
+    fun partyExpired() = shell("party-expired", Tab.Home) {
+        PartyScreen(partyOpen.copy(phase = PartyPhase.Expired, millisLeft = 0), it, onBack = {})
+    }
 
     private fun home(rows: List<Transaction>) = HomeUiState(
         currentUserName = "Maxi",
