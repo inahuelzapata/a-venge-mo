@@ -22,10 +22,20 @@ The look follows the reference screenshots in
 
 ## Run it on a phone, step by step
 
-You need Android Studio (it includes the SDK), or a **JDK 17–21** plus the
-Android SDK. Gradle 8.11 does not run on JDK 22+; if `./gradlew` fails with a
-bare version number such as `25.0.4`, point `JAVA_HOME` at a JDK 21 (for example
-`/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`).
+You need a recent Android Studio (it includes the SDK and a Java 25 runtime), or
+any JDK 17+ plus the Android SDK (platform 37) for terminal builds.
+
+The build runs on **Java 25**, pinned in `gradle/gradle-daemon-jvm.properties`
+(Gradle Daemon JVM criteria). Android Studio and `./gradlew` both read it: Gradle
+uses an installed Java 25 or downloads one into `~/.gradle/jdks` on the first
+build, so there is no Gradle JDK setting to pick by hand. The JDK that *starts*
+`./gradlew` only needs to be 17+ (Android Studio's bundled one works:
+`export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`).
+The app itself is compiled to Java 21 bytecode; that is what runs on phones.
+
+Toolchain: Gradle 9.8.2, Android Gradle Plugin 9.5 with built-in Kotlin 2.4,
+compile/target SDK 37. To move the JVM later, run
+`./gradlew updateDaemonJvm --jvm-version=<N>` and commit the file it rewrites.
 
 1. **Choose the database** (next section): `cp firestore.properties.example firestore.properties`
    and edit it.
@@ -40,7 +50,9 @@ bare version number such as `25.0.4`, point `JAVA_HOME` at a JDK 21 (for example
    (needs `ANDROID_HOME`, or a `local.properties` with `sdk.dir`; Android Studio
    writes that file for you).
 5. Open **Split Party** and sign in as `maxi`, `annie` or `christophe`. The login
-   screen shows which database the build points at.
+   screen shows which database the build points at. On **Android 17+** with the
+   emulator target, the app first asks to **allow local network** (shown by the
+   system as "nearby devices"): tap Allow, or the phone can't reach the laptop.
 
 Building leaves `git status` clean: `firestore.properties`, `local.properties`,
 `google-services.json` and build output are git-ignored.
@@ -99,5 +111,6 @@ builds without it still work.
 | `ui/MainShell.kt` | Bottom bar and tab navigation (back from a tab returns to Home) |
 | `ui/home`, `ui/me`, `ui/pay`, `ui/login`, `ui/components` | Screens and the shared feed row |
 | `format/` | Integer-cents money formatting, relative times |
+| `app/src/main/res/drawable/ic_*.xml` | Material icons as local vectors (the Compose icon packs are discontinued) |
 
 Unit tests: `./gradlew testDebugUnitTest`.

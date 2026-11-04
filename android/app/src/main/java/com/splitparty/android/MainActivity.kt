@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.splitparty.android.data.FirebaseConnection
 import com.splitparty.android.data.SessionStore
 import com.splitparty.android.data.SplitPartyRepository
+import com.splitparty.android.ui.LocalNetworkGate
 import com.splitparty.android.ui.MainShell
 import com.splitparty.android.ui.SetupRequiredScreen
 import com.splitparty.android.ui.login.LoginScreen
@@ -74,6 +75,11 @@ private fun Root(container: AppContainer) {
         SetupRequiredScreen(connection.target, connection.problems)
         return
     }
+    LocalNetworkGate(connection.target) { SignedInOrLogin(container, connection) }
+}
+
+@Composable
+private fun SignedInOrLogin(container: AppContainer, connection: FirebaseConnection) {
     val repository: SplitPartyRepository = container.repository!!
     val sessionViewModel: SessionViewModel = viewModel(factory = viewModelFactory {
         initializer { SessionViewModel(container.session) }

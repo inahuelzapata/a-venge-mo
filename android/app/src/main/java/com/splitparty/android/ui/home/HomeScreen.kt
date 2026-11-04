@@ -16,15 +16,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.QrCode2
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +30,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.splitparty.android.R
 import com.splitparty.android.data.LiveEvent
 import com.splitparty.android.data.NetworkMonitor
 import com.splitparty.android.data.SplitPartyRepository
@@ -179,8 +178,8 @@ private fun HomeHeader(currentUserName: String) {
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(22.dp),
             ) {
-                Icon(Icons.Outlined.Search, contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
-                Icon(Icons.Outlined.QrCode2, contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
+                Icon(painterResource(R.drawable.ic_search), contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
+                Icon(painterResource(R.drawable.ic_qr_code), contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
             }
         }
     }

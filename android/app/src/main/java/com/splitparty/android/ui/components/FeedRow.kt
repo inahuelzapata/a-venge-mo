@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
@@ -38,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.splitparty.android.R
 import com.splitparty.android.data.Transaction
 import com.splitparty.android.data.User
 import com.splitparty.android.data.Username
@@ -92,7 +90,7 @@ fun FeedRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(RelativeTime.format(transaction.createdAtMillis, nowMillis), color = Brand.InkSecondary, fontSize = 14.sp)
             Spacer(Modifier.weight(1f))
-            Icon(Icons.Rounded.MoreHoriz, contentDescription = null, tint = Brand.Ink)
+            Icon(painterResource(R.drawable.ic_more_horiz), contentDescription = null, tint = Brand.Ink)
         }
         Spacer(Modifier.height(12.dp))
 
@@ -128,21 +126,21 @@ fun FeedRow(
         )
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CountChip(Icons.Outlined.ChatBubbleOutline, transaction.commentsCount, "comments")
-            CountChip(Icons.Outlined.FavoriteBorder, transaction.likesCount, "likes")
+            CountChip(R.drawable.ic_comment, transaction.commentsCount, "comments")
+            CountChip(R.drawable.ic_favorite_border, transaction.likesCount, "likes")
         }
     }
 }
 
 @Composable
-private fun CountChip(icon: ImageVector, count: Long, label: String) {
+private fun CountChip(@DrawableRes icon: Int, count: Long, label: String) {
     Row(
         modifier = Modifier
             .background(Brand.Chip, RoundedCornerShape(50))
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = label, tint = Brand.Ink, modifier = Modifier.size(20.dp))
+        Icon(painterResource(icon), contentDescription = label, tint = Brand.Ink, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(6.dp))
         Text(count.toString(), color = Brand.Ink, fontSize = 15.sp)
     }

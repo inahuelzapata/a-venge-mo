@@ -21,11 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,7 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -47,6 +43,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.splitparty.android.R
 import com.splitparty.android.data.NetworkMonitor
 import com.splitparty.android.data.SplitPartyRepository
 import com.splitparty.android.ui.home.HomeRoute
@@ -117,10 +114,10 @@ private fun BottomBar(current: String, onSelect: (String) -> Unit, modifier: Mod
             shadowElevation = 6.dp,
         ) {
             Row(Modifier.fillMaxSize().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TabItem("Home", Icons.Rounded.Home, Icons.Outlined.Home, current == Routes.HOME, Modifier.weight(1f)) {
+                TabItem("Home", R.drawable.ic_home_filled, R.drawable.ic_home_outlined, current == Routes.HOME, Modifier.weight(1f)) {
                     onSelect(Routes.HOME)
                 }
-                TabItem("Me", Icons.Rounded.Person, Icons.Outlined.Person, current == Routes.ME, Modifier.weight(1f)) {
+                TabItem("Me", R.drawable.ic_person_filled, R.drawable.ic_person_outlined, current == Routes.ME, Modifier.weight(1f)) {
                     onSelect(Routes.ME)
                 }
             }
@@ -133,8 +130,8 @@ private fun BottomBar(current: String, onSelect: (String) -> Unit, modifier: Mod
 @Composable
 private fun TabItem(
     label: String,
-    selectedIcon: ImageVector,
-    icon: ImageVector,
+    @DrawableRes selectedIcon: Int,
+    @DrawableRes icon: Int,
     selected: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
@@ -148,7 +145,7 @@ private fun TabItem(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(if (selected) selectedIcon else icon, contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
+        Icon(painterResource(if (selected) selectedIcon else icon), contentDescription = null, tint = Brand.Ink, modifier = Modifier.size(26.dp))
         Text(label, fontSize = 11.sp, color = Brand.Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
