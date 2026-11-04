@@ -1,47 +1,47 @@
 package com.splitparty.android.ui.me
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.splitparty.android.R
 import com.splitparty.android.domain.live.LiveState
 import com.splitparty.android.format.Money
 import com.splitparty.android.ui.components.Avatar
+import com.splitparty.android.ui.components.EmptyCard
 import com.splitparty.android.ui.components.FeedRow
 import com.splitparty.android.ui.components.LoadingCard
 import com.splitparty.android.ui.components.MessageCard
+import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.components.PreviewData
 import com.splitparty.android.ui.components.UnreachableCard
 import com.splitparty.android.ui.components.rememberNow
 import com.splitparty.android.ui.theme.Brand
+import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.SplitPartyTheme
+import com.splitparty.android.ui.theme.Type
+import com.splitparty.android.ui.theme.topInset
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+
 @Composable
 fun MeRoute(
     userId: String,
@@ -54,73 +54,54 @@ fun MeRoute(
 }
 
 /**
- * Profile, mock balance and the user's own payments. Deliberately nothing
- * else in this slice (no friends list).
+ * As in docs/design/ios-captures/me.png: "Me" title, the profile card (avatar,
+ * name, @username, live mock balance, Log out), then "Your payments". Deliberately
+ * nothing else in this slice (no friends list).
  */
 @Composable
 fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeAction) -> Unit, modifier: Modifier = Modifier) {
     val now = rememberNow()
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val name = state.displayName
-    val userId = state.userId
-    val user = state.profile
     val transactions = state.transactions
-    val users = state.users
+    // The list spacing is 12; iOS has 16 between the title, card and heading, hence the extra 4s.
+    val extra = Dimens.ContentSpacing - Dimens.CardGap
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
-            top = top + 8.dp,
-            bottom = contentPadding.calculateBottomPadding()
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = modifier.fillMaxSize().testTag(MeTestTags.LIST),
+        contentPadding = PaddingValues(top = topInset(), bottom = contentPadding.calculateBottomPadding() + Dimens.ListBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(Dimens.CardGap)
     ) {
-        item(key = "profile") {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+        item(key = "title") {
+            Box(
+                Modifier.fillMaxWidth().height(Dimens.HeaderHeight),
+                contentAlignment = Alignment.Center
             ) {
-                Avatar(state.avatar, name, size = 64.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(name, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Brand.Ink)
-                    Text("@$userId", color = Brand.InkSecondary, fontSize = 15.sp)
-                }
-                OutlinedButton(
-                    onClick = { onAction(MeAction.LogOut) },
-                    shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, Brand.Outline),
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Brand.Card, contentColor = Brand.Ink)
-                ) { Text("Log out") }
+                Text("Me", style = Type.ScreenTitle, color = Brand.Ink, modifier = Modifier.padding(top = Dimens.HeaderTop))
+            }
+            Spacer(Modifier.height(extra))
+        }
+        item(key = "profile") {
+            val balance = (state.profile as? LiveState.Ready)?.value?.balanceCents
+            ProfileCard(state.displayName, state.userId, state.avatar, balance, onLogOut = { onAction(MeAction.LogOut) })
+            Spacer(Modifier.height(extra))
+        }
+        val profile = state.profile
+        if (profile is LiveState.Ready && profile.value == null) {
+            item(key = "account-missing") {
+                MessageCard(
+                    icon = R.drawable.ic_exclamationmark_circle_fill,
+                    iconWidth = 36.dp,
+                    iconHeight = 36.dp,
+                    title = "Account not found",
+                    message = "users/${state.userId} no longer exists. Log out and sign in again."
+                )
             }
         }
-        item(key = "balance") {
-            when (user) {
-                is LiveState.Unreachable -> UnreachableCard(user.message)
-
-                is LiveState.Ready ->
-                    if (user.value == null) {
-                        MessageCard(
-                            emoji = "🤔",
-                            title = "Account not found",
-                            message = "users/$userId no longer exists. Log out and sign in again."
-                        )
-                    } else {
-                        BalanceCard(user.value.balanceCents)
-                    }
-
-                LiveState.Loading -> BalanceCard(null)
-            }
-        }
-        item(key = "activity-title") {
+        item(key = "payments-title") {
             Text(
-                "Your activity",
-                modifier = Modifier.padding(start = 8.dp, top = 8.dp),
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Brand.Ink
+                "Your payments",
+                style = Type.SectionTitle,
+                color = Brand.Ink,
+                modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = extra)
             )
         }
         when (transactions) {
@@ -131,35 +112,57 @@ fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeActio
             is LiveState.Ready ->
                 if (transactions.value.isEmpty()) {
                     item(key = "empty") {
-                        MessageCard("💸", "No payments yet", "Payments you send or receive show up here.")
+                        EmptyCard("No payments yet", "Payments you send or receive show up here.")
                     }
                 } else {
                     items(transactions.value, key = { it.id }) { transaction ->
-                        FeedRow(transaction, users, now, highlighted = false, modifier = Modifier.animateItem())
+                        FeedRow(transaction, state.users, now, highlighted = false, modifier = Modifier.animateItem())
                     }
                 }
         }
     }
 }
 
+object MeTestTags {
+    const val LIST = "me_list"
+}
+
+/** Placeholder dash until the user document has loaded (or while it can't be read), as on iOS. */
 @Composable
-private fun BalanceCard(balanceCents: Long?, modifier: Modifier = Modifier) {
+private fun ProfileCard(
+    name: String,
+    userId: String,
+    avatar: String?,
+    balanceCents: Long?,
+    onLogOut: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = modifier.fillMaxWidth().background(Brand.Card, RoundedCornerShape(28.dp)).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = modifier
+            .padding(horizontal = Dimens.Gutter)
+            .fillMaxWidth()
+            .background(Brand.Card, RoundedCornerShape(Dimens.CardRadius))
+            .padding(Dimens.CardPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Balance", color = Brand.InkSecondary, fontSize = 15.sp)
-        Text(
-            balanceCents?.let(Money::format) ?: "—",
-            color = Brand.Ink,
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text("Mock wallet for the demo", color = Brand.InkSecondary, fontSize = 13.sp)
+        Avatar(avatar, name, size = 80.dp)
+        Text(name, style = Type.ProfileName, color = Brand.Ink)
+        Text("@$userId", style = Type.Body, color = Brand.InkSecondary)
+        Column(
+            // iOS: 12 above and below. Inter's 36 line renders ~1.7 taller than SF's, taken off below.
+            modifier = Modifier.padding(top = 12.dp, bottom = 10.3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text("Balance", style = Type.Body, color = Brand.InkSecondary)
+            Text(balanceCents?.let(Money::format) ?: "—", style = Type.Balance, color = Brand.Ink)
+        }
+        PillButton(text = "Log out", onClick = onLogOut)
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFF2F3F5)
+@Preview(showBackground = true, backgroundColor = 0xFFF6F6F7)
 @Composable
 private fun MeScreenPreview() {
     SplitPartyTheme {

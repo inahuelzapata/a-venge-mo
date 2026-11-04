@@ -19,13 +19,14 @@ class HomeScreenshotTest {
     private fun home(state: HomeUiState) = paparazzi.screen { HomeScreen(state, contentPadding = PaddingValues()) }
 
     @Test
-    fun loaded() = home(HomeUiState("Maxi", feed = LiveState.Ready(PreviewData.transactions), users = PreviewData.users))
+    fun loaded() = home(HomeUiState("Maxi", "avatar_maxi", feed = LiveState.Ready(PreviewData.transactions), users = PreviewData.users))
 
     /** A row that just arrived, at the start of its highlight. */
     @Test
     fun newRowHighlighted() = home(
         HomeUiState(
             currentUserName = "Maxi",
+            currentUserAvatar = "avatar_maxi",
             feed = LiveState.Ready(PreviewData.transactions),
             users = PreviewData.users,
             highlighted = persistentSetOf(PreviewData.transactions.first().id)
@@ -40,7 +41,7 @@ class HomeScreenshotTest {
     fun loading() = home(HomeUiState("Maxi"))
 
     @Test
-    fun empty() = home(HomeUiState("Maxi", feed = LiveState.Ready(persistentListOf())))
+    fun empty() = home(HomeUiState("Maxi", "avatar_maxi", feed = LiveState.Ready(persistentListOf())))
 
     @Test
     fun offline() = home(HomeUiState("Maxi", feed = LiveState.Unreachable(OFFLINE_MESSAGE)))

@@ -1,41 +1,34 @@
 package com.splitparty.android.format
 
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.TimeZone
 
-/** Feed timestamps in the reference screenshot's style: "12 hours ago". */
+/**
+ * Feed timestamps worded like the iOS app (RelativeDateTimeFormatter, full
+ * style, English): "Just now", "12 hours ago", "2 weeks ago", "3 months ago".
+ * The largest whole calendar unit wins, so both platforms print the same text.
+ */
 object RelativeTime {
     private const val MINUTE = 60_000L
-    private const val HOUR = 60 * MINUTE
-    private const val DAY = 24 * HOUR
-    private const val WEEK = 7 * DAY
+    private const val DAYS_PER_WEEK = 7
 
-    fun format(thenMillis: Long?, nowMillis: Long, timeZone: TimeZone = TimeZone.getDefault(), locale: Locale = Locale.US): String {
-        if (thenMillis == null) return "just now"
-        val diff = nowMillis - thenMillis
+    fun format(thenMillis: Long?, nowMillis: Long, timeZone: TimeZone = TimeZone.getDefault()): String {
+        // No server time yet means it just happened; also covers small clock skew into the future.
+        if (thenMillis == null || nowMillis - thenMillis < MINUTE) return "Just now"
+        val zone = timeZone.toZoneId()
+        val then = Instant.ofEpochMilli(thenMillis).atZone(zone)
+        val now = Instant.ofEpochMilli(nowMillis).atZone(zone)
+        val days = ChronoUnit.DAYS.between(then, now)
         return when {
-            diff < MINUTE -> "just now"
-
-            // includes small clock skew into the future
-            diff < HOUR -> plural(diff / MINUTE, "minute")
-
-            diff < DAY -> plural(diff / HOUR, "hour")
-
-            diff < WEEK -> plural(diff / DAY, "day")
-
-            else -> {
-                val sameYear = year(thenMillis, timeZone) == year(nowMillis, timeZone)
-                SimpleDateFormat(if (sameYear) "MMM d" else "MMM d, yyyy", locale)
-                    .apply { this.timeZone = timeZone }
-                    .format(Date(thenMillis))
-            }
+            ChronoUnit.YEARS.between(then, now) > 0 -> plural(ChronoUnit.YEARS.between(then, now), "year")
+            ChronoUnit.MONTHS.between(then, now) > 0 -> plural(ChronoUnit.MONTHS.between(then, now), "month")
+            days >= DAYS_PER_WEEK -> plural(days / DAYS_PER_WEEK, "week")
+            days > 0 -> plural(days, "day")
+            ChronoUnit.HOURS.between(then, now) > 0 -> plural(ChronoUnit.HOURS.between(then, now), "hour")
+            else -> plural(ChronoUnit.MINUTES.between(then, now), "minute")
         }
     }
 
     private fun plural(n: Long, unit: String) = if (n == 1L) "1 $unit ago" else "$n ${unit}s ago"
-
-    private fun year(millis: Long, tz: TimeZone) = Calendar.getInstance(tz).apply { timeInMillis = millis }.get(Calendar.YEAR)
 }
