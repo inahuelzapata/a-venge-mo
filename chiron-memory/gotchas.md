@@ -61,10 +61,6 @@ What: Robolectric 4.17 tests failed with "Failed to interact with raw FileDescri
 
 What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDebugUnitTest task without conflicts (69 tests pass together), although older Paparazzi docs advise keeping them in separate modules · Why: avoids a separate screenshot module, which could not depend on the application module's screens anyway · Where: android/app/build.gradle.kts, app/src/test/resources/robolectric.properties · Learned: if they start clashing after an upgrade, check this first; the fallback is moving screens into an Android library module
 
-## Compose drops taps on a child drawn outside its parent's bounds
-
-What: The raised Pay/Request button sits inside a Box made PayButtonLift (16 dp) taller than the bar capsule, instead of being offset upward past the bar · Why: Compose only hit-tests children inside the parent's layout bounds, so an offset button's top part would ignore taps · Where: android/app/src/main/java/com/splitparty/android/ui/shell/MainShell.kt BottomBar · Learned: SwiftUI .offset moves hit-testing with the view, so iOS can just offset the button
-
 ## iOS snapshots shift slightly after the simulator restarts or captures run
 
 What: After capture-ios.sh (status bar override) and a simulator shutdown/reboot, ScreenSnapshotTests failed on Home and Me with every pixel off by at most 3/255 and no layout change; re-recording on the current simulator state made two full runs pass · Why: the screens that failed are the ones with content blurred under the material tab bar, whose rendering moved with the fresh simulator state · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, docs/design/capture/capture-ios.sh · Learned: record snapshots and run them on the same booted simulator session; measure the diff before assuming a UI regression
