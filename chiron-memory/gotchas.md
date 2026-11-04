@@ -83,3 +83,11 @@ What: switchTab reaches Home with popBackStack<HomeDestination>(saveState only w
 ## capture-ios.sh re-takes every capture, even screens a change did not touch
 
 What: Running docs/design/capture/capture-ios.sh rewrites all PNGs in docs/design/ios-captures, and login/Me/Pay-Request come out byte-different from the committed ones (keyboard, cursor, status-bar noise) even when nothing changed · Why: committing those makes unrelated screens look changed to Android reviewers · Where: docs/design/capture/capture-ios.sh · Learned: after a run, git checkout the captures of screens the work did not change
+
+## Infinite ViewModel timers hang runTest
+
+What: A while(true){ delay() } ticker in viewModelScope (Dispatchers.Main = the rule's test dispatcher, sharing runTest's scheduler) makes runTest advance virtual time forever at the end of the test; the Gradle test task just never finishes. Timers must end (Clock.at deadlines, Clock.countdown until expiry), and fakes must behave like the real write (FakePartyRepository.expire stores status expired) or the host's expiry retry loop never stops · Where: android domain/Clock.kt, app/src/test/.../testing/Fakes.kt
+
+## Compose testTag after clearAndSetSemantics is lost
+
+What: In a modifier chain, a testTag placed after clearAndSetSemantics is cleared with the rest, so onNodeWithTag finds nothing; put testTag before clearAndSetSemantics · Where: android ui/home/PartyBanners.kt, ui/party/PartyScreen.kt
