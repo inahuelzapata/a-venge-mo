@@ -21,3 +21,7 @@ What: When the host pays, each joinee's payment is written to transactions/{part
 ## Android emulator target uses its own FirebaseApp with the project id forced
 
 What: For FIREBASE_TARGET=emulator the Android app creates a named FirebaseApp from google-services.json options (or placeholder options when the file is absent) with projectId set to FIREBASE_PROJECT_ID, then calls useEmulator; hosted uses the default app and refuses (Setup required screen) if the json's project_id differs · Why: the emulator keeps one database per project id, so the default app (project from google-services.json) would read a different, empty database than the seed script; and an emulator demo should not need a Firebase config file · Where: android/app/src/main/java/com/splitparty/android/data/FirebaseSetup.kt · Learned: the iOS shell needs the same project-id override for the emulator
+
+## Android icons are local vector drawables, not the Compose icon packs
+
+What: The app's 9 icons (home, person, comment, heart, more, search, QR) are Material icon paths in app/src/main/res/drawable/ic_*.xml used via painterResource · Why: material-icons-core/extended are discontinued at 1.7.8 and no longer managed by the Compose BOM · Where: android/app/src/main/res/drawable/
