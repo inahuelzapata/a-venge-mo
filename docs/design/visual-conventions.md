@@ -176,15 +176,62 @@ button keeps 18 from the card edge, a choice made in review.
 | ---- | ---------- |
 | `brand/split-party-banner.png` | The banner artwork as supplied, 1774 × 887 px (2 : 1). Committed only here. The iOS project bundles this file directly ("Shared brand assets" group), with no copy in `Assets.xcassets`. 1774 px covers a 3x card on the widest iPhone (416 pt card image → 1248 px) |
 
-**Split Party placeholder** ([`ios-captures/split-party-placeholder.png`](ios-captures/split-party-placeholder.png)):
-pushed over Home with the system navigation bar, inline title "Split Party" and
-the standard Back button. Back returns to Home at the same scroll position. The
-bottom bar stays visible. Body centred on the page background: `person.3.fill`
-symbol 52 in brand blue, "In progress" (24 bold, primary), then "We're still
-building Split Party. Soon you'll start a party here and split the check with
-friends." (17 regular, secondary, centred), 12 apart, 32 side margins. A real
-party screen later replaces this at one point (`HomeDestination.splitParty` in
-`ios/SplitParty/UI/MainTabView.swift`).
+The placeholder screen this card used to open is gone: "Start a party" now
+opens the party screen below. Its old capture (`ios-captures/split-party-placeholder.png`)
+stays only until the Android party slice replaces its own placeholder.
+
+## Home banner slot (PoC-7/8)
+
+Home's banner slot, between the header and the first feed item, shows exactly
+one of these, most important first. With nothing to show it adds no view and no
+spacing: the first feed card moves up to 16 below the header.
+
+1. **"Back to your party"** while the signed-in user is in an open, unexpired party.
+2. **Join banner** for the newest open, unexpired party at Tony's hosted by a
+   friend the user is not in and not locked out of.
+3. **"Split the check" card** while the Me tab's "Demo mode: at Tony's" switch is on.
+
+| Element | iOS (pt) and Android (dp) |
+| ------- | ------------------------- |
+| Merchant card arrival | Waits for the open-parties query (at most 1.2 s), then 0.35 s, then slides in from the trailing edge with opacity, spring (response 0.5, damping 0.85). The feed below moves down with the same spring. Then one shimmer sweep: 0.25 s delay, 0.9 s ease-in-out, a white band 35% of the card wide, peak opacity 0.55, tilted 20°, clipped to the card's 28 radius. Plays once per session, and again after the switch is turned back on |
+| Join banner | White card, radius 28, 8 gutter, 1 pt brand-blue border at 25%. Padding 18 horizontal, 16 vertical, 12 between items. Left: 10 brand-blue dot whose halo grows to 2.6× and fades, 1.2 s, repeating. Middle: "{Host} started a Split Party at {Merchant}", 16 semibold, primary, wraps. Right: "Join", black capsule 38 tall, 20 horizontal padding, 15 semibold white. Drops in from the top with opacity (spring 0.45 / 0.8) |
+| "Back to your party" card | Same card and padding as the Join banner, no border. The party's three emojis at 26, then "Back to your party" (16 semibold) over "Split Party at Tony's · 4:12 left" (14, secondary, monospaced digits), chevron 15 semibold secondary. The whole card is one button |
+| Demo switch (Me tab) | White card, radius 28, 8 gutter, 16 below the profile card: "Demo mode: at Tony's" (17 semibold) over "Pretend this phone is at the merchant" (14 secondary), 20 × 14 padding, system switch tinted brand blue. On by default, remembered across restarts |
+| Start error | Under the slot: red `#D92D20` 15 regular with an `exclamationmark.circle.fill` and a dismiss ×, 20 from the screen edge. The card stays; nothing navigates |
+| Accessibility | Join banner: the sentence, then the "Join" button. "Back to your party" card: one button, "Back to your party, Split Party at Tony's" |
+| Reduce Motion | No slide, drop, shimmer or pulse: banners appear and disappear instantly |
+
+## Party screen (PoC-8/9)
+
+Pushed over Home with the system navigation bar: inline title **"Split Party at
+Tony's"** and Back. The bottom bar stays. Page background `#F6F6F7`; three white
+section cards, radius 28, 8 gutter, 20 padding, 16 apart, 8 below the bar.
+
+| Element | iOS (pt) and Android (dp) |
+| ------- | ------------------------- |
+| Code card | "Show friends this code" (15 medium, secondary), 14 above the tiles. Three tiles **76 × 76**, radius 20 (continuous), fill `#F1F1F3`, 12 apart, emoji 44. Then the countdown 14 below |
+| Tile motion | Pop in one by one, 0.14 s apart, from 20% scale and 0 opacity (spring 0.35 / 0.55). Then bob ±3 vertically, 1.4 s ease-in-out, autoreversing, alternate tiles out of step |
+| Countdown | `timer` symbol + "Expires in 4:59", 17 semibold, monospaced digits, primary; error red for the last 30 s. Ticks on the whole second and exactly at expiry |
+| Member card | "Who's in" (17 semibold), 14 above the seats. Seats 14 apart, each 72 wide: avatar **56**, first name 14 medium 6 below. The host's avatar carries a black "Host" capsule (11 bold white, 7 × 2 padding, 1.5 white ring) overlapping its bottom edge by 7. At least 3 seats: empty ones are a 56 circle with a 2 pt dashed `#7F7F7F`-at-50% ring over `#E4E4E8`, "Waiting" below, pulsing (scale 0.94 and fill opacity 0.35, 0.9 s, autoreversing) |
+| Member arrival | New seat scales from 30% with opacity, spring (0.45 / 0.7). Success haptic on the phones already in the party |
+| Total area | Reserved, min 120 tall: `hourglass` 24 secondary, "Waiting for the total" (17 semibold), "The host enters the bill and tip next." (14 secondary). No Pay action |
+| Reconnecting | While the party document only comes from the cache or the network is down: capsule above the code card, white, small spinner + "Reconnecting…" (14 medium, secondary), 14 × 8 padding |
+| Expired | Replaces the cards: `clock.badge.xmark` 52 secondary, "This party has expired" (24 bold), "Nothing was charged." (17 secondary), 12 apart, then the black 52 "Back to Home" pill 12 lower, 32 side margins |
+| Accessibility | Code: one element, "Join code: pizza, beer, party popper". Each seat: "Maxi, host", "Annie", "Empty seat" |
+| Reduce Motion | Tiles appear at once and do not bob; seats appear without the spring; empty seats do not pulse. Haptics stay |
+
+## Code confirmation (PoC-9)
+
+Pushed from the Join banner, inline title "Join Split Party".
+
+| Element | iOS (pt) and Android (dp) |
+| ------- | ------------------------- |
+| Header | Host avatar 56, "Join {Host}'s party at Tony's" (22 bold, centred), "Pick the code shown on {Host}'s phone" (16 secondary), 10 apart, 12 below the bar, 24 side margins |
+| Options | Four full-width white buttons, **72** tall, radius 20, 8 gutter, 12 apart, three emojis at 34, 18 apart. Exactly one is the host's code; three decoys from the same palette, all different. New random order each visit and after every wrong pick |
+| Wrong pick | The picked option gets a 2 pt red `#D92D20` outline and shakes ±10 pt three times in 0.4 s; error haptic; "That's not Maxi's code. 2 tries left." (15 medium, red, with an `exclamationmark.circle.fill`) under the options. After 0.45 s the options reshuffle (spring 0.4 / 0.8) |
+| Locked (third wrong pick) | `lock.fill` 52 secondary, "Too many wrong codes" (24 bold), "You can't join Maxi's party any more. Ask them to start a new one if you're at the same table." (17 secondary), "Back to Home" pill. The Join banner for that party no longer appears on this phone; the host sees nothing |
+| Accessibility | Each option is read by emoji names ("pizza, beer, party popper") |
+| Reduce Motion | No shake or reshuffle animation; the outline, message and haptic stay |
 
 ## Type
 

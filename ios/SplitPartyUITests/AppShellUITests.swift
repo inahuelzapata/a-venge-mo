@@ -94,7 +94,7 @@ final class AppShellUITests: XCTestCase {
         let topRowIsIncoming = NSPredicate { _, _ in
             self.transactionRows.firstMatch.label.contains("$31.15")
         }
-        XCTAssertTrue(bannerCard.exists)
+        XCTAssertTrue(bannerCard.waitForExistence(timeout: Self.screenTimeout), "Card slides in")
         let cardFrameBefore = bannerCard.frame
         expectation(for: topRowIsIncoming, evaluatedWith: nil)
         waitForExpectations(timeout: Self.incomingPaymentTimeout)
@@ -138,33 +138,26 @@ final class AppShellUITests: XCTestCase {
         XCTAssertEqual(bannerCard.buttons.count, 2, "Only the image and the button are tap targets")
     }
 
-    func testStartPartyOpensPlaceholderAndBackKeepsScrollPosition() {
+    func testStartPartyOpensThePartyScreenAndBackOffersTheWayBack() {
         launch(resettingSession: true)
         signIn(as: "maxi")
-        XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
-
-        // Scroll a little, keeping the button on screen, so Back has a position to keep.
-        let start = homeScreen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -120)))
-        let scrolledButtonFrame = startPartyButton.frame
-        XCTAssertLessThan(scrolledButtonFrame.minY, 0.6 * app.frame.height, "Home scrolled")
+        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout))
 
         startPartyButton.tap()
-        assertPlaceholderIsOpen()
+        assertPartyScreenIsOpen()
 
+        // Home now shows "Back to your party" where the card was.
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout))
-        XCTAssertFalse(placeholderScreen.exists)
-        XCTAssertEqual(startPartyButton.frame.minY, scrolledButtonFrame.minY, accuracy: 1,
-                       "Back returns to the same scroll position")
+        XCTAssertTrue(app.buttons["backToPartyCard"].waitForExistence(timeout: Self.screenTimeout))
+        XCTAssertFalse(partyScreen.exists)
     }
 
-    func testBannerImageOpensPlaceholder() {
+    func testBannerImageOpensThePartyScreen() {
         launch(resettingSession: true)
         signIn(as: "maxi")
-        XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
+        XCTAssertTrue(bannerImage.waitForExistence(timeout: Self.screenTimeout))
         bannerImage.tap()
-        assertPlaceholderIsOpen()
+        assertPartyScreenIsOpen()
     }
 
     // MARK: Helpers
@@ -179,7 +172,7 @@ final class AppShellUITests: XCTestCase {
     private var bannerCard: XCUIElement { element("splitPartyBanner") }
     private var bannerImage: XCUIElement { app.buttons["splitPartyBannerImage"] }
     private var startPartyButton: XCUIElement { app.buttons["startPartyButton"] }
-    private var placeholderScreen: XCUIElement { element("splitPartyPlaceholderScreen") }
+    private var partyScreen: XCUIElement { element("partyScreen") }
 
     private func assertBannerCardIsAbove(_ feedItem: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(bannerCard.waitForExistence(timeout: Self.screenTimeout), "Card shown", file: file, line: line)
@@ -188,10 +181,9 @@ final class AppShellUITests: XCTestCase {
                                  "Card sits above the feed", file: file, line: line)
     }
 
-    private func assertPlaceholderIsOpen(file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertTrue(placeholderScreen.waitForExistence(timeout: Self.screenTimeout), file: file, line: line)
-        XCTAssertTrue(app.navigationBars["Split Party"].exists, "Titled Split Party", file: file, line: line)
-        XCTAssertTrue(app.staticTexts["In progress"].exists, file: file, line: line)
+    private func assertPartyScreenIsOpen(file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(partyScreen.waitForExistence(timeout: Self.screenTimeout), file: file, line: line)
+        XCTAssertTrue(app.navigationBars["Split Party at Tony's"].exists, file: file, line: line)
     }
 
     private func element(_ identifier: String) -> XCUIElement {

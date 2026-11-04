@@ -53,14 +53,10 @@ final class ReferenceCaptureUITests: XCTestCase {
     func test03HomeTabs() throws {
         launch(resettingSession: true)
         signIn()
-        XCTAssertTrue(element("homeScreen").waitForExistence(timeout: Self.timeout))
+        XCTAssertTrue(element("splitPartyBanner").waitForExistence(timeout: Self.timeout))
+        // After the slide-in and the shimmer sweep.
+        Thread.sleep(forTimeInterval: 1.5)
         try capture("home-feed")
-
-        app.buttons["startPartyButton"].tap()
-        XCTAssertTrue(element("splitPartyPlaceholderScreen").waitForExistence(timeout: Self.timeout))
-        try capture("split-party-placeholder")
-        app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(element("homeScreen").waitForExistence(timeout: Self.timeout))
 
         tapTab("Pay or request")
         XCTAssertTrue(element("payRequestScreen").waitForExistence(timeout: Self.timeout))
@@ -101,7 +97,74 @@ final class ReferenceCaptureUITests: XCTestCase {
         try capture("home-error")
     }
 
+    // MARK: Split Party (fixture parties always use 🍕🍺🎉)
+
+    func test07HostPartyFillsUp() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendsJoinEvery", "6"])
+        signIn()
+        XCTAssertTrue(app.buttons["startPartyButton"].waitForExistence(timeout: Self.timeout))
+        app.buttons["startPartyButton"].tap()
+        XCTAssertTrue(element("partyScreen").waitForExistence(timeout: Self.timeout))
+        try capture("party-1-member")
+        XCTAssertTrue(seats.element(boundBy: 1).waitForExistence(timeout: 8))
+        try capture("party-2-members")
+        XCTAssertTrue(seats.element(boundBy: 2).waitForExistence(timeout: 8))
+        try capture("party-3-members")
+        measure("party code", element("joinCode"))
+        measure("party countdown", element("partyCountdown"))
+        measure("party member row", element("memberRow"))
+        measure("party first seat", seats.firstMatch)
+        measure("party total area", element("totalPlaceholder"))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["backToPartyCard"].waitForExistence(timeout: Self.timeout))
+        try capture("home-back-to-party")
+        measure("back-to-party card", app.buttons["backToPartyCard"])
+    }
+
+    func test08JoinAndConfirm() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi"])
+        signIn(as: "annie")
+        XCTAssertTrue(element("joinBanner").waitForExistence(timeout: Self.timeout))
+        try capture("home-join-banner")
+        measure("join banner", element("joinBanner"))
+        measure("join button", element("joinBanner").buttons["Join"])
+        element("joinBanner").buttons["Join"].tap()
+        XCTAssertTrue(element("joinConfirmationScreen").waitForExistence(timeout: Self.timeout))
+        try capture("confirm-code")
+        let options = app.buttons.matching(identifier: "codeOption")
+        measure("first option", options.element(boundBy: 0))
+        measure("second option", options.element(boundBy: 1))
+
+        let wrong = app.buttons.matching(identifier: "codeOption")
+            .matching(NSPredicate(format: "label != %@", "pizza, beer, party popper")).firstMatch
+        wrong.tap()
+        // Mid-shake, with the red outline and the error.
+        Thread.sleep(forTimeInterval: 0.12)
+        try capture("confirm-wrong-pick", settling: false)
+        Thread.sleep(forTimeInterval: 1)
+        for _ in 0..<2 {
+            app.buttons.matching(identifier: "codeOption")
+                .matching(NSPredicate(format: "label != %@", "pizza, beer, party popper")).firstMatch.tap()
+            Thread.sleep(forTimeInterval: 1)
+        }
+        XCTAssertTrue(app.staticTexts["Too many wrong codes"].waitForExistence(timeout: Self.timeout))
+        try capture("confirm-locked")
+    }
+
+    func test09Expired() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers", "annie",
+                                               "-UITestFriendPartyAge", "290"])
+        signIn(as: "annie")
+        XCTAssertTrue(element("partyScreen").waitForExistence(timeout: Self.timeout))
+        XCTAssertTrue(app.staticTexts["This party has expired"].waitForExistence(timeout: 15))
+        try capture("party-expired")
+    }
+
     // MARK: Helpers
+
+    private var seats: XCUIElementQuery {
+        app.descendants(matching: .any).matching(identifier: "memberSeat")
+    }
 
     private var usernameField: XCUIElement { app.textFields["usernameField"] }
 
@@ -110,22 +173,30 @@ final class ReferenceCaptureUITests: XCTestCase {
     }
 
     private func launch(scenario: String = "seeded", resettingSession: Bool,
-                        insertingIncomingPaymentAfter delay: TimeInterval? = nil) {
+                        insertingIncomingPaymentAfter delay: TimeInterval? = nil, extra: [String] = []) {
         app.launchArguments = ["-UITestFixture", scenario,
-                               "-UITestResetSession", resettingSession ? "YES" : "NO"]
+                               "-UITestResetSession", resettingSession ? "YES" : "NO"] + extra
         if let delay { app.launchArguments += ["-UITestInsertIncomingPaymentAfter", String(delay)] }
         app.launch()
     }
 
-    private func signIn() {
+    private func signIn(as username: String = "maxi") {
         XCTAssertTrue(usernameField.waitForExistence(timeout: Self.timeout))
         usernameField.tap()
-        usernameField.typeText("maxi")
+        usernameField.typeText(username)
         app.buttons["Sign in"].tap()
     }
 
     private func tapTab(_ title: String) {
         element("bottomBar").buttons[title].tap()
+    }
+
+    /// Prints an element's frame in points, for the measured values in
+    /// docs/design/visual-conventions.md (grep the test log for "MEASURE").
+    private func measure(_ name: String, _ element: XCUIElement) {
+        let frame = element.frame
+        print(String(format: "MEASURE %@: x %.1f y %.1f w %.1f h %.1f", name,
+                     frame.minX, frame.minY, frame.width, frame.height))
     }
 
     private func capture(_ name: String, settling: Bool = true) throws {
