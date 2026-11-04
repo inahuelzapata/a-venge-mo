@@ -6,19 +6,73 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5AB000000000000000000001 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 5AD000000000000000000001 /* FirebaseFirestore */; };
+		5AB000000000000000000002 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 5AD000000000000000000002 /* SnapshotTesting */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5AE000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5A2000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A1000000000000000000001;
+			remoteInfo = SplitParty;
+		};
+		5AE000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5A2000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A1000000000000000000001;
+			remoteInfo = SplitParty;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		5A3000000000000000000001 /* SplitParty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SplitParty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A3000000000000000000002 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		5A3000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5A3000000000000000000004 /* FirestoreTarget.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = FirestoreTarget.example.xcconfig; sourceTree = "<group>"; };
+		5A3000000000000000000005 /* SplitPartyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SplitPartyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A3000000000000000000006 /* SplitPartyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SplitPartyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5A4000000000000000000001 /* SplitParty */ = {isa = PBXFileSystemSynchronizedRootGroup; path = SplitParty; sourceTree = "<group>"; };
+		5A4000000000000000000001 /* SplitParty */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SplitParty;
+			sourceTree = "<group>";
+		};
+		5A4000000000000000000002 /* SplitPartyTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SplitPartyTests;
+			sourceTree = "<group>";
+		};
+		5A4000000000000000000003 /* SplitPartyUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SplitPartyUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A5000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5AB000000000000000000001 /* FirebaseFirestore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A5000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5AB000000000000000000002 /* SnapshotTesting in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A5000000000000000000003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -32,6 +86,8 @@
 			isa = PBXGroup;
 			children = (
 				5A4000000000000000000001 /* SplitParty */,
+				5A4000000000000000000002 /* SplitPartyTests */,
+				5A4000000000000000000003 /* SplitPartyUITests */,
 				5A6000000000000000000003 /* Config */,
 				5A6000000000000000000002 /* Products */,
 			);
@@ -41,6 +97,8 @@
 			isa = PBXGroup;
 			children = (
 				5A3000000000000000000001 /* SplitParty.app */,
+				5A3000000000000000000005 /* SplitPartyTests.xctest */,
+				5A3000000000000000000006 /* SplitPartyUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,9 +132,57 @@
 				5A4000000000000000000001 /* SplitParty */,
 			);
 			name = SplitParty;
+			packageProductDependencies = (
+				5AD000000000000000000001 /* FirebaseFirestore */,
+			);
 			productName = SplitParty;
 			productReference = 5A3000000000000000000001 /* SplitParty.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5A1000000000000000000002 /* SplitPartyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A8000000000000000000003 /* Build configuration list for PBXNativeTarget "SplitPartyTests" */;
+			buildPhases = (
+				5A7000000000000000000003 /* Sources */,
+				5A5000000000000000000002 /* Frameworks */,
+				5A7000000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5AF000000000000000000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5A4000000000000000000002 /* SplitPartyTests */,
+			);
+			name = SplitPartyTests;
+			packageProductDependencies = (
+				5AD000000000000000000002 /* SnapshotTesting */,
+			);
+			productName = SplitPartyTests;
+			productReference = 5A3000000000000000000005 /* SplitPartyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		5A1000000000000000000003 /* SplitPartyUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A8000000000000000000004 /* Build configuration list for PBXNativeTarget "SplitPartyUITests" */;
+			buildPhases = (
+				5A7000000000000000000005 /* Sources */,
+				5A5000000000000000000003 /* Frameworks */,
+				5A7000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5AF000000000000000000002 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5A4000000000000000000003 /* SplitPartyUITests */,
+			);
+			name = SplitPartyUITests;
+			productName = SplitPartyUITests;
+			productReference = 5A3000000000000000000006 /* SplitPartyUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -87,6 +193,14 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					5A1000000000000000000002 = {
+						TestTargetID = 5A1000000000000000000001;
+					};
+					5A1000000000000000000003 = {
+						TestTargetID = 5A1000000000000000000001;
+					};
+				};
 			};
 			buildConfigurationList = 5A8000000000000000000001 /* Build configuration list for PBXProject "SplitParty" */;
 			developmentRegion = en;
@@ -97,18 +211,38 @@
 			);
 			mainGroup = 5A6000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5AC000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				5AC000000000000000000002 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5A6000000000000000000002 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				5A1000000000000000000001 /* SplitParty */,
+				5A1000000000000000000002 /* SplitPartyTests */,
+				5A1000000000000000000003 /* SplitPartyUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		5A7000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A7000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A7000000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -125,7 +259,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5A7000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A7000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5AF000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A1000000000000000000001 /* SplitParty */;
+			targetProxy = 5AE000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		5AF000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A1000000000000000000001 /* SplitParty */;
+			targetProxy = 5AE000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5A9000000000000000000001 /* Debug */ = {
@@ -226,6 +387,72 @@
 			};
 			name = Release;
 		};
+		5A9000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5A3000000000000000000002 /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited).tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SplitParty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SplitParty";
+			};
+			name = Debug;
+		};
+		5A9000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5A3000000000000000000002 /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited).tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SplitParty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SplitParty";
+			};
+			name = Release;
+		};
+		5A9000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5A3000000000000000000002 /* Base.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = SplitParty;
+			};
+			name = Debug;
+		};
+		5A9000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5A3000000000000000000002 /* Base.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = SplitParty;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -247,7 +474,57 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		5A8000000000000000000003 /* Build configuration list for PBXNativeTarget "SplitPartyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A9000000000000000000005 /* Debug */,
+				5A9000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5A8000000000000000000004 /* Build configuration list for PBXNativeTarget "SplitPartyUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A9000000000000000000007 /* Debug */,
+				5A9000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5AC000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.9.0;
+			};
+		};
+		5AC000000000000000000002 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.19.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5AD000000000000000000001 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5AC000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		5AD000000000000000000002 /* SnapshotTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5AC000000000000000000002 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
+			productName = SnapshotTesting;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5A2000000000000000000001 /* Project object */;
 }

@@ -1,0 +1,10 @@
+# Images are stored with Git LFS (Large File Storage): git keeps a small
+# pointer, the image itself lives on the LFS server. A fresh clone needs
+# `git lfs install` once per machine (see ios/README.md).
+
+# iOS snapshot test reference images (swift-snapshot-testing writes them here).
+ios/SplitPartyTests/__Snapshots__/** filter=lfs diff=lfs merge=lfs -text
+
+# Design reference screenshots shared by both apps.
+docs/design/*.jpg filter=lfs diff=lfs merge=lfs -text
+docs/design/*.png filter=lfs diff=lfs merge=lfs -text
