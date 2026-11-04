@@ -45,48 +45,59 @@ Requires Xcode 16+ **with the iOS platform installed** (Xcode → Settings →
 Components; without it Xcode lists no run destinations), an iPhone on iOS 17+
 with Developer Mode on, and an Apple ID added in Xcode → Settings → Accounts.
 
-1. Start a database and seed it (see [demo runbook](../docs/demo-runbook.md)):
-   for the emulator, `cd backend && npm run emulators`, then `npm run seed` in
-   another terminal.
+The default is the **hosted** Firebase project: the phone talks to Firestore
+over the internet, on any network (Wi-Fi or mobile data), with no laptop
+involved. Full walkthrough: [Integration & Setup Guide](../docs/integration-setup-guide.md).
+
+1. Make sure the hosted database is ready, from `backend/`:
+   `npm run deploy:firestore` (rules and indexes), then `npm run seed`.
 2. `cp Config/FirestoreTarget.example.xcconfig Config/FirestoreTarget.local.xcconfig`
 3. In that file set `DEVELOPMENT_TEAM` (your Apple team id, shown in Xcode →
-   Settings → Accounts) and, with a free personal team, a unique
-   `PRODUCT_BUNDLE_IDENTIFIER`. Set the Firestore target (below).
-4. `open SplitParty.xcodeproj`, wait for the package to resolve, select your
-   iPhone, press Run. On first launch accept the local-network prompt (needed
-   to reach the emulator). The login screen footer shows which database the
-   app is using.
-5. Sign in as `maxi`, `annie` or `christophe`.
+   Settings → Accounts) and `FIREBASE_PROJECT_ID`. With a free personal team
+   you also need a unique `PRODUCT_BUNDLE_IDENTIFIER`; Firestore still works,
+   Firebase only logs a bundle-id mismatch warning.
+4. Put the project's `GoogleService-Info.plist` at `SplitParty/GoogleService-Info.plist` (below).
+5. `open SplitParty.xcodeproj`, wait for the package to resolve, select your
+   iPhone, press Run. The login screen footer shows which database the app is using.
+6. Sign in as `maxi`, `annie` or `christophe`.
 
 Without the local file the app still builds; the login screen says the target
 is not configured and sign-in stays disabled.
 
 ## Firestore target: the one place to switch
 
-`Config/FirestoreTarget.local.xcconfig` (git-ignored):
+`Config/FirestoreTarget.local.xcconfig` (git-ignored). Hosted (default):
 
 ```
-FIREBASE_TARGET = emulator              // or hosted
-FIREBASE_PROJECT_ID = demo-split-party  // or your hosted project id
-FIRESTORE_EMULATOR_HOST = 192.168.1.20:8080   // laptop LAN IP; empty for hosted
+FIREBASE_TARGET = hosted
+FIREBASE_PROJECT_ID = your-firebase-project-id   // the same id as backend/.env
+FIRESTORE_EMULATOR_HOST =
 ```
 
-Rebuild after changing it; no code change is needed to switch. Get the laptop
-IP with `ipconfig getifaddr en0`; the phone and laptop must be on the same
-Wi-Fi. The keys and the demo setup are the same as Android and the backend:
-see [Firestore target](../docs/firestore-target.md). The emulator itself is
-started from [`backend/`](../backend); this app never runs its own.
+Emulator (opt-in, offline; started from [`backend/`](../backend) with `npm run emulators`):
 
-## Firebase config file (hosted only)
+```
+FIREBASE_TARGET = emulator
+FIREBASE_PROJECT_ID = demo-split-party
+FIRESTORE_EMULATOR_HOST = 192.168.1.20:8080   // laptop LAN IP: ipconfig getifaddr en0
+```
 
-- **Emulator:** no config file needed. The app configures Firebase from the
-  project id alone.
-- **Hosted:** `GoogleService-Info.plist` is required and **not committed**.
-  Download it from the Firebase console (iOS app with your bundle id, in the
-  same project as `FIREBASE_PROJECT_ID`) and put it at
+Rebuild after changing it; no code change is needed to switch. For the emulator
+the phone and laptop must be on the same Wi-Fi, and on first launch you accept
+the local-network prompt. The keys are the same as Android and the backend:
+see [Firestore target](../docs/firestore-target.md). This app never runs its own emulator.
+
+## Firebase config file (hosted)
+
+- **Hosted (default):** `GoogleService-Info.plist` is required and **not committed**.
+  Download it from the Firebase console (Project settings → Your apps → iOS app
+  `com.splitparty.ios`, in the same project as `FIREBASE_PROJECT_ID`) and put it at
   `SplitParty/GoogleService-Info.plist`. Steps:
   [`Config/GoogleService-Info.README.md`](Config/GoogleService-Info.README.md).
-  If it is missing or from another project, the login screen says so.
+  If it is missing or from another project, the login screen says so at launch
+  and sign-in stays disabled.
+- **Emulator:** no config file needed. The app configures Firebase from the
+  project id alone.
 
 ## Behaviour worth knowing
 
@@ -139,8 +150,8 @@ without the variable to confirm they pass. Snapshots are drawn at a fixed
 | Symptom | Fix |
 | ------- | --- |
 | No iPhone in the run destinations | Install the iOS platform in Xcode → Settings → Components |
-| "Can't reach the database" on a phone | Emulator running? `FIRESTORE_EMULATOR_HOST` is the laptop's LAN IP, not 127.0.0.1? Local-network permission allowed (Settings → Privacy → Local Network)? |
-| Feed empty but seeded | Phone and seed script use different `FIREBASE_PROJECT_ID`s |
+| "Can't reach the database" on a phone | Hosted: phone has internet? Emulator: running? `FIRESTORE_EMULATOR_HOST` is the laptop's LAN IP, not 127.0.0.1? Local-network permission allowed (Settings → Privacy → Local Network)? |
+| Feed empty but seeded | Phone and seed script use different `FIREBASE_PROJECT_ID`s or targets |
 | Signing error | Set `DEVELOPMENT_TEAM` and a unique `PRODUCT_BUNDLE_IDENTIFIER` in the local xcconfig |
 | Every snapshot test fails with "could not be loaded" | The PNGs are LFS pointers: `git lfs install && git lfs pull` |
 | Snapshot tests are skipped | You're not on the iOS 26.5 simulator, the one the references were recorded on |

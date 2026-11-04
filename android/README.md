@@ -61,32 +61,46 @@ Toolchain: Gradle 9.8.2, Android Gradle Plugin 9.5 with built-in Kotlin 2.4,
 compile/target SDK 37. To move the JVM later, run
 `./gradlew updateDaemonJvm --jvm-version=<N>` and commit the file it rewrites.
 
-1. **Choose the database** (next section): `cp firestore.properties.example firestore.properties`
-   and edit it.
-2. **Start that database with data in it.** For the emulator, run from
-   [`backend/`](../backend): `npm run emulators`, then `npm run seed` in another
-   terminal. For hosted, seed it as the backend README says.
+The default is the **hosted** Firebase project: the phone talks to Firestore
+over the internet, on any network (Wi-Fi or mobile data), with no laptop
+involved. Full walkthrough: [Integration & Setup Guide](../docs/integration-setup-guide.md).
+
+1. **Config files**: `cp firestore.properties.example firestore.properties` and
+   set `FIREBASE_PROJECT_ID`. Put the project's `google-services.json` at
+   `app/google-services.json` (next sections).
+2. **Database ready**: rules and indexes deployed and the data seeded, from
+   [`backend/`](../backend): `npm run deploy:firestore`, then `npm run seed`.
 3. **Connect the phone**: enable Developer options → USB debugging, plug it in,
-   accept the prompt. For the emulator target the phone must be on the **same
-   Wi-Fi** as the laptop.
+   accept the prompt.
 4. **Install**: open **this `android/` folder** in Android Studio, select the
    phone, press Run. Or from a terminal in `android/`: `./gradlew installDebug`
    (needs `ANDROID_HOME`, or a `local.properties` with `sdk.dir`; Android Studio
    writes that file for you).
 5. Open **Split Party** and sign in as `maxi`, `annie` or `christophe`. The login
-   screen shows which database the build points at. On **Android 17+** with the
-   emulator target, the app first asks to **allow local network** (shown by the
-   system as "nearby devices"): tap Allow, or the phone can't reach the laptop.
+   screen shows which database the build points at.
 
 Building leaves `git status` clean: `firestore.properties`, `local.properties`,
 `google-services.json` and build output are git-ignored.
 
 ## Firestore target: the one place to switch
 
-`android/firestore.properties` (git-ignored). Same keys as iOS and
-`backend/.env`; see [Firestore target](../docs/firestore-target.md).
+`android/firestore.properties` (git-ignored). It alone decides where the app
+connects: one build, no product flavours, no code change to switch. Same keys as
+iOS and `backend/.env`; see [Firestore target](../docs/firestore-target.md).
 
-**Emulator** (started from `backend/`):
+**Hosted** (default):
+
+```
+FIREBASE_TARGET=hosted
+FIREBASE_PROJECT_ID=your-firebase-project-id   # the same id as backend/.env
+FIRESTORE_EMULATOR_HOST=
+```
+
+Hosted needs `app/google-services.json` **from that same project** (below), and
+the composite indexes from `backend/firestore.indexes.json` deployed with
+`npm run deploy:firestore` (the Me tab query uses one).
+
+**Emulator** (opt-in, offline; started from `backend/` with `npm run emulators`):
 
 ```
 FIREBASE_TARGET=emulator
@@ -94,34 +108,26 @@ FIREBASE_PROJECT_ID=demo-split-party      # must match backend/.env
 FIRESTORE_EMULATOR_HOST=192.168.1.20:8080 # laptop LAN IP: ipconfig getifaddr en0
 ```
 
-A physical phone can't use `127.0.0.1`. An Android Studio emulator (AVD) reaches
-the laptop at `10.0.2.2:8080`. Debug builds allow cleartext HTTP so the phone can
-talk to the emulator. **No `google-services.json` is needed** for this target.
-
-**Hosted**:
-
-```
-FIREBASE_TARGET=hosted
-FIREBASE_PROJECT_ID=your-firebase-project-id
-FIRESTORE_EMULATOR_HOST=
-```
-
-Hosted needs `app/google-services.json` **from that same project** (below), and
-the composite index from `backend/firestore.indexes.json` deployed (the Me tab
-query uses it).
+A physical phone can't use `127.0.0.1` and must be on the **same Wi-Fi** as the
+laptop. An Android Studio emulator (AVD) reaches the laptop at `10.0.2.2:8080`.
+Debug builds allow cleartext HTTP so the phone can talk to the emulator. On
+**Android 17+** the app first asks to **allow local network** (shown by the
+system as "nearby devices"): tap Allow, or the phone can't reach the laptop.
+**No `google-services.json` is needed** for this target.
 
 **Rebuild and reinstall after any change** (the values are compiled into
-`BuildConfig`). No code change is needed to switch. If something is missing or
-inconsistent (no target, an emulator target with no host, hosted with no
+`BuildConfig`). If something is missing or inconsistent (no target, the template
+placeholder project id, an emulator target with no host, hosted with no
 `google-services.json`, or a config file from a different project), the app
 opens on a **Setup required** screen that says what to fix.
 
-## Firebase config file (hosted only)
+## Firebase config file (hosted)
 
 `google-services.json` is **never committed**. Download it from the Firebase
-console (Android app `com.splitparty.android`) and put it at
-`app/google-services.json`: see [`app/GoogleServices.README.md`](app/GoogleServices.README.md).
-The Google Services Gradle plugin is applied only when that file exists, so
+console (Project settings → Your apps → Android app `com.splitparty.android`)
+and put it at `app/google-services.json`: see
+[`app/GoogleServices.README.md`](app/GoogleServices.README.md). The Google
+Services Gradle plugin is applied only when that file exists, so emulator
 builds without it still work.
 
 ## Architecture
