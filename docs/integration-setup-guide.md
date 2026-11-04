@@ -22,6 +22,8 @@ Firebase CLI comes with `npm install` in `backend/`; no global install is needed
 
 Ask whoever owns the Firebase project to add you as a member (Project
 settings → Users and permissions) if you can't see it in the console.
+None of these files are in the repo; [Sharing the config files with
+colleagues](#sharing-the-config-files-with-colleagues) says how to get them.
 
 ## 1. One-time project setup (already done for `a-venge-mo`)
 
@@ -180,6 +182,88 @@ git check-ignore -v backend/.env backend/service-account.json android/firestore.
 
 The Android debug build keeps its cleartext allowance and local-network prompt
 so this path works. The hosted path uses neither.
+
+## Sharing the config files with colleagues
+
+The config files and the key are git-ignored, so a clone never has them. This
+repo is **public**: anything committed is readable by anyone, which is why they
+stay out of git. Share them like this instead.
+
+### What can be shared, and how sensitive it is
+
+| File | Sensitivity | Share it? |
+| ---- | ----------- | --------- |
+| Project id (`a-venge-mo`) | Not secret | Yes, anywhere |
+| `google-services.json`, `GoogleService-Info.plist` | Low: they identify the project and ship inside every app build, but with this PoC's shape-only rules anyone holding them can read and write the demo database | Yes, but only through the team vault (below), never in public places |
+| `backend/service-account.json` | **High**: full admin access to the project, bypasses the security rules | **No.** Each person gets their own key (or uses their own Google login) |
+
+### Option A (preferred): add the colleague to the Firebase project
+
+Then nobody has to send them files; they download everything themselves.
+
+1. A project owner opens Firebase console → ⚙ **Project settings** →
+   **Users and permissions** → **Add member**, enters the colleague's Google
+   account and gives the role **Editor** (enough to download the configs, seed and
+   deploy; use **Owner** only for people who manage the project).
+2. The colleague downloads `google-services.json` and `GoogleService-Info.plist`
+   from Project settings → **Your apps** (table at the top of this guide).
+3. For the backend, the colleague either:
+   - generates **their own** service-account key (Project settings → Service
+     accounts → Generate new private key) and saves it as
+     `backend/service-account.json`, or
+   - skips the key: `gcloud auth application-default login` with the same
+     Google account, and `GOOGLE_APPLICATION_CREDENTIALS=` (empty) in `backend/.env`.
+
+### Option B: the colleague has no console access
+
+1. Keep the two app config files in the **team vault**: a shared vault in the
+   team's password manager (1Password, Bitwarden, …) or, failing that, a
+   private, access-restricted Google Drive folder. Name the entry
+   "Split Party — Firebase app configs (a-venge-mo)" and attach both files.
+2. For the backend, a project owner generates a **separate** key for that
+   colleague (Generate new private key, once per person), puts it in the vault
+   entry shared with that person only, and notes in the entry whose key it is
+   and when it was created.
+3. The colleague copies the files into place (paths in the table at the top).
+
+### Rules for every option
+
+- **Never** send these files through Slack, email, GitHub issues/PRs/gists,
+  ticket attachments or AI chats, and never commit them, even to a branch:
+  a pushed commit stays in history after it is deleted.
+- **One service-account key per person.** A shared key can't be revoked for
+  one person without breaking everyone else.
+- **When someone leaves** (or a key may have leaked): Google Cloud console →
+  IAM & Admin → **Service accounts** → `firebase-adminsdk-…` → **Keys** →
+  delete their key, and remove them under Firebase → Users and permissions.
+  The app config files don't need rotating for a departure; if they leaked
+  publicly, tighten the rules or restrict the API key in Google Cloud console →
+  APIs & Services → Credentials.
+- Before pushing, `git status --short` must not list any of these files. They
+  are ignored, so it shouldn't. If one shows up, stop and check `.gitignore`.
+
+### Keeping a personal master copy
+
+Ignored files exist only in the folder where you put them, so a new clone or
+git worktree starts without them. Keep one copy outside every checkout and copy
+from it:
+
+```sh
+# once: store your copies outside the repo (readable only by you)
+mkdir -p ~/secrets/a-venge-mo && chmod 700 ~/secrets/a-venge-mo
+cp android/app/google-services.json ios/SplitParty/GoogleService-Info.plist \
+   backend/service-account.json ~/secrets/a-venge-mo/
+
+# in each new clone/worktree, from the repo root
+S=~/secrets/a-venge-mo
+cp $S/google-services.json android/app/
+cp $S/GoogleService-Info.plist ios/SplitParty/
+cp $S/service-account.json backend/
+```
+
+The per-checkout settings files (`backend/.env`, `android/firestore.properties`,
+`ios/Config/FirestoreTarget.local.xcconfig`) come from their templates in a
+minute, so they don't need to be shared at all.
 
 ## Security note
 

@@ -85,5 +85,7 @@ To work offline instead, switch each config file to its emulator block and run
 ## Secrets
 
 Never commit `GoogleService-Info.plist`, `google-services.json`, `.env` files,
-`backend/service-account.json` or any other service-account key; they are git-ignored. Each folder's README says
-where its file goes. There is no CI: each piece is built and verified locally.
+`backend/service-account.json` or any other service-account key; they are git-ignored
+(the repo is public). Each folder's README says where its file goes, and
+[Sharing the config files with colleagues](docs/integration-setup-guide.md#sharing-the-config-files-with-colleagues)
+says how a teammate gets them. There is no CI: each piece is built and verified locally.
