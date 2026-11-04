@@ -3,13 +3,16 @@ import SwiftUI
 /// Home: header, the banner slot, then the live feed of everyone's payments,
 /// newest first.
 struct HomeView: View {
+    /// Opens Split Party; called from the banner card.
+    var onStartParty: () -> Void = {}
+
     @Environment(LiveDataStore.self) private var liveData
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 HomeHeader(user: liveData.signedInUser, fallbackName: liveData.userId)
-                HomeBannerSlot()
+                HomeBannerSlot(onStartParty: onStartParty)
                 TransactionList(state: liveData.feed,
                                 emptyTitle: "No payments yet",
                                 emptyMessage: "When friends pay each other, it shows up here.")
@@ -21,12 +24,14 @@ struct HomeView: View {
     }
 }
 
-/// Reserved space above the feed for the merchant banner (PoC-7) and the Join
-/// banner (PoC-8). Empty in this slice; later slices put their views here so the
-/// feed layout around it does not change.
+/// Space above the feed for banners. Holds the "Split the check" card (PoC-7),
+/// shown to everyone in every feed state; the Join banner (PoC-8) goes here later
+/// so the feed layout around it does not change.
 struct HomeBannerSlot: View {
+    let onStartParty: () -> Void
+
     var body: some View {
-        EmptyView()
+        SplitPartyBannerCard(onStartParty: onStartParty)
     }
 }
 

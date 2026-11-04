@@ -37,6 +37,21 @@ enum Theme {
     static let tabIconSlot: CGFloat = 52
     static let payButtonDiameter: CGFloat = 60
     static let payButtonMarkSize: CGFloat = 30
+
+    // "Split the check" card on Home, measured from the Kalshi card in the Venmo
+    // reference. Android uses the same numbers in dp; all are in
+    // docs/design/visual-conventions.md ("Split the check card").
+
+    /// Card edge to the banner image, on the top and both sides.
+    static let bannerImageInset: CGFloat = 4
+    /// Concentric with the card's 28 corners (28 - 4).
+    static let bannerImageCornerRadius: CGFloat = 24
+    static let bannerImageToButtonSpacing: CGFloat = 12
+    /// Added to `bannerImageInset`, so the button sits 18 from the card edge.
+    static let bannerButtonSideInset: CGFloat = 14
+    static let bannerButtonBottomInset: CGFloat = 16
+    static let bannerButtonHeight: CGFloat = 38
+    static let bannerButtonFontSize: CGFloat = 15
 }
 
 extension Color {

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		5AB000000000000000000001 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 5AD000000000000000000001 /* FirebaseFirestore */; };
 		5AB000000000000000000002 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 5AD000000000000000000002 /* SnapshotTesting */; };
+		5AB000000000000000000003 /* split-party-banner.png in Resources */ = {isa = PBXBuildFile; fileRef = 5A3000000000000000000007 /* split-party-banner.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,6 +36,7 @@
 		5A3000000000000000000004 /* FirestoreTarget.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = FirestoreTarget.example.xcconfig; sourceTree = "<group>"; };
 		5A3000000000000000000005 /* SplitPartyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SplitPartyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A3000000000000000000006 /* SplitPartyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SplitPartyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A3000000000000000000007 /* split-party-banner.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "split-party-banner.png"; path = "../brand/split-party-banner.png"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +91,7 @@
 				5A4000000000000000000002 /* SplitPartyTests */,
 				5A4000000000000000000003 /* SplitPartyUITests */,
 				5A6000000000000000000003 /* Config */,
+				5A6000000000000000000004 /* Shared brand assets */,
 				5A6000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -111,6 +114,14 @@
 				5A3000000000000000000003 /* Info.plist */,
 			);
 			path = Config;
+			sourceTree = "<group>";
+		};
+		5A6000000000000000000004 /* Shared brand assets */ = {
+			isa = PBXGroup;
+			children = (
+				5A3000000000000000000007 /* split-party-banner.png */,
+			);
+			name = "Shared brand assets";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -232,6 +243,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5AB000000000000000000003 /* split-party-banner.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

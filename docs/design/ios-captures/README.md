@@ -11,7 +11,7 @@ styled to match them. Measured values are in
 | Appearance | Light. The app forces light mode (`preferredColorScheme(.light)`) |
 | Status bar | Pinned to 9:41, full signal and Wi-Fi, charged battery (`simctl status_bar override`) |
 | Data | The app's Debug fixture (`-UITestFixture`), which serves the same users and payments as `backend/lib/seedData.js`, with ages relative to now ("3 hours ago" and so on) |
-| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, Pay/Request button seated in the tab bar) |
+| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, Pay/Request button seated in the tab bar). The Home captures (feed, new-row highlight, empty, error) were re-taken again the same day, iPhone 17 Pro / iOS 26.5, when the "Split the check" card filled the banner slot, and the placeholder capture was added |
 
 The work order asked for a physical iPhone. These come from the simulator at the
 same pt size and scale as an iPhone 17/18 Pro, because the project owner chose
@@ -25,7 +25,8 @@ run `docs/design/capture/capture-ios.sh`. Android then follows the new images.
 | [`login-filled.png`](login-filled.png) | Login, "maxi" typed, Sign in enabled |
 | [`login-error.png`](login-error.png) | Login after "thor": red field outline and inline error under the field |
 | [`login-not-configured.png`](login-not-configured.png) | Launch with no Firestore target: footer says what to fix, Sign in disabled |
-| [`home-feed.png`](home-feed.png) | Home with the seeded feed (signed in as Maxi) |
+| [`home-feed.png`](home-feed.png) | Home with the seeded feed (signed in as Maxi), with the "Split the check" card above the first row |
+| [`split-party-placeholder.png`](split-party-placeholder.png) | Split Party placeholder, opened from "Start a party" on Home |
 | [`home-new-row-highlight.png`](home-new-row-highlight.png) | Home ~0.5 s after a new payment arrived: top card tinted with brand blue |
 | [`home-empty.png`](home-empty.png) | Home with no payments |
 | [`home-error.png`](home-error.png) | Home with the database unreachable ("Reconnecting…") |

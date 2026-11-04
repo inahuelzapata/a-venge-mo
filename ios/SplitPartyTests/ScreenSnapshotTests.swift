@@ -84,16 +84,21 @@ final class ScreenSnapshotTests: XCTestCase {
         try assertSignedInScreen(scenario: .seeded, tab: .payRequest)
     }
 
+    func testSplitPartyPlaceholder() throws {
+        try assertSignedInScreen(scenario: .seeded, tab: .home, homePath: [.splitParty])
+    }
+
     // MARK: Helpers
 
     private func assertSignedInScreen(scenario: FixtureDataSource.Scenario, tab: AppTab,
+                                      homePath: [HomeDestination] = [],
                                       pixelPrecision: Float = ScreenSnapshotTests.pixelPrecision,
                                       file: StaticString = #filePath, testName: String = #function,
                                       line: UInt = #line) throws {
         let appModel = makeAppModel(scenario: scenario, signedInUserId: "maxi")
         let liveData = try XCTUnwrap(appModel.liveData, "Saved session should open as maxi")
         defer { liveData.stop() }
-        assertScreen(MainTabView(initialTab: tab).environment(liveData), appModel: appModel,
+        assertScreen(MainTabView(initialTab: tab, initialHomePath: homePath).environment(liveData), appModel: appModel,
                      pixelPrecision: pixelPrecision, file: file, testName: testName, line: line)
     }
 

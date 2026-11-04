@@ -94,9 +94,13 @@ final class AppShellUITests: XCTestCase {
         let topRowIsIncoming = NSPredicate { _, _ in
             self.transactionRows.firstMatch.label.contains("$31.15")
         }
+        XCTAssertTrue(bannerCard.exists)
+        let cardFrameBefore = bannerCard.frame
         expectation(for: topRowIsIncoming, evaluatedWith: nil)
         waitForExpectations(timeout: Self.incomingPaymentTimeout)
         XCTAssertEqual(transactionRows.count, 7)
+        XCTAssertEqual(bannerCard.frame, cardFrameBefore, "The card does not move when a row arrives")
+        assertBannerCardIsAbove(transactionRows.firstMatch)
     }
 
     func testEmptyFeedShowsEmptyState() {
@@ -104,6 +108,7 @@ final class AppShellUITests: XCTestCase {
         signIn(as: "maxi")
         XCTAssertTrue(element("feedEmptyState").waitForExistence(timeout: Self.screenTimeout))
         XCTAssertEqual(transactionRows.count, 0)
+        assertBannerCardIsAbove(element("feedEmptyState"))
     }
 
     func testUnreachableDatabaseShowsErrorState() {
@@ -116,6 +121,50 @@ final class AppShellUITests: XCTestCase {
         launch(scenario: "unreachable", resettingSession: false)
         XCTAssertTrue(element("feedErrorState").waitForExistence(timeout: Self.screenTimeout))
         XCTAssertTrue(element("bottomBar").exists)
+        assertBannerCardIsAbove(element("feedErrorState"))
+    }
+
+    // MARK: Split the check card
+
+    func testBannerCardSitsAboveFeedWithAccessibleLabels() {
+        launch(resettingSession: true)
+        signIn(as: "maxi")
+        XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
+        assertBannerCardIsAbove(transactionRows.firstMatch)
+        XCTAssertEqual(bannerImage.label,
+                       "Split the check with friends. A faster, easier way to take care of the bill.",
+                       "VoiceOver reads the banner's own copy, not an unnamed image")
+        XCTAssertEqual(startPartyButton.label, "Start a party")
+        XCTAssertEqual(bannerCard.buttons.count, 2, "Only the image and the button are tap targets")
+    }
+
+    func testStartPartyOpensPlaceholderAndBackKeepsScrollPosition() {
+        launch(resettingSession: true)
+        signIn(as: "maxi")
+        XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
+
+        // Scroll a little, keeping the button on screen, so Back has a position to keep.
+        let start = homeScreen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -120)))
+        let scrolledButtonFrame = startPartyButton.frame
+        XCTAssertLessThan(scrolledButtonFrame.minY, 0.6 * app.frame.height, "Home scrolled")
+
+        startPartyButton.tap()
+        assertPlaceholderIsOpen()
+
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(startPartyButton.waitForExistence(timeout: Self.screenTimeout))
+        XCTAssertFalse(placeholderScreen.exists)
+        XCTAssertEqual(startPartyButton.frame.minY, scrolledButtonFrame.minY, accuracy: 1,
+                       "Back returns to the same scroll position")
+    }
+
+    func testBannerImageOpensPlaceholder() {
+        launch(resettingSession: true)
+        signIn(as: "maxi")
+        XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
+        bannerImage.tap()
+        assertPlaceholderIsOpen()
     }
 
     // MARK: Helpers
@@ -125,6 +174,24 @@ final class AppShellUITests: XCTestCase {
     private var homeScreen: XCUIElement { element("homeScreen") }
     private var transactionRows: XCUIElementQuery {
         app.descendants(matching: .any).matching(identifier: "transactionRow")
+    }
+
+    private var bannerCard: XCUIElement { element("splitPartyBanner") }
+    private var bannerImage: XCUIElement { app.buttons["splitPartyBannerImage"] }
+    private var startPartyButton: XCUIElement { app.buttons["startPartyButton"] }
+    private var placeholderScreen: XCUIElement { element("splitPartyPlaceholderScreen") }
+
+    private func assertBannerCardIsAbove(_ feedItem: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(bannerCard.waitForExistence(timeout: Self.screenTimeout), "Card shown", file: file, line: line)
+        XCTAssertTrue(feedItem.exists, file: file, line: line)
+        XCTAssertLessThanOrEqual(bannerCard.frame.maxY, feedItem.frame.minY,
+                                 "Card sits above the feed", file: file, line: line)
+    }
+
+    private func assertPlaceholderIsOpen(file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(placeholderScreen.waitForExistence(timeout: Self.screenTimeout), file: file, line: line)
+        XCTAssertTrue(app.navigationBars["Split Party"].exists, "Titled Split Party", file: file, line: line)
+        XCTAssertTrue(app.staticTexts["In progress"].exists, file: file, line: line)
     }
 
     private func element(_ identifier: String) -> XCUIElement {

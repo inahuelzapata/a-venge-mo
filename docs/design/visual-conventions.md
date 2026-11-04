@@ -144,6 +144,48 @@ fills the box's full height and 87% of its width.
 | `android/app/src/main/res/drawable/ic_launcher_foreground.xml`, `ic_launcher_background.xml` | Adaptive launcher icon layers: light mark inside the 66 dp safe zone, navy radial gradient |
 | `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`, `ic_launcher_round.xml` | Adaptive icon (vectors cover every density; minSdk is 26). No monochrome layer, so themed icons don't restyle it |
 
+## Split the check card
+
+The entry point to Split Party: the first item of the Home feed, in the banner
+slot between the header and the first payment card. It scrolls with the feed.
+Its anatomy follows the Kalshi card in `home-feed-reference-1.jpg`, but with **no
+header row**: no logo, no merchant name and no "Sponsored" label, because the
+artwork carries the copy and the Tony's identity. It reads no Firestore data and
+looks the same with seeded data, an empty feed and the error state (it sits
+above the empty/error card). Measured on [`ios-captures/home-feed.png`](ios-captures/home-feed.png)
+(402 pt wide, @3x).
+
+| Value | iOS (pt) and Android (dp) |
+| ----- | ------------------------- |
+| Position | First feed item, 16 below the header (y 130 on the reference device), 16 above the first payment card |
+| Card | White, radius 28 (continuous), 8 gutter left and right (386 wide). 259 tall on a 402 screen |
+| Hero image | 4 from the card's top, left and right edges (378 wide). Radius 24 (continuous, concentric with the card). Aspect ratio **2 : 1**, fitted, never cropped: 189 tall at 378 wide |
+| Image to button | 12 |
+| Button | Black `#000000` capsule, **38** tall, **18** from each card edge (the 4 image inset plus 14). "Start a party", 15 semibold, white, centred. Pressed: 80% opacity |
+| Button to card bottom | 16 |
+| Tap targets | Hero image and button only, both open Split Party. The image shows no press feedback |
+| Accessibility | The image is one element labelled with the banner copy ("Split the check with friends. A faster, easier way to take care of the bill."). The button is labelled "Start a party". No unnamed image |
+| Theme | Same in light and dark: the app is light-only |
+
+For comparison, the Kalshi reference card measures 3.3 image inset, 37.3 button
+height, 14.4 button side inset, 10.9 image-to-button gap and 15.3 bottom inset,
+at 1.836 px per pt. The values above round these to the spacing scale. The
+button keeps 18 from the card edge, a choice made in review.
+
+| File | What it is |
+| ---- | ---------- |
+| `brand/split-party-banner.png` | The banner artwork as supplied, 1774 × 887 px (2 : 1). Committed only here. The iOS project bundles this file directly ("Shared brand assets" group), with no copy in `Assets.xcassets`. 1774 px covers a 3x card on the widest iPhone (416 pt card image → 1248 px) |
+
+**Split Party placeholder** ([`ios-captures/split-party-placeholder.png`](ios-captures/split-party-placeholder.png)):
+pushed over Home with the system navigation bar, inline title "Split Party" and
+the standard Back button. Back returns to Home at the same scroll position. The
+bottom bar stays visible. Body centred on the page background: `person.3.fill`
+symbol 52 in brand blue, "In progress" (24 bold, primary), then "We're still
+building Split Party. Soon you'll start a party here and split the check with
+friends." (17 regular, secondary, centred), 12 apart, 32 side margins. A real
+party screen later replaces this at one point (`HomeDestination.splitParty` in
+`ios/SplitParty/UI/MainTabView.swift`).
+
 ## Type
 
 iOS uses SF Pro, which may not be bundled on Android. Android bundles **Inter**
