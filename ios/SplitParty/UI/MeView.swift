@@ -27,6 +27,7 @@ struct MeView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        .accessibilityIdentifier("meScreen")
     }
 }
 

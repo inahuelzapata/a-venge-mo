@@ -24,7 +24,12 @@ enum AppTab: CaseIterable {
 /// A custom bar instead of `TabView` because the reference bar is a floating
 /// capsule with a round brand-blue action button, which `TabView` can't draw.
 struct MainTabView: View {
-    @State private var selectedTab: AppTab = .home
+    @State private var selectedTab: AppTab
+
+    /// `initialTab` lets snapshot tests open on Me or Pay/Request; the app starts on Home.
+    init(initialTab: AppTab = .home) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     var body: some View {
         ZStack {
@@ -64,6 +69,8 @@ private struct BottomBar: View {
         .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("bottomBar")
     }
 
     @ViewBuilder
@@ -105,5 +112,7 @@ struct PayRequestPlaceholderView: View {
                 .foregroundStyle(Theme.secondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("payRequestScreen")
     }
 }

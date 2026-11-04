@@ -1,4 +1,3 @@
-import FirebaseFirestore
 import Foundation
 import Observation
 import SwiftUI
@@ -33,15 +32,15 @@ final class LiveDataStore {
     private static let relistenDelay: Duration = .seconds(2)
     private static let highlightDuration: Duration = .seconds(1.5)
 
-    @ObservationIgnored private let repository: PaymentRepository
+    @ObservationIgnored private let repository: any PaymentDataSource
     @ObservationIgnored private let connection = ConnectionMonitor()
-    @ObservationIgnored private var registrations: [ListenerRegistration] = []
+    @ObservationIgnored private var subscriptions: [LiveSubscription] = []
     @ObservationIgnored private var feedTracker = ListConnectionTracker()
     @ObservationIgnored private var myTransactionsTracker = ListConnectionTracker()
     @ObservationIgnored private var seenFeedIds: Set<String>?
     @ObservationIgnored private var isStopped = false
 
-    init(userId: String, repository: PaymentRepository) {
+    init(userId: String, repository: any PaymentDataSource) {
         self.userId = userId
         self.repository = repository
         connection.whenNetworkRestored { [weak self] in
@@ -52,8 +51,8 @@ final class LiveDataStore {
 
     func stop() {
         isStopped = true
-        registrations.forEach { $0.remove() }
-        registrations = []
+        subscriptions.forEach { $0.cancel() }
+        subscriptions = []
         feedTracker.cancelTimer()
         myTransactionsTracker.cancelTimer()
     }
@@ -67,7 +66,7 @@ final class LiveDataStore {
     }
 
     private func listenToUsers() {
-        registrations.append(repository.listenToUsers { [weak self] result in
+        subscriptions.append(repository.listenToUsers { [weak self] result in
             guard let self else { return }
             switch result {
             case let .success(usersById):
@@ -83,7 +82,7 @@ final class LiveDataStore {
         feedTracker.armTimeout(after: Self.unreachableAfter) { [weak self] in
             self?.markUnreachableIfUnconfirmed(\.feed, tracker: \.feedTracker)
         }
-        registrations.append(repository.listenToFeed { [weak self] result in
+        subscriptions.append(repository.listenToFeed { [weak self] result in
             guard let self else { return }
             switch result {
             case let .success(list):
@@ -100,7 +99,7 @@ final class LiveDataStore {
         myTransactionsTracker.armTimeout(after: Self.unreachableAfter) { [weak self] in
             self?.markUnreachableIfUnconfirmed(\.myTransactions, tracker: \.myTransactionsTracker)
         }
-        registrations.append(repository.listenToTransactions(involving: userId) { [weak self] result in
+        subscriptions.append(repository.listenToTransactions(involving: userId) { [weak self] result in
             guard let self else { return }
             switch result {
             case let .success(list):

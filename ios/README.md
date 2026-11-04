@@ -16,17 +16,28 @@ Pay/Request (placeholder) and Me. The phone stays signed in until Log out.
 | ---- | ---- |
 | `SplitParty.xcodeproj` | The project. Open this. |
 | `SplitParty/` | App sources and assets. This folder is **synchronized** with Xcode: files added here are part of the app with no project edit. |
-| `SplitParty/Data/` | Firestore access (`PaymentRepository`), models, money formatting, session storage |
+| `SplitParty/Data/` | Data access behind `PaymentDataSource`: Firestore (`PaymentRepository`) and, in Debug builds only, the in-memory `FixtureDataSource` used by tests; models, money formatting, session storage |
 | `SplitParty/App/` | `AppModel` (target + who is signed in) and `LiveDataStore` (live listeners, error state) |
 | `SplitParty/UI/` | Login, Home, Me, bottom bar, theme |
-| `SplitPartyTests/` | Unit tests (money, usernames, document mapping). Run with ⌘U. |
+| `SplitPartyTests/` | Unit tests (money, usernames, document mapping) and snapshot tests (`ScreenSnapshotTests`) |
+| `SplitPartyTests/__Snapshots__/` | Snapshot reference PNGs, stored with **Git LFS** |
+| `SplitPartyUITests/` | UI tests of the shell flows (`AppShellUITests`) |
 | `Config/Base.xcconfig` | Shared build settings; optionally includes your local override |
 | `Config/FirestoreTarget.example.xcconfig` | Template for your git-ignored `FirestoreTarget.local.xcconfig` |
 | `Config/Info.plist` | Custom Info.plist keys (Firestore target, local-network prompt) |
 
-Dependency: [firebase-ios-sdk](https://github.com/firebase/firebase-ios-sdk)
-(FirebaseFirestore only) via Swift Package Manager. Xcode fetches it on first
-open; the pinned version is in `SplitParty.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
+Dependencies via Swift Package Manager, fetched by Xcode on first open and
+pinned in `SplitParty.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`:
+[firebase-ios-sdk](https://github.com/firebase/firebase-ios-sdk) (FirebaseFirestore
+only, in the app) and
+[swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing)
+(test target only).
+
+**Before cloning, install Git LFS** (Large File Storage; the snapshot PNGs and
+the design screenshots are stored there): `brew install git-lfs` or the
+installer from <https://git-lfs.com>, then `git lfs install` once per machine.
+If you cloned without it, run `git lfs pull`. Without it the PNGs are small
+text pointers and every snapshot test fails.
 
 ## Run on a physical iPhone
 
@@ -90,6 +101,39 @@ started from [`backend/`](../backend); this app never runs its own.
 - Names are shown as display names, never "You", so every phone shows the
   identical feed.
 
+## Tests
+
+Run everything with ⌘U in Xcode, or from this folder:
+
+```
+xcodebuild test -project SplitParty.xcodeproj -scheme SplitParty \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
+```
+
+| Suite | What it covers | Needs |
+| ----- | -------------- | ----- |
+| `SplitPartyTests` (unit) | Money formatting from cents, username rules, Firestore document mapping | Nothing |
+| `ScreenSnapshotTests` | Pixel snapshots of login (empty, unknown user, not configured), Home (feed, empty, unreachable), Me and Pay/Request | **iOS 26.5 simulator** (references are recorded there; other iOS versions skip these tests) |
+| `SplitPartyUITests` | Sign in as maxi, "thor" error, empty field, stay signed in across relaunch, Log out, tab bar, a new payment appearing on top, empty and error states | Nothing |
+
+Snapshot and UI tests never touch Firestore. In Debug builds the app accepts
+launch arguments that switch it to built-in seeded data (`FixtureDataSource`):
+`-UITestFixture seeded|empty|unreachable`, `-UITestResetSession YES`,
+`-UITestInsertIncomingPaymentAfter <seconds>`. Release builds ignore them.
+
+**After an intended visual change**, re-record the snapshots, look at every
+changed PNG, then commit them (Git LFS stores them automatically):
+
+```
+TEST_RUNNER_SNAPSHOT_TESTING_RECORD=all xcodebuild test -project SplitParty.xcodeproj \
+  -scheme SplitParty -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
+  -only-testing:SplitPartyTests/ScreenSnapshotTests
+```
+
+Record mode reports every snapshot test as failed; that is expected. Run again
+without the variable to confirm they pass. Snapshots are drawn at a fixed
+390×844 size in sRGB, so any iPhone 26.5 simulator gives the same images.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -98,3 +142,11 @@ started from [`backend/`](../backend); this app never runs its own.
 | "Can't reach the database" on a phone | Emulator running? `FIRESTORE_EMULATOR_HOST` is the laptop's LAN IP, not 127.0.0.1? Local-network permission allowed (Settings → Privacy → Local Network)? |
 | Feed empty but seeded | Phone and seed script use different `FIREBASE_PROJECT_ID`s |
 | Signing error | Set `DEVELOPMENT_TEAM` and a unique `PRODUCT_BUNDLE_IDENTIFIER` in the local xcconfig |
+| Every snapshot test fails with "could not be loaded" | The PNGs are LFS pointers: `git lfs install && git lfs pull` |
+| Snapshot tests are skipped | You're not on the iOS 26.5 simulator, the one the references were recorded on |
+
+## Glossary
+
+- **LFS** (Large File Storage): Git extension that keeps big binary files on a separate server and only a small pointer file in the repository.
+- **P3 / sRGB**: colour spaces. Simulators render in the wider Display P3; snapshots are forced to sRGB so they compare reliably.
+- **Snapshot test**: renders a screen to an image and compares it pixel by pixel with a committed reference image.

@@ -5,10 +5,19 @@ import SwiftUI
 struct LoginView: View {
     @Environment(AppModel.self) private var appModel
 
-    @State private var username = ""
+    @State private var username: String
     @State private var errorMessage: String?
     @State private var isSigningIn = false
     @FocusState private var isUsernameFocused: Bool
+    private let focusesFieldOnAppear: Bool
+
+    /// The parameters exist for snapshot tests, which need a given state on first
+    /// render and no blinking cursor; the app uses the defaults.
+    init(initialUsername: String = "", initialErrorMessage: String? = nil, focusesFieldOnAppear: Bool = true) {
+        _username = State(initialValue: initialUsername)
+        _errorMessage = State(initialValue: initialErrorMessage)
+        self.focusesFieldOnAppear = focusesFieldOnAppear
+    }
 
     private var trimmedUsername: String {
         username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -72,7 +81,7 @@ struct LoginView: View {
             SetupStatusFooter()
         }
         .background(Theme.background.ignoresSafeArea())
-        .onAppear { isUsernameFocused = true }
+        .onAppear { isUsernameFocused = focusesFieldOnAppear }
     }
 
     private func submit() {
@@ -94,7 +103,7 @@ private struct SetupStatusFooter: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Label(appModel.target.summary, systemImage: "cylinder.split.1x2")
+            Label(appModel.targetSummary, systemImage: "cylinder.split.1x2")
                 .foregroundStyle(Theme.secondaryText)
             if let setupProblem = appModel.setupProblem {
                 Text(setupProblem)

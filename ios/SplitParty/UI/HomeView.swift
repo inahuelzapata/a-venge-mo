@@ -17,6 +17,7 @@ struct HomeView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        .accessibilityIdentifier("homeScreen")
     }
 }
 

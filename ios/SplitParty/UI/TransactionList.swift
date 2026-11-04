@@ -82,6 +82,7 @@ struct TransactionRow: View {
         )
         .padding(.horizontal, Theme.screenGutter)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("transactionRow")
     }
 
     /// Names, never "You": every phone must show the identical feed text.

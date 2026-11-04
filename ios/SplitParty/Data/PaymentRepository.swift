@@ -1,22 +1,10 @@
 import FirebaseFirestore
 import Foundation
 
-/// One delivery from a live list query.
-struct LiveList<Item> {
-    let items: [Item]
-    /// True while Firestore has not confirmed the rows with the server. With the
-    /// memory-only cache this means "we could not reach the database yet".
-    let isFromCache: Bool
-}
-
 /// All Firestore access for the app shell. Uses only the collections, fields and
 /// queries documented in docs/firestore-schema.md.
-final class PaymentRepository {
-    enum LoginError: Error, Equatable {
-        case unknownUsername
-        case databaseUnreachable
-    }
-
+@MainActor
+final class PaymentRepository: PaymentDataSource {
     /// Login is a single server read; give up after this long so an unreachable
     /// database shows an error instead of a spinner that never ends.
     private static let loginTimeout: Duration = .seconds(5)
@@ -50,7 +38,7 @@ final class PaymentRepository {
 
     /// Feed: `transactions orderBy(createdAt desc) limit(50)`, all users.
     func listenToFeed(_ onChange: @escaping (Result<LiveList<PaymentTransaction>, Error>) -> Void)
-        -> ListenerRegistration {
+        -> LiveSubscription {
         let query = firestore.collection(Schema.Collection.transactions)
             .order(by: Schema.TransactionField.createdAt, descending: true)
             .limit(to: Schema.listLimit)
@@ -62,7 +50,7 @@ final class PaymentRepository {
     /// backend/firestore.indexes.json.
     func listenToTransactions(involving userId: String,
                               _ onChange: @escaping (Result<LiveList<PaymentTransaction>, Error>) -> Void)
-        -> ListenerRegistration {
+        -> LiveSubscription {
         let query = firestore.collection(Schema.Collection.transactions)
             .whereField(Schema.TransactionField.participantIds, arrayContains: userId)
             .order(by: Schema.TransactionField.createdAt, descending: true)
@@ -74,8 +62,8 @@ final class PaymentRepository {
     /// name and avatar, and the Me tab needs the live balance. Three seeded users,
     /// so one small listener is cheaper than a read per row.
     func listenToUsers(_ onChange: @escaping (Result<[String: UserAccount], Error>) -> Void)
-        -> ListenerRegistration {
-        firestore.collection(Schema.Collection.users)
+        -> LiveSubscription {
+        let registration = firestore.collection(Schema.Collection.users)
             .addSnapshotListener(includeMetadataChanges: true) { snapshot, error in
                 if let error { return onChange(.failure(error)) }
                 guard let snapshot else { return }
@@ -87,6 +75,7 @@ final class PaymentRepository {
                 }
                 onChange(.success(usersById))
             }
+        return FirestoreSubscription(registration: registration)
     }
 
     /// Forces an immediate reconnect. Firestore retries with growing backoff while
@@ -101,10 +90,10 @@ final class PaymentRepository {
 
     private func listen(to query: Query,
                         _ onChange: @escaping (Result<LiveList<PaymentTransaction>, Error>) -> Void)
-        -> ListenerRegistration {
+        -> LiveSubscription {
         // Metadata changes are included so a "cache → server confirmed" flip is
         // delivered; that is how the screens know they are connected.
-        query.addSnapshotListener(includeMetadataChanges: true) { snapshot, error in
+        let registration = query.addSnapshotListener(includeMetadataChanges: true) { snapshot, error in
             if let error { return onChange(.failure(error)) }
             guard let snapshot else { return }
             let items = snapshot.documents.compactMap { document in
@@ -119,6 +108,7 @@ final class PaymentRepository {
             }
             onChange(.success(LiveList(items: items, isFromCache: snapshot.metadata.isFromCache)))
         }
+        return FirestoreSubscription(registration: registration)
     }
 
     private func withTimeout<Value: Sendable>(_ timeout: Duration,
@@ -141,5 +131,14 @@ final class PaymentRepository {
                 throw LoginError.databaseUnreachable
             }
         }
+    }
+}
+
+/// Adapts a Firestore listener to `LiveSubscription`.
+private struct FirestoreSubscription: LiveSubscription {
+    let registration: ListenerRegistration
+
+    func cancel() {
+        registration.remove()
     }
 }
