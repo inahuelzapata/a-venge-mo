@@ -2,12 +2,15 @@ package com.splitparty.android.ui.shell
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.splitparty.android.di.domainModule
@@ -21,9 +24,13 @@ import com.splitparty.android.testing.FakeSplitPartyRepository
 import com.splitparty.android.testing.TestData
 import com.splitparty.android.testing.TestData.server
 import com.splitparty.android.testing.TestData.tx
+import com.splitparty.android.ui.home.HomeTestTags
+import com.splitparty.android.ui.home.SplitPartyCardTestTags
 import com.splitparty.android.ui.me.MeTestTags
+import com.splitparty.android.ui.party.SplitPartyTestTags
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -86,6 +93,48 @@ class MainShellNavigationTest {
 
         pressBack()
         compose.onNodeWithText("Feed row", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun startAPartyOpensThePlaceholderAndSystemBackReturnsHome() {
+        compose.onNodeWithText("Start a party").performClick()
+        compose.onNodeWithText("Split Party").assertIsDisplayed()
+        compose.onNodeWithTag(SplitPartyTestTags.BODY).assertTextContains("in progress", substring = true)
+
+        pressBack()
+        compose.onNodeWithText("Start a party").assertIsDisplayed()
+        compose.onNodeWithText("Feed row", substring = true).assertExists()
+    }
+
+    @Test
+    fun bannerImageOpensThePlaceholderAndOnScreenBackReturnsHome() {
+        compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).performClick()
+        compose.onNodeWithText("Split Party").assertIsDisplayed()
+
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Start a party").assertIsDisplayed()
+    }
+
+    @Test
+    fun homeTabFromThePlaceholderReturnsHome() {
+        compose.onNodeWithText("Start a party").performClick()
+        compose.onNodeWithTag(ShellTestTags.tab(Tab.Home)).performClick()
+        compose.onNodeWithText("Start a party").assertIsDisplayed()
+        compose.onNodeWithText("Split Party").assertDoesNotExist()
+    }
+
+    @Test
+    fun backFromThePlaceholderKeepsTheFeedScrollPosition() {
+        repository.feed.value = server((1..20).map { tx("r$it", memo = "Row $it") })
+        // Header scrolled off, the card at the top: a position Home only keeps if its state survives.
+        compose.onNodeWithTag(HomeTestTags.FEED).performScrollToIndex(1)
+        val cardTop = compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).getUnclippedBoundsInRoot().top
+
+        compose.onNodeWithText("Start a party").performClick()
+        compose.onNodeWithText("Split Party").assertIsDisplayed()
+        pressBack()
+
+        assertEquals(cardTop, compose.onNodeWithTag(SplitPartyCardTestTags.IMAGE).getUnclippedBoundsInRoot().top)
     }
 
     /** TalkBack reads the content description, so the image-only button is announced by name. */

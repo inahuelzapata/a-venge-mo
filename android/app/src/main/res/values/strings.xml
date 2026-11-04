@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">A-venge-mo</string>
+
+    <!-- Split Party entry card on Home and its placeholder screen -->
+    <string name="split_party_banner_description">Split the check with friends. A faster, easier way to take care of the bill.</string>
+    <string name="split_party_start">Start a party</string>
+    <string name="split_party_title">Split Party</string>
+    <string name="split_party_in_progress_title">In progress</string>
+    <string name="split_party_in_progress">Splitting the check is in progress. Starting a party will open here soon.</string>
+    <string name="back">Back</string>
 </resources>

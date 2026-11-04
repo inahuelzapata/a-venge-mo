@@ -56,6 +56,19 @@ object Dimens {
     val StatusCardPadding = 28.dp
 
     val PillHeight = 52.dp
+
+    // "Split the check with friends" card (Kalshi-style feed banner, no header).
+    // Provisional until the iOS card's measured values land in the conventions note.
+
+    /** Card edge to the hero image (top and sides); the image radius stays concentric with the card's 28. */
+    val BannerCardInset = 4.dp
+    val BannerImageRadius = CardRadius - BannerCardInset
+
+    /** Between the hero image and the button. */
+    val BannerButtonGap = 12.dp
+
+    /** Card edge to the button, left, right and bottom. */
+    val BannerButtonMargin = 16.dp
     val FieldHeight = 56.dp
 
     val TabBarSideMargin = 16.dp
@@ -75,9 +88,11 @@ object Dimens {
     // conventions note). A mark size is its square box, which includes a little
     // room above and below the artwork.
     val LoginMark = 72.dp
+
     /** Between the login mark and the wordmark. */
     val LoginMarkGap = 20.dp
     val HeaderMark = 24.dp
+
     /** Between the header mark and the "Home" title. */
     val HeaderMarkSpacing = 6.dp
     val PayButtonDiameter = 60.dp

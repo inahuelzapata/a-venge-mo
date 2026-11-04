@@ -76,6 +76,29 @@ Spacing values used: **4, 6, 8, 12, 14, 16, 20, 24, 28, 32**.
 | Pill button | Black capsule, full width, 52 tall, 18 semibold white text. Disabled: black at 30%. Pressed: 80% opacity, nothing else |
 | Corner radii | Cards 28; field, buttons, chips, capsules and tab bar are full capsules (radius = height / 2) |
 
+## Split Party card and placeholder
+
+The Home feed's entry to Split Party: a feed item directly below the header,
+above the first row (and above the loading, empty and error cards). Modelled on
+the Kalshi ad card in [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg)
+**without** its logo/name/"Sponsored" header. **Android values below are
+provisional** (built from the reference before the iOS card existed). Replace
+them with the iOS card's measured values when its capture lands, then reconcile
+Android.
+
+| Element | Value |
+| ------- | ----- |
+| Card | White, radius 28, 8 gutter (386 wide on 402), no shadow or elevation. 16 below the header, 12 above the first row |
+| Hero image | `brand/banners/split-the-check-with-friends.png` (1774 × 887, 2:1), 4 from the card's top and sides, full card width minus 8, scaled to fit with no crop, radius 24 (concentric with the card) |
+| Button | Pill button (52, black, "Start a party"), 12 below the image, 16 from the card's sides and bottom |
+| Taps | Image and button open Split Party. Nothing else on the card is tappable. No ripple; the button dims to 80% while pressed |
+| Accessibility | The image is announced by the banner's own copy ("Split the check with friends. A faster, easier way to take care of the bill."), the button as "Start a party, button" |
+| Placeholder screen | Header as Home's (44 tall, 8 below the safe area): round 44 white back button with 8% hairline and a chevron on the left, "Split Party" centred (screen title). Body centred above the tab bar: 64 brand-blue circle with white fork-and-knife, "In progress" (placeholder title), explanation (subtitle, secondary), 12 apart. Tab bar stays, Home selected |
+
+The banner artwork is committed once, in `brand/banners/`. Android copies it into
+generated resources at build time (`drawable-nodpi`, see `android/app/build.gradle.kts`),
+so there is no copy under `android/`.
+
 ## Bottom (tab) bar
 
 A floating capsule, not a full-width bar. iOS shows no top hairline across the

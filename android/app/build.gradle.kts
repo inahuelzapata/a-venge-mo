@@ -79,6 +79,37 @@ ktlint {
     android.set(true)
 }
 
+// Shared artwork lives once in the repo's brand/ folder (iOS bundles the same
+// file). It is copied into generated resources at build time, never committed
+// under android/. drawable-nodpi: the 1774 px source is wider than a full-width
+// card on any phone (386 dp x 4.5), so one size stays crisp at every density.
+abstract class SharedBannerResources : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val banner: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val target = outputDir.get().dir("drawable-nodpi").asFile
+        target.deleteRecursively()
+        target.mkdirs()
+        banner.get().asFile.copyTo(target.resolve("split_party_banner.png"))
+    }
+}
+
+val sharedBannerResources = tasks.register<SharedBannerResources>("sharedBannerResources") {
+    banner.set(rootProject.layout.projectDirectory.file("../brand/banners/split-the-check-with-friends.png"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.res?.addGeneratedSourceDirectory(sharedBannerResources, SharedBannerResources::outputDir)
+    }
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))

@@ -22,6 +22,7 @@ import com.splitparty.android.ui.login.LoginUiState
 import com.splitparty.android.ui.login.LoginViewModel
 import com.splitparty.android.ui.me.MeScreen
 import com.splitparty.android.ui.me.MeUiState
+import com.splitparty.android.ui.party.SplitPartyPlaceholderScreen
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.shell.ShellFrame
 import com.splitparty.android.ui.shell.Tab
@@ -105,6 +106,10 @@ class ParityScreenshotTest {
 
     @Test
     fun payRequest() = shell("pay-request", Tab.Pay) { PayRequestScreen(it) }
+
+    /** Pushed over Home, so the bar shows Home selected. */
+    @Test
+    fun splitPartyPlaceholder() = shell("split-party-placeholder", Tab.Home) { SplitPartyPlaceholderScreen(it, onBack = {}) }
 
     private fun home(rows: List<Transaction>) = HomeUiState(
         currentUserName = "Maxi",

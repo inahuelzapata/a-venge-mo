@@ -50,6 +50,7 @@ import com.splitparty.android.R
 import com.splitparty.android.ui.components.BrandMark
 import com.splitparty.android.ui.home.HomeRoute
 import com.splitparty.android.ui.me.MeRoute
+import com.splitparty.android.ui.party.SplitPartyPlaceholderScreen
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
@@ -81,7 +82,15 @@ fun MainShell(userId: String, modifier: Modifier = Modifier) {
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None }
         ) {
-            composable<HomeDestination> { HomeRoute(userId, contentPadding) }
+            composable<HomeDestination> {
+                HomeRoute(userId, contentPadding, onStartParty = {
+                    navController.navigate(SplitPartyDestination) { launchSingleTop = true }
+                })
+            }
+            // Forward from Home, so system back pops to Home with its scroll intact.
+            composable<SplitPartyDestination> {
+                SplitPartyPlaceholderScreen(contentPadding, onBack = { navController.popBackStack(HomeDestination, inclusive = false) })
+            }
             composable<PayDestination> { PayRequestScreen(contentPadding) }
             composable<MeDestination> { MeRoute(userId, contentPadding) }
         }
@@ -105,6 +114,7 @@ fun ShellFrame(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modif
 /** The bottom bar's tabs, in bar order, and the destination each one opens. */
 enum class Tab(val destination: Any, val label: String) {
     Home(HomeDestination, "Home"),
+
     /** No visible label: this is the TalkBack label of the centre button, as iOS's VoiceOver label. */
     Pay(PayDestination, "Pay or request"),
     Me(MeDestination, "Me")
@@ -118,10 +128,17 @@ private fun NavDestination?.toTab(): Tab = when {
 
 /**
  * Every switch pops back to Home (the start destination), saving and restoring
- * each tab's state, so back from another tab returns to Home.
+ * each tab's state, so back from another tab returns to Home. Home itself is
+ * reached by popping, never by navigating with restoreState: that would bring
+ * back a screen pushed over Home (Split Party), whose state the pop to Home
+ * saves under Home. A pushed screen is dropped, not saved, when Home is tapped.
  */
 private fun NavHostController.switchTab(tab: Tab) {
-    if (currentDestination.toTab() == tab) return
+    if (currentDestination?.hasRoute(tab.destination::class) == true) return
+    if (tab == Tab.Home) {
+        popBackStack<HomeDestination>(inclusive = false, saveState = currentDestination.toTab() != Tab.Home)
+        return
+    }
     navigate(tab.destination) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true

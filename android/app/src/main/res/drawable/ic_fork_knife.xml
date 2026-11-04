@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Look-alike of the SF Symbol fork.knife, echoing the banner's cutlery. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M5,3V8.5A2.5,2.5 0,0 0,7.5 11A2.5,2.5 0,0 0,10 8.5V3M7.5,3V21M7.5,11V21" />
+    <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="1.6" android:strokeLineJoin="round" android:pathData="M17.5,21V3C15.5,4 14.5,7 14.5,10.5V13.5H17.5" />
+</vector>
