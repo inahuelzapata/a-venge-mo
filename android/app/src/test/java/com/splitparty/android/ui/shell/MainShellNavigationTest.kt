@@ -3,6 +3,7 @@ package com.splitparty.android.ui.shell
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -80,5 +81,12 @@ class MainShellNavigationTest {
 
         pressBack()
         compose.onNodeWithText("Feed row", substring = true).assertIsDisplayed()
+    }
+
+    /** TalkBack reads the content description, so the image-only button is announced by name. */
+    @Test
+    fun centreButtonIsAnnouncedAsPayOrRequestAndOpensThePlaceholder() {
+        compose.onNodeWithContentDescription("Pay or request").performClick()
+        compose.onNodeWithText("Pay or request").assertIsDisplayed()
     }
 }

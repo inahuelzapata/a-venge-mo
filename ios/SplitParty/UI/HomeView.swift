@@ -31,7 +31,8 @@ struct HomeBannerSlot: View {
 }
 
 /// Like the reference header: the user's round avatar on the left and the
-/// search / QR capsule on the right, with the screen title in the middle.
+/// search / QR capsule on the right, with the screen title (and the Aven-mo mark
+/// just left of it) in the middle.
 /// Search and QR are decorative in the PoC.
 private struct HomeHeader: View {
     let user: UserAccount?
@@ -41,6 +42,11 @@ private struct HomeHeader: View {
         ZStack {
             Text("Home")
                 .font(.system(size: 20, weight: .bold))
+                // An overlay, so the title stays centred exactly where it was.
+                .overlay(alignment: .leading) {
+                    BrandMark(size: Theme.headerMarkSize)
+                        .offset(x: -(Theme.headerMarkSize + Theme.headerMarkSpacing))
+                }
             HStack {
                 AvatarView(avatarKey: user?.avatarKey ?? "",
                            displayName: user?.displayName ?? fallbackName,

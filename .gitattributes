@@ -8,3 +8,7 @@ ios/SplitPartyTests/__Snapshots__/** filter=lfs diff=lfs merge=lfs -text
 # Design reference screenshots shared by both apps.
 docs/design/*.jpg filter=lfs diff=lfs merge=lfs -text
 docs/design/*.png filter=lfs diff=lfs merge=lfs -text
+
+# Aven-mo brand images (icon master, source artwork) and the iOS app icon copy.
+brand/**/*.png filter=lfs diff=lfs merge=lfs -text
+ios/SplitParty/Assets.xcassets/AppIcon.appiconset/*.png filter=lfs diff=lfs merge=lfs -text

@@ -60,3 +60,11 @@ What: Robolectric 4.17 tests failed with "Failed to interact with raw FileDescri
 ## Paparazzi and Robolectric run together in android/app unit tests
 
 What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDebugUnitTest task without conflicts (69 tests pass together), although older Paparazzi docs advise keeping them in separate modules · Why: avoids a separate screenshot module, which could not depend on the application module's screens anyway · Where: android/app/build.gradle.kts, app/src/test/resources/robolectric.properties · Learned: if they start clashing after an upgrade, check this first; the fallback is moving screens into an Android library module
+
+## Compose drops taps on a child drawn outside its parent's bounds
+
+What: The raised Pay/Request button sits inside a Box made PayButtonLift (16 dp) taller than the bar capsule, instead of being offset upward past the bar · Why: Compose only hit-tests children inside the parent's layout bounds, so an offset button's top part would ignore taps · Where: android/app/src/main/java/com/splitparty/android/ui/shell/MainShell.kt BottomBar · Learned: SwiftUI .offset moves hit-testing with the view, so iOS can just offset the button
+
+## Paparazzi screen snapshots never include the bottom bar
+
+What: The per-screen Paparazzi goldens render stateless screens without MainShell, so BottomBar is internal and has its own BottomBarScreenshotTest (Home and Pay selected) · Why: the bar, and the centre button with it, would otherwise appear in no Android golden or comparison image · Where: android/app/src/test/java/com/splitparty/android/screenshots/BottomBarScreenshotTest.kt

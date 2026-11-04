@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,6 +33,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.splitparty.android.ui.components.BrandMark
+import com.splitparty.android.ui.components.BrandMarkSizes
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import org.koin.compose.viewmodel.koinViewModel
@@ -56,13 +57,7 @@ fun LoginScreen(state: LoginUiState, onAction: (LoginAction) -> Unit, modifier: 
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = Modifier.size(72.dp).background(Brand.Blue, CircleShape),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("$", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-        }
+        BrandMark(size = BrandMarkSizes.LoginMark)
         Spacer(Modifier.height(20.dp))
         Text("Split Party", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Brand.Ink)
         Spacer(Modifier.height(6.dp))

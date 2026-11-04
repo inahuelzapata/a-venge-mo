@@ -14,23 +14,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.splitparty.android.R
 import com.splitparty.android.domain.live.LiveState
 import com.splitparty.android.domain.live.OFFLINE_MESSAGE
+import com.splitparty.android.ui.components.BrandMark
+import com.splitparty.android.ui.components.BrandMarkSizes
 import com.splitparty.android.ui.components.FeedRow
 import com.splitparty.android.ui.components.InitialBadge
 import com.splitparty.android.ui.components.LoadingCard
@@ -103,28 +109,44 @@ object HomeTestTags {
     const val FEED = "home_feed"
 }
 
-/** Initial badge on the left, search/QR pill on the right (decorative), as in the reference. */
+/**
+ * Initial badge on the left, search/QR pill on the right (decorative), as in the
+ * reference, with the Aven-mo mark and the "Home" title centred between them as
+ * on iOS. The title row sits on top of the badge row, so the header is no taller
+ * than before.
+ */
 @Composable
 private fun HomeHeader(currentUserName: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        InitialBadge(currentUserName)
-        Spacer(Modifier.weight(1f))
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = Brand.Card,
-            border = BorderStroke(1.dp, Brand.Outline)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(22.dp)
+    Box(modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            InitialBadge(currentUserName)
+            Spacer(Modifier.weight(1f))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = Brand.Card,
+                border = BorderStroke(1.dp, Brand.Outline)
             ) {
-                HeaderIcon(R.drawable.ic_search)
-                HeaderIcon(R.drawable.ic_qr_code)
+                Row(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(22.dp)
+                ) {
+                    HeaderIcon(R.drawable.ic_search)
+                    HeaderIcon(R.drawable.ic_qr_code)
+                }
             }
         }
+        HeaderTitle()
+    }
+}
+
+/** The mark left of "Home"; an equal empty space on the right keeps the title itself centred. */
+@Composable
+private fun HeaderTitle(modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        BrandMark(size = BrandMarkSizes.HeaderMark)
+        Spacer(Modifier.width(BrandMarkSizes.HeaderMarkSpacing))
+        Text("Home", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Brand.Ink)
+        Spacer(Modifier.width(BrandMarkSizes.HeaderMark + BrandMarkSizes.HeaderMarkSpacing))
     }
 }
 

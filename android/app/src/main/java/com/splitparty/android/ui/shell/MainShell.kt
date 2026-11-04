@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -47,12 +49,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.splitparty.android.R
+import com.splitparty.android.ui.components.BrandMark
+import com.splitparty.android.ui.components.BrandMarkSizes
 import com.splitparty.android.ui.home.HomeRoute
 import com.splitparty.android.ui.me.MeRoute
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.theme.Brand
 
-private val BarHeight = 68.dp
+private val BarHeight = BrandMarkSizes.BottomBarHeight
 
 /**
  * Signed-in shell: Home, Pay/Request and Me behind a floating bottom bar
@@ -113,17 +117,26 @@ object ShellTestTags {
     fun tab(tab: Tab) = "tab_${tab.name.lowercase()}"
 }
 
+/**
+ * Floating capsule with Home and Me as regular tabs and, between them, the
+ * Pay/Request action as a raised round button carrying the white Aven-mo mark
+ * (Venmo-style), matching iOS. The box is [BrandMarkSizes.PayButtonLift] taller
+ * than the capsule so the raised part of the button is inside it and still
+ * receives taps (Compose drops touches outside a parent's bounds).
+ */
 @Composable
-private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
-    Row(
+internal fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
     ) {
         Surface(
-            modifier = Modifier.weight(1f).height(BarHeight),
+            modifier = Modifier
+                .padding(top = BrandMarkSizes.PayButtonLift)
+                .fillMaxWidth()
+                .height(BarHeight),
             shape = RoundedCornerShape(50),
             color = Color.White.copy(alpha = 0.97f),
             border = BorderStroke(1.dp, Brand.Outline),
@@ -138,6 +151,8 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier 
                     onClick = { onSelect(Tab.Home) },
                     modifier = Modifier.weight(1f).testTag(ShellTestTags.tab(Tab.Home))
                 )
+                // Keeps Home and Me clear of the button.
+                Spacer(Modifier.width(BrandMarkSizes.PayButtonDiameter + 8.dp))
                 TabItem(
                     label = "Me",
                     selectedIcon = R.drawable.ic_person_filled,
@@ -148,11 +163,10 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier 
                 )
             }
         }
-        Spacer(Modifier.width(10.dp))
         PayRequestButton(
             selected = current == Tab.Pay,
             onClick = { onSelect(Tab.Pay) },
-            modifier = Modifier.testTag(ShellTestTags.tab(Tab.Pay))
+            modifier = Modifier.align(Alignment.TopCenter).testTag(ShellTestTags.tab(Tab.Pay))
         )
     }
 }
@@ -190,23 +204,29 @@ private fun TabItem(
     }
 }
 
-/** The brand-blue round button on the right of the reference bar, labelled Pay/Request. */
+/** Accessibility label of the centre button, the same words iOS uses. */
+const val PAY_BUTTON_DESCRIPTION = "Pay or request"
+
+/**
+ * Raised brand-blue circle with the white mark and no text. It looks the same
+ * whether or not Pay/Request is open; only its selected semantics change.
+ */
 @Composable
 private fun PayRequestButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(BarHeight).semantics { this.selected = selected },
-        shape = RoundedCornerShape(50),
-        color = if (selected) Brand.BlueDark else Brand.Blue,
-        shadowElevation = 6.dp
+        modifier = modifier
+            .size(BrandMarkSizes.PayButtonDiameter)
+            .semantics {
+                contentDescription = PAY_BUTTON_DESCRIPTION
+                this.selected = selected
+            },
+        shape = CircleShape,
+        color = Brand.PayButtonBlue,
+        shadowElevation = BrandMarkSizes.PayButtonElevation
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("$", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, lineHeight = 24.sp)
-            Text("Pay/Request", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Box(contentAlignment = Alignment.Center) {
+            BrandMark(size = BrandMarkSizes.PayButtonMark, color = Color.White)
         }
     }
 }

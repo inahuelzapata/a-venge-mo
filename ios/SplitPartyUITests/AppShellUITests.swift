@@ -73,7 +73,7 @@ final class AppShellUITests: XCTestCase {
         signIn(as: "maxi")
         XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
 
-        tapTab("Pay/Request")
+        tapTab("Pay or request")
         XCTAssertTrue(element("payRequestScreen").waitForExistence(timeout: Self.screenTimeout))
         XCTAssertTrue(element("bottomBar").exists, "Bar stays visible on Pay/Request")
 
