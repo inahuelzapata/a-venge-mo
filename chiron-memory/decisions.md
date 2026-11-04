@@ -72,3 +72,11 @@ What: ParityScreenshotTest renders one Android image per iOS capture (same state
 ## Firebase config files are shared outside git, one service-account key per person
 
 What: google-services.json, GoogleService-Info.plist and service-account keys stay git-ignored; colleagues are preferably added to the Firebase project and download configs themselves (own key or gcloud ADC), otherwise app configs go through the team password-manager vault and an owner generates a separate key per person · Why: the GitHub repo is public and the rules are shape-only, so committed configs would let anyone read/write the demo database; a shared key can't be revoked for one person · Where: docs/integration-setup-guide.md "Sharing the config files with colleagues" · Learned: ignored files exist only in the checkout where they were placed, so each git worktree needs them copied in (keep a master copy in ~/secrets/a-venge-mo)
+
+## Shared artwork lives once in brand/; Android copies it in at build time
+
+What: The "Split the check with friends" banner is committed only at brand/banners/split-the-check-with-friends.png (Git LFS); the Android sharedBannerResources Gradle task copies it into generated res as drawable-nodpi/split_party_banner.png, registered with androidComponents addGeneratedSourceDirectory · Why: the work order forbids a second copy under android/, and the 1774 px source is wider than a full-width 386 dp card up to ~4.5x density, so one nodpi image is crisp on every phone · Where: android/app/build.gradle.kts, docs/design/visual-conventions.md "Split Party card and placeholder" · Learned: iOS should bundle the same brand/ file (asset catalog reference), not a copy
+
+## "Start a party" lands on one placeholder route
+
+What: The Home card (image and button) navigates to SplitPartyDestination, which renders SplitPartyPlaceholderScreen; the real party screen replaces that composable at that route only. The card has no header row and reads nothing from Firestore · Why: no party screen exists yet; the user chose the image+button anatomy over the Kalshi-style Tony's/"Sponsored" header when the work order contradicted itself · Where: ui/shell/MainShell.kt, ui/shell/ShellRoutes.kt, ui/party/SplitPartyPlaceholderScreen.kt, ui/home/SplitPartyCard.kt

@@ -3,6 +3,7 @@ package com.splitparty.android.screenshots
 import androidx.compose.foundation.layout.PaddingValues
 import com.splitparty.android.data.firebase.FirestoreTarget
 import com.splitparty.android.ui.gate.LocalNetworkPermissionScreen
+import com.splitparty.android.ui.party.SplitPartyPlaceholderScreen
 import com.splitparty.android.ui.pay.PayRequestScreen
 import com.splitparty.android.ui.setup.SetupRequiredScreen
 import org.junit.Rule
@@ -16,6 +17,9 @@ class OtherScreensScreenshotTest {
 
     @Test
     fun payRequest() = paparazzi.screen { PayRequestScreen(PaddingValues()) }
+
+    @Test
+    fun splitPartyPlaceholder() = paparazzi.screen { SplitPartyPlaceholderScreen(PaddingValues(), onBack = {}) }
 
     @Test
     fun localNetworkPermission() = paparazzi.screen {

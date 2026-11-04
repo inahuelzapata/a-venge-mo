@@ -61,15 +61,16 @@ import org.koin.core.parameter.parametersOf
 fun HomeRoute(
     userId: String,
     contentPadding: PaddingValues,
+    onStartParty: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel { parametersOf(userId) }
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    HomeScreen(state = state, contentPadding = contentPadding, modifier = modifier)
+    HomeScreen(state = state, contentPadding = contentPadding, onStartParty = onStartParty, modifier = modifier)
 }
 
 @Composable
-fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modifier = Modifier) {
+fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modifier = Modifier, onStartParty: () -> Unit = {}) {
     val now = rememberNow()
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag(HomeTestTags.FEED),
@@ -85,11 +86,14 @@ fun HomeScreen(state: HomeUiState, contentPadding: PaddingValues, modifier: Modi
         item(key = "header") {
             Column {
                 HomeHeader(state.currentUserName, state.currentUserAvatar)
-                BannerSlot()
-                // 16 between header and feed, as on iOS (12 of it is the list spacing).
+                // 16 between header and the first card, as on iOS (12 of it is the list spacing).
                 Spacer(Modifier.height(Dimens.ContentSpacing - Dimens.CardGap))
             }
         }
+        // The banner slot (PoC-7): a feed item that scrolls with the rows, shown
+        // in every feed state. It takes nothing from the state, so arriving rows
+        // never recompose it.
+        item(key = "split_party_card") { SplitPartyCard(onStartParty = onStartParty) }
         when (val feed = state.feed) {
             LiveState.Loading -> item(key = "loading") { LoadingCard() }
 
@@ -156,15 +160,6 @@ private fun HomeHeader(currentUserName: String, currentUserAvatar: String?, modi
             HeaderIcon(R.drawable.ic_qrcode, 25.dp)
         }
     }
-}
-
-/**
- * Reserved for the merchant banner (PoC-7) and the Join banner (PoC-8), which
- * later slices place here. Empty in this slice, so it takes no space.
- */
-@Composable
-private fun BannerSlot(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth())
 }
 
 /** The mark left of "Home"; an equal empty space on the right keeps the title itself centred, as on iOS. */
