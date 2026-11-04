@@ -33,30 +33,3 @@ What: ScreenSnapshotTests uses .image(drawHierarchyInKeyWindow: true, …); plai
 ## Snapshot pixel allowance hides colour changes
 
 What: Snapshots use precision 1.0 with perceptualPrecision 0.98 (0.995 only for the spinner screen); with precision 0.99 a shifted brand blue still passed on screens where blue covers under 1 % · Why: precision counts how many pixels may differ, not by how much · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift · Learned: verify a snapshot setup by making a small deliberate change and checking every screen fails
-## Firestore listeners never fail when offline
-
-What: Snapshot listeners keep serving cache with metadata.isFromCache=true instead of erroring when the network or the emulator is gone; Android derives the error state from ConnectivityManager (offline at once) plus "no server snapshot for 5 s" (MetadataChanges.INCLUDE), and recovers on the next server snapshot · Why: the feed must show a visible error in airplane mode instead of stale or blank data · Where: android/app/src/main/java/com/splitparty/android/domain/live/LiveState.kt, data/AndroidConnectivityObserver.kt · Learned: in ConnectivityManager.onLost, report offline directly; activeNetwork can still return the lost network for a moment
-
-## Android 17 (targetSdk 37) blocks LAN traffic until ACCESS_LOCAL_NETWORK is granted
-
-What: With targetSdk 37, Firestore connections to the laptop emulator (LAN IP or 10.0.2.2) silently time out ("Could not reach Cloud Firestore backend"); the app declares ACCESS_LOCAL_NETWORK and LocalNetworkGate requests it before login on API 37+ when FIREBASE_TARGET=emulator (hosted needs nothing) · Why: Android 17 enables local network protection by default for apps targeting SDK 37 · Where: android/app/src/main/java/com/splitparty/android/ui/gate/LocalNetworkGate.kt, AndroidManifest.xml · Learned: adb shell/nc tests from the device still reach the host, so only the app is blocked; the system prompt reads "nearby devices"; Compose supportingText (the login error) does not appear as its own node in uiautomator dumps
-
-## Stopping the Firestore emulator by port also cuts the Android AVD off from adb
-
-What: `lsof -ti tcp:8080 | xargs kill` also matches clients connected to 8080 (the AVD forwards 10.0.2.2:8080 through its qemu process); in practice adb lost the AVD until `adb kill-server && adb start-server` · Why: lsof without -sTCP:LISTEN matches both ends of each connection · Where: backend `npm run emulators` (port 8080) · Learned: to simulate an unreachable database, kill only the listener (`lsof -ti tcp:8080 -sTCP:LISTEN`) or stop the emulators task
-
-## detekt 1.23 cannot run on the Java 25 Gradle daemon; use detekt 2.0 alpha
-
-What: detekt 1.23.8 (last stable) fails first with "Invalid value (25) passed to --jvm-target" and, even with jvmTarget pinned to 21, with a bare "25.0.4" (its embedded Kotlin 2.0 can't parse the JDK version); android/ uses detekt 2.0.0-alpha.6 (plugin id dev.detekt), the version io.nlopez.compose.rules 0.6.8 is built against · Why: Gradle runs on Java 25 (gradle-daemon-jvm.properties) · Where: android/gradle/libs.versions.toml, android/config/detekt/detekt.yml · Learned: detekt 2 renamed config keys (LongParameterList functionThreshold → allowedFunctionParameters, UnusedPrivateMember split into UnusedPrivateFunction/Property); move to a stable 2.x when released
-
-## ViewModels in tests must be created after MainDispatcherRule runs
-
-What: Android ViewModel tests build the ViewModel `by lazy` (or in the test body), never as a plain field · Why: JUnit initialises fields before rules run, so a field-built ViewModel starts viewModelScope (Eagerly/stateIn) on the real Dispatchers.Main and its flows never advance; with a StateFlow-backed fake, values set before first access are also conflated into one emission (a "new row" looks like the first load) · Where: android/app/src/test/java/com/splitparty/android/testing/MainDispatcherRule.kt, ui/*/…ViewModelTest.kt · Learned: touch `viewModel.state` before pushing the first fake snapshot when the test is about changes between snapshots
-
-## Robolectric Compose tests need JDK flags on Java 25 and espresso 3.7 on API 37
-
-What: Robolectric 4.17 tests failed with "Failed to interact with raw FileDescriptor internals" until the test JVM got `--add-opens=java.base/java.io` and `--add-exports=java.base/jdk.internal.access` (ALL-UNNAMED), then with NoSuchMethodException InputManager.getInstance() until espresso-core was pinned to 3.7.0 (Compose ui-test pulls 3.5.0) · Why: unit tests run on the Gradle JVM (Java 25), and API 37 removed InputManager.getInstance · Where: android/app/build.gradle.kts testOptions.unitTests.all, android/gradle/libs.versions.toml · Learned: the real SplitPartyApplication would startKoin once per Robolectric test, so app/src/test/resources/robolectric.properties uses a plain android.app.Application and tests start Koin themselves
-
-## Paparazzi and Robolectric run together in android/app unit tests
-
-What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDebugUnitTest task without conflicts (69 tests pass together), although older Paparazzi docs advise keeping them in separate modules · Why: avoids a separate screenshot module, which could not depend on the application module's screens anyway · Where: android/app/build.gradle.kts, app/src/test/resources/robolectric.properties · Learned: if they start clashing after an upgrade, check this first; the fallback is moving screens into an Android library module

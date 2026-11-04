@@ -29,6 +29,3 @@ What: ScreenSnapshotTests skips on any other iOS version; re-record with TEST_RU
 ## __Snapshots__ is excluded from the test bundle
 
 What: SplitPartyTests is a synchronized folder, so a PBXFileSystemSynchronizedBuildFileExceptionSet excludes __Snapshots__ from the test target · Why: otherwise every reference PNG is copied into the test bundle as a resource · Where: ios/SplitParty.xcodeproj/project.pbxproj
-## Android build runs on Java 25 via Gradle Daemon JVM criteria
-
-What: android/ uses Gradle 9.8.2 + AGP 9.5 (built-in Kotlin, no org.jetbrains.kotlin.android plugin) + Kotlin 2.4.21; gradle/gradle-daemon-jvm.properties pins the daemon to Java 25 and the foojay resolver in settings.gradle.kts downloads it if missing, so Android Studio and ./gradlew need no Gradle JDK setting; app bytecode is Java 21 (compileOptions), compile/target SDK 37 · Why: Android Studio bundles Java 25, which Gradle 8.11 could not run on ("incompatible with the Gradle JVM version 25") · Where: android/gradle/gradle-daemon-jvm.properties, android/settings.gradle.kts, android/app/build.gradle.kts · Learned: with built-in Kotlin the Kotlin version follows the Compose compiler plugin version on the classpath (AGP alone pins 2.2.10); change the JVM with ./gradlew updateDaemonJvm --jvm-version=N

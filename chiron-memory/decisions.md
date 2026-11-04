@@ -33,18 +33,3 @@ What: users.avatar keys map to fixed colours (avatar_maxi #0087E0, avatar_annie 
 ## iOS snapshot and UI tests run on an in-memory fixture, not Firestore
 
 What: Screens read through the PaymentDataSource protocol; FixtureDataSource (Debug only) serves the seeded users and payments with ages relative to now; UI tests switch to it with -UITestFixture seeded|empty|unreachable, -UITestResetSession, -UITestInsertIncomingPaymentAfter · Why: tests need no Java/emulator and stay deterministic; relative ages keep "2 days ago" stable in snapshots · Where: ios/SplitParty/Data/FixtureDataSource.swift, ios/SplitParty/App/AppModel.swift UITestLaunch · Learned: the fixture must stay in step with backend/lib/seedData.js by hand
-## Android emulator target uses its own FirebaseApp with the project id forced
-
-What: For FIREBASE_TARGET=emulator the Android app creates a named FirebaseApp from google-services.json options (or placeholder options when the file is absent) with projectId set to FIREBASE_PROJECT_ID, then calls useEmulator; hosted uses the default app and refuses (Setup required screen) if the json's project_id differs · Why: the emulator keeps one database per project id, so the default app (project from google-services.json) would read a different, empty database than the seed script; and an emulator demo should not need a Firebase config file · Where: android/app/src/main/java/com/splitparty/android/data/firebase/FirebaseSetup.kt · Learned: the iOS shell needs the same project-id override for the emulator
-
-## Android icons are local vector drawables, not the Compose icon packs
-
-What: The app's 9 icons (home, person, comment, heart, more, search, QR) are Material icon paths in app/src/main/res/drawable/ic_*.xml used via painterResource · Why: material-icons-core/extended are discontinued at 1.7.8 and no longer managed by the Compose BOM · Where: android/app/src/main/res/drawable/
-
-## Android DI uses Koin (DSL, no annotations) rather than Hilt
-
-What: Koin 4.2 with the constructor DSL (singleOf/factoryOf/viewModelOf) and koinViewModel { parametersOf(userId) } for user-scoped ViewModels; KoinModulesTest verifies the graph · Why: the user asked for Koin; the DSL needs no KSP/kapt compiler plugin, which keeps the AGP 9 built-in-Kotlin build simple · Where: android/app/src/main/java/com/splitparty/android/di/AppModules.kt, android/app/src/test/java/com/splitparty/android/di/KoinModulesTest.kt · Learned: verify() needs extraTypes for androidContext() (Context) and parametersOf values (String)
-
-## Android screenshot tests use Paparazzi 2.0 alpha on the stateless screens
-
-What: Paparazzi snapshots every stateless XScreen in each UI state (plus a 1.5x font-scale pass) on DeviceConfig.PIXEL_5; goldens are committed in android/app/src/test/snapshots/images and `./gradlew check` depends on verifyPaparazziDebug · Why: catches visual regressions the semantics-based Robolectric tests can't; Paparazzi 2.0.0-alpha05.1 is the first release with AGP 9 support (1.3.x stops at AGP 8) · Where: android/app/src/test/java/com/splitparty/android/screenshots/Snapshots.kt, android/app/build.gradle.kts · Learned: plain testDebugUnitTest only renders snapshots and never compares them; stateless screens have no page background, so the shared `screen {}` helper wraps them in SplitPartyTheme + Brand.Page like the app root does
