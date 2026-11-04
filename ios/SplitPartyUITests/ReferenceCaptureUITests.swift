@@ -65,6 +65,14 @@ final class ReferenceCaptureUITests: XCTestCase {
         tapTab("Me")
         XCTAssertTrue(element("meScreen").waitForExistence(timeout: Self.timeout))
         try capture("me")
+
+        // Demo switch off: no merchant card, the feed moves up.
+        element("demoModeToggle").switches.firstMatch.tap()
+        tapTab("Home")
+        XCTAssertTrue(element("homeScreen").waitForExistence(timeout: Self.timeout))
+        try capture("home-demo-off")
+        tapTab("Me")
+        element("demoModeToggle").switches.firstMatch.tap()
     }
 
     func test04HomeNewRowHighlight() throws {
@@ -105,11 +113,11 @@ final class ReferenceCaptureUITests: XCTestCase {
         XCTAssertTrue(app.buttons["startPartyButton"].waitForExistence(timeout: Self.timeout))
         app.buttons["startPartyButton"].tap()
         XCTAssertTrue(element("partyScreen").waitForExistence(timeout: Self.timeout))
-        try capture("party-1-member")
+        try capture("party-one-member")
         XCTAssertTrue(seats.element(boundBy: 1).waitForExistence(timeout: 8))
-        try capture("party-2-members")
+        try capture("party-two-members")
         XCTAssertTrue(seats.element(boundBy: 2).waitForExistence(timeout: 8))
-        try capture("party-3-members")
+        try capture("party-three-members")
         measure("party code", element("joinCode"))
         measure("party countdown", element("partyCountdown"))
         measure("party member row", element("memberRow"))
@@ -125,12 +133,12 @@ final class ReferenceCaptureUITests: XCTestCase {
         launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi"])
         signIn(as: "annie")
         XCTAssertTrue(element("joinBanner").waitForExistence(timeout: Self.timeout))
-        try capture("home-join-banner")
+        try capture("join-banner")
         measure("join banner", element("joinBanner"))
         measure("join button", element("joinBanner").buttons["Join"])
         element("joinBanner").buttons["Join"].tap()
         XCTAssertTrue(element("joinConfirmationScreen").waitForExistence(timeout: Self.timeout))
-        try capture("confirm-code")
+        try capture("join-confirm")
         let options = app.buttons.matching(identifier: "codeOption")
         measure("first option", options.element(boundBy: 0))
         measure("second option", options.element(boundBy: 1))
@@ -140,7 +148,7 @@ final class ReferenceCaptureUITests: XCTestCase {
         wrong.tap()
         // Mid-shake, with the red outline and the error.
         Thread.sleep(forTimeInterval: 0.12)
-        try capture("confirm-wrong-pick", settling: false)
+        try capture("join-confirm-wrong-pick", settling: false)
         Thread.sleep(forTimeInterval: 1)
         for _ in 0..<2 {
             app.buttons.matching(identifier: "codeOption")
@@ -148,7 +156,7 @@ final class ReferenceCaptureUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
         }
         XCTAssertTrue(app.staticTexts["Too many wrong codes"].waitForExistence(timeout: Self.timeout))
-        try capture("confirm-locked")
+        try capture("join-locked")
     }
 
     func test09Expired() throws {
