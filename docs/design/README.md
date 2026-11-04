@@ -1,12 +1,14 @@
 # App shell design reference
 
 The iOS and Android shells must look the same. These screenshots are the
-visual reference, and the values below are what both apps use.
+visual reference. The values below are the ones the iOS app uses; the Android
+shell currently uses a different palette and avatar colours, which still has to
+be reconciled (see `chiron-memory/contradictions.md`).
 
 | File | What it shows |
 | ---- | ------------- |
-| [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg) | Feed cards: time line, "Name paid Name for memo" sentence with inline avatars, round grey like/comment buttons, floating bottom bar with a round blue action button |
-| [`home-feed-reference-2.jpg`](home-feed-reference-2.jpg) | Header: round avatar on the left, search/QR capsule on the right, banner area above the feed |
+| [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg) | Top of Home. Header: round avatar on the left, search/QR capsule on the right, banner area above the feed |
+| [`home-feed-reference-2.jpg`](home-feed-reference-2.jpg) | Scrolled feed. Cards: time line, "Name paid Name for memo" sentence with inline avatars, round grey like/comment buttons, floating bottom bar with a round blue action button |
 
 The screenshots come from a real payments app, so their ads, merchants and
 people are only examples of layout. The apps show the seeded data from

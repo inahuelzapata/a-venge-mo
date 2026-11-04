@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Palette and shapes sampled from the reference screenshots in
-/// docs/design/ (home-feed-reference-1.jpg / -2.jpg). Android uses the same hex
-/// values (docs/design/README.md) so the two apps look the same.
+/// docs/design/ (home-feed-reference-1.jpg / -2.jpg), listed in docs/design/README.md.
+/// The Android shell currently uses different values; aligning the two apps is
+/// still open (chiron-memory/contradictions.md).
 enum Theme {
     /// Brand blue: the round action button in the reference bottom bar.
     static let brandBlue = Color(hex: 0x0087E0)

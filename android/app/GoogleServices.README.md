@@ -1,10 +1,12 @@
 # Where google-services.json goes
 
 The Firebase Android configuration file is **not committed** (it is git-ignored).
+Only the **hosted** Firestore target needs it; the emulator target runs without it.
 
 1. Firebase console → Project settings → Your apps → Android app with package
-   `com.splitparty.android` → download `google-services.json`.
-2. Put it at `android/app/google-services.json`.
+   `com.splitparty.android` → download `google-services.json`. Use the same
+   project as `FIREBASE_PROJECT_ID` in `android/firestore.properties`.
+2. Put it at `android/app/google-services.json`, then rebuild.
 
-Until the file is there, the placeholder screen shows
-"google-services.json missing" instead of failing silently.
+If the hosted target is selected and the file is missing (or belongs to another
+project), the app opens on a "Setup required" screen instead of failing silently.
