@@ -17,3 +17,15 @@ What: For FIREBASE_TARGET=emulator the iOS app builds FirebaseOptions from place
 ## iOS Firebase dependency is SwiftPM with a committed Package.resolved
 
 What: firebase-ios-sdk (FirebaseFirestore product only) is an XCRemoteSwiftPackageReference in the pbxproj; the pin lives in SplitParty.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved, which is committed · Why: every clone resolves the same SDK version; the root .gitignore's .swiftpm/ rule does not cover that path · Where: ios/SplitParty.xcodeproj/project.pbxproj
+
+## Images are stored with Git LFS
+
+What: .gitattributes routes ios/SplitPartyTests/__Snapshots__/** and docs/design/*.jpg|png through LFS; a clone needs git-lfs and `git lfs install` (else `git lfs pull`), otherwise the PNGs are pointer files and snapshot tests fail · Why: binary images would bloat the history · Where: .gitattributes, ios/README.md · Learned: Homebrew has no git-lfs bottle for Intel on new macOS and compiles Go and LLVM from source; the official GitHub release binary installs in seconds
+
+## Snapshot references are recorded on the iOS 26.5 simulator
+
+What: ScreenSnapshotTests skips on any other iOS version; re-record with TEST_RUNNER_SNAPSHOT_TESTING_RECORD=all on an iPhone simulator running 26.5; images are a fixed 390x844 @3x so the iPhone model does not matter · Why: text rendering changes between iOS versions · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, ios/README.md
+
+## __Snapshots__ is excluded from the test bundle
+
+What: SplitPartyTests is a synchronized folder, so a PBXFileSystemSynchronizedBuildFileExceptionSet excludes __Snapshots__ from the test target · Why: otherwise every reference PNG is copied into the test bundle as a resource · Where: ios/SplitParty.xcodeproj/project.pbxproj

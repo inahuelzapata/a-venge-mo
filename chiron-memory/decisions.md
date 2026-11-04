@@ -29,3 +29,7 @@ What: Both apps render every feed row as "Payer paid Payee for memo" with displa
 ## Avatars are initials on a fixed colour per avatar key
 
 What: users.avatar keys map to fixed colours (avatar_maxi #0087E0, avatar_annie #E5487D, avatar_christophe #2EAF6F, unknown #8E8E93) drawn with initials; no image assets · Why: no avatar art exists, and fixed values let Android match iOS exactly · Where: ios/SplitParty/UI/AvatarView.swift, docs/design/README.md
+
+## iOS snapshot and UI tests run on an in-memory fixture, not Firestore
+
+What: Screens read through the PaymentDataSource protocol; FixtureDataSource (Debug only) serves the seeded users and payments with ages relative to now; UI tests switch to it with -UITestFixture seeded|empty|unreachable, -UITestResetSession, -UITestInsertIncomingPaymentAfter · Why: tests need no Java/emulator and stay deterministic; relative ages keep "2 days ago" stable in snapshots · Where: ios/SplitParty/Data/FixtureDataSource.swift, ios/SplitParty/App/AppModel.swift UITestLaunch · Learned: the fixture must stay in step with backend/lib/seedData.js by hand

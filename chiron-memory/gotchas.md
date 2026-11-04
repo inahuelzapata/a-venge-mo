@@ -21,3 +21,15 @@ What: With Xcode 26.5 but no iOS 26.5 platform component, xcodebuild fails with 
 ## Swift 5 mode rejects bare regex literals
 
 What: The iOS target uses SWIFT_VERSION 5.0, so /…/ regex literals fail to parse; use the #/…/# form · Why: bare-slash regex needs Swift 6 mode or -enable-bare-slash-regex · Where: ios/SplitParty/Data/Username.swift
+
+## Snapshot references must be sRGB, not the simulator's Display P3
+
+What: ScreenSnapshotTests renders with displayGamut .SRGB; with P3 PNGs swift-snapshot-testing's perceptual compare reported the saturated brand blue as different, so any tiny unrelated difference (the animated spinner) failed the whole screen in 3 of 4 runs · Why: the byte-exact fast path hid the problem until an image differed at all · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift · Learned: when a snapshot flakes, diff the actual pixels yourself; the library's failing-pixel count included areas that were byte-identical
+
+## Snapshots must be drawn through the key window
+
+What: ScreenSnapshotTests uses .image(drawHierarchyInKeyWindow: true, …); plain layer rendering drew the bottom bar's material see-through and left hairlines at capsule edges · Why: CALayer rendering skips UIVisualEffectView blur · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift
+
+## Snapshot pixel allowance hides colour changes
+
+What: Snapshots use precision 1.0 with perceptualPrecision 0.98 (0.995 only for the spinner screen); with precision 0.99 a shifted brand blue still passed on screens where blue covers under 1 % · Why: precision counts how many pixels may differ, not by how much · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift · Learned: verify a snapshot setup by making a small deliberate change and checking every screen fails
