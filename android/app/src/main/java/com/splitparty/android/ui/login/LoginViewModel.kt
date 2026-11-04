@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.splitparty.android.data.firebase.FirestoreTarget
 import com.splitparty.android.domain.usecase.SignInResult
 import com.splitparty.android.domain.usecase.SignInUseCase
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,9 +20,11 @@ data class LoginUiState(
     val error: String? = null,
     val busy: Boolean = false,
     /** Which database this build points at, shown small under the form. */
-    val targetSummary: String = ""
+    val targetSummary: String = "",
+    /** What to fix when the build has no usable database; sign-in stays disabled meanwhile. */
+    val setupProblems: ImmutableList<String> = persistentListOf()
 ) {
-    val canSubmit: Boolean get() = username.isNotBlank() && !busy
+    val canSubmit: Boolean get() = username.isNotBlank() && !busy && setupProblems.isEmpty()
 }
 
 sealed interface LoginAction {
@@ -56,8 +60,8 @@ class LoginViewModel(private val signIn: SignInUseCase, target: FirestoreTarget)
     }
 
     companion object {
-        const val UNREACHABLE = "Can't reach the server. Check the connection and try again."
+        const val UNREACHABLE = "Can't reach the database. Check your connection and try again."
 
-        fun noAccount(input: String) = "No account named \"$input\". Try maxi, annie or christophe."
+        fun noAccount(input: String) = "No account called \"$input\". Try Maxi, Annie or Christophe."
     }
 }

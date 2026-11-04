@@ -26,8 +26,10 @@ inline fun <T, R> LiveState<T>.map(transform: (T) -> R): LiveState<R> = when (th
 }
 
 const val SERVER_TIMEOUT_MS = 5_000L
-const val OFFLINE_MESSAGE = "You're offline. The feed comes back by itself when the connection returns."
-const val UNREACHABLE_MESSAGE = "Can't reach the database right now. Retrying automatically…"
+
+/** Same text as iOS for both causes, so the error state reads the same on every phone. */
+const val OFFLINE_MESSAGE = "Can't reach the database right now. We'll reconnect automatically."
+const val UNREACHABLE_MESSAGE = OFFLINE_MESSAGE
 
 /**
  * Turns listener events into screen state. Firestore never fails a listener

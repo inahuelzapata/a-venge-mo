@@ -6,13 +6,13 @@ A rule the codebase follows — naming, patterns, and where things live.
 
 What: iOS, Android and backend all choose Firestore with FIREBASE_TARGET (emulator|hosted), FIREBASE_PROJECT_ID and FIRESTORE_EMULATOR_HOST, each set in one git-ignored file: backend/.env, ios/Config/FirestoreTarget.local.xcconfig (optional #include? from Base.xcconfig into Info.plist), android/firestore.properties (into BuildConfig); missing values show "not configured" on screen (Android placeholder screen, iOS login footer) · Why: a demo needs phones and scripts on the same database, and the emulator keeps one database per project id, so the ids must match · Where: docs/firestore-target.md · Learned: phones use the laptop's LAN IP, scripts use 127.0.0.1, so the emulator binds 0.0.0.0
 
-## Shared visual reference lives in docs/design
+## The iOS captures are the visual contract for both apps
 
-What: The reference screenshots plus palette, avatar colours, row content and bottom-bar order (Home, Pay/Request, Me) are in docs/design/README.md; both app shells match it · Why: the iOS and Android shells are built in parallel and must look the same without sharing code · Where: docs/design/README.md, ios/SplitParty/UI/Theme.swift
+What: docs/design/ios-captures/ (iOS Debug fixture, iPhone 18 Pro simulator @3x, one PNG per screen and state) define the look; docs/design/visual-conventions.md holds the measured values and the only allowed platform differences; Android reproduces them and docs/design/comparisons/ shows iOS|Android side by side plus 50% overlays · Why: the shells share no code and are demoed side by side, so review needs an objective reference, not a judgement call · Where: docs/design/, docs/design/capture/ · Learned: on an iOS UI change, re-run capture-ios.sh first, then update the note, then Android
 
-## Both app shells match docs/design and render identical feed rows
+## Feed rows read identically on both platforms
 
-What: The visual reference is docs/design/home-feed-reference-1.jpg (top of Home) and -2.jpg (scrolled feed); feed rows always use display names (never "You") so every phone shows the same rows; avatar keys map to fixed initial circles (avatar_maxi #3D7BE0, avatar_annie #E86A5C, avatar_christophe #2FA37A, unknown grey); relative time reads "just now / N minutes|hours|days ago / Oct 27"; brand blue #0B5FD6 on page grey #F2F3F5 · Why: the checkpoint compares 3 phones (iOS and Android mixed) row by row, and the apps share no code · Where: android/app/src/main/java/com/splitparty/android/ui/components/, docs/design/
+What: Feed sentences use display names (never "You"), relative times use iOS RelativeDateTimeFormatter wording ("Just now", "3 hours ago", "2 weeks ago"), and the last line of a sentence never holds a lone word (Android moves the previous word down, as iOS text layout does) · Why: the demo puts three mixed phones next to each other and compares rows line by line · Where: android/app/src/main/java/com/splitparty/android/ui/components/FeedRow.kt, android/.../format/RelativeTime.kt, ios/SplitParty/UI/TransactionList.swift
 
 ## Android screens: one UiState, onAction, Route/Screen split, fakes in tests
 

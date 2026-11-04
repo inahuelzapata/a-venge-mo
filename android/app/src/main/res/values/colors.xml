@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand.Page: the iOS page background (docs/design/visual-conventions.md). -->
+    <color name="page">#FFF6F6F7</color>
+</resources>

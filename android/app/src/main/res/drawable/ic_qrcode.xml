@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Look-alike of the SF Symbol used in the iOS captures (docs/design/visual-conventions.md). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="1.6" android:pathData="M3.8,3.8h6.4v6.4h-6.4z M13.8,3.8h6.4v6.4h-6.4z M3.8,13.8h6.4v6.4h-6.4z" />
+    <path android:fillColor="#FF000000" android:pathData="M6,6h2v2h-2z M16,6h2v2h-2z M6,16h2v2h-2z M13,13h2.5v2.5h-2.5z M17.5,13h3v2.5h-3z M15.5,15.5h2v2h-2z M13,17.5h2.5v3h-2.5z M18,18h2.5v2.5h-2.5z" />
+</vector>

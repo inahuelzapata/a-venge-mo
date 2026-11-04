@@ -8,3 +8,4 @@ ios/SplitPartyTests/__Snapshots__/** filter=lfs diff=lfs merge=lfs -text
 # Design reference screenshots shared by both apps.
 docs/design/*.jpg filter=lfs diff=lfs merge=lfs -text
 docs/design/*.png filter=lfs diff=lfs merge=lfs -text
+docs/design/**/*.png filter=lfs diff=lfs merge=lfs -text

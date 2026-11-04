@@ -1,61 +1,38 @@
-# App shell design reference
+# App shell design
 
-The iOS and Android shells must look the same. These screenshots are the
-visual reference. The values below are the ones the iOS app uses; the Android
-shell currently uses a different palette and avatar colours, which still has to
-be reconciled (see `chiron-memory/contradictions.md`).
+**The iOS captures are the source of truth for how both apps look.** The Android
+app is built to match them screen for screen.
 
-| File | What it shows |
-| ---- | ------------- |
-| [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg) | Top of Home. Header: round avatar on the left, search/QR capsule on the right, banner area above the feed |
-| [`home-feed-reference-2.jpg`](home-feed-reference-2.jpg) | Scrolled feed. Cards: time line, "Name paid Name for memo" sentence with inline avatars, round grey like/comment buttons, floating bottom bar with a round blue action button |
+| Path | What |
+| ---- | ---- |
+| [`ios-captures/`](ios-captures/) | One iOS capture per screen and state, with device, scale and build recorded in its README |
+| [`visual-conventions.md`](visual-conventions.md) | Values measured from the captures (colours, spacing, type, tab bar, status bar, radii), the bundled Android font, and the **only** allowed platform differences |
+| [`comparisons/`](comparisons/) | Each screen as iOS (left) and Android (right) at the same width, plus `-overlay.png` with Android at 50% over iOS |
+| [`android-captures/`](android-captures/) | The Android side of each comparison |
+| [`capture/`](capture/) | Scripts that recreate all of the above |
+| [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg), [`-2.jpg`](home-feed-reference-2.jpg) | The original inspiration screenshots from a real payments app. Only the layout idea is used: their ads, merchants and people are examples. They are not the contract |
 
-The screenshots come from a real payments app, so their ads, merchants and
-people are only examples of layout. The apps show the seeded data from
-[`firestore-schema.md`](../firestore-schema.md).
+## Refreshing
 
-## Palette (sampled from the screenshots)
+When the iOS screens change (for example after an iOS review), capture first,
+then update the note, then update Android:
 
-| Token | Hex | Used for |
-| ----- | --- | -------- |
-| Brand blue | `#0087E0` | Pay/Request button, app title, icons in empty/error states |
-| Background | `#F6F6F7` | Screen behind the cards |
-| Card | `#FFFFFF` | Feed cards, profile card |
-| Primary text | `#000000` | Names, memo, amounts; pill buttons |
-| Secondary text | `#7F7F7F` | "paid", "for", relative time, labels |
-| Action background | `#F1F1F3` | Round like/comment buttons |
-| Error | `#D92D20` | Inline login error |
-| New row highlight | brand blue at 14 % | Fades out about 1.5 s after a row arrives |
+```sh
+docs/design/capture/capture-ios.sh                    # iOS captures (simulator, Debug fixture)
+(cd android && ./gradlew recordPaparazziDebug)        # Android renders, incl. ParityScreenshotTest
+python3 docs/design/capture/compare.py                # android-captures/ + comparisons/ (needs Pillow)
+```
 
-Cards have a 28 pt/dp corner radius, 20 padding and an 8 side gutter; pill
-buttons are black, full width and 52 tall.
+The Android images are Paparazzi renders of the same states, with the same data
+as the iOS fixture, at the reference iPhone's 402 × 874 geometry
+(`android/app/src/test/.../screenshots/ParityScreenshotTest.kt`). Re-running
+the commands gives the same images. The status bar and the keyboard are drawn
+by the OS, so the Android renders show the page colour behind the status bar
+and a flat grey stand-in where the iOS keyboard is.
 
-## Avatars
-
-No avatar art exists yet. Each `users.avatar` key is drawn as a coloured circle
-with the user's initials (first letter of up to two words of `displayName`):
-
-| Key | Colour |
-| --- | ------ |
-| `avatar_maxi` | `#0087E0` |
-| `avatar_annie` | `#E5487D` |
-| `avatar_christophe` | `#2EAF6F` |
-| anything else | `#8E8E93` (fallback) |
-
-## Feed row content
-
-- Top line: relative time (`Just now` under a minute, then `12 hours ago`,
-  `6 days ago`, English on every phone) on the left, amount (`$31.15`) on the right.
-- Sentence: `(avatar) Payer paid (avatar) Payee for memo`, using display names,
-  **never "You"**, so all phones show identical rows.
-- Buttons: comments count, then likes count.
-
-## Bottom bar
-
-A floating capsule with three items in this order: **Home**, **Pay/Request**
-(the round brand-blue button) and **Me**, each with an icon and a label.
+All images here are stored with Git LFS (see the repo `.gitattributes`).
 
 ## Glossary
 
 - **dp**: density-independent pixel, the Android equivalent of an iOS point (pt).
-- **pt**: iOS point, the layout unit (2–3 physical pixels on current iPhones).
+- **pt**: iOS point, the layout unit (3 physical pixels on the reference iPhone).

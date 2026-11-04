@@ -10,4 +10,4 @@ exists here once; platform READMEs link to it and never copy it.
 | [Firestore target](firestore-target.md) | How every piece picks the hosted project or the local emulator |
 | [Demo runbook](demo-runbook.md) | Seed, reset and run the 3-phone demo |
 | [Repository structure](repo-structure.md) | Where new work goes; nothing is shared at build time |
-| [Design reference](design/) | Home feed screenshots both app shells reproduce (`home-feed-reference-1.jpg` top of Home, `-2.jpg` scrolled feed) |
+| [Design](design/) | iOS reference captures (the visual contract for both apps), the measured [visual conventions](design/visual-conventions.md) and iOS/Android side-by-side comparisons |

@@ -2,10 +2,12 @@ package com.splitparty.android.ui.shell
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.splitparty.android.di.domainModule
 import com.splitparty.android.di.viewModelModule
@@ -18,6 +20,7 @@ import com.splitparty.android.testing.FakeSplitPartyRepository
 import com.splitparty.android.testing.TestData
 import com.splitparty.android.testing.TestData.server
 import com.splitparty.android.testing.TestData.tx
+import com.splitparty.android.ui.me.MeTestTags
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import org.junit.After
 import org.junit.Before
@@ -67,6 +70,8 @@ class MainShellNavigationTest {
         compose.onNodeWithTag(ShellTestTags.tab(Tab.Me)).performClick()
         compose.onNodeWithText("@maxi").assertIsDisplayed()
         compose.onNodeWithText("$250.00").assertIsDisplayed()
+        // The profile card fills the small test screen; the user's rows are below it.
+        compose.onNodeWithTag(MeTestTags.LIST).performScrollToNode(hasText("My row", substring = true))
         compose.onNodeWithText("My row", substring = true).assertIsDisplayed()
 
         pressBack()

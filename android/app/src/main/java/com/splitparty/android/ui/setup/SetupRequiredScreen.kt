@@ -1,47 +1,37 @@
 package com.splitparty.android.ui.setup
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.splitparty.android.data.firebase.FirestoreTarget
-import com.splitparty.android.ui.theme.Brand
+import com.splitparty.android.ui.login.LoginAction
+import com.splitparty.android.ui.login.LoginScreen
+import com.splitparty.android.ui.login.LoginUiState
 import com.splitparty.android.ui.theme.SplitPartyTheme
-
-private val warningColor = Color(0xFFE65100)
+import kotlinx.collections.immutable.toImmutableList
 
 /**
- * Shown instead of login when the local Firestore setup is incomplete, so a
- * missing step is visible instead of a silent failure (android/README.md).
+ * Shown instead of a working login when the local Firestore setup is incomplete
+ * (android/README.md). It looks like docs/design/ios-captures/login-not-configured.png:
+ * the login screen with Sign in disabled, and a footer that says what to fix.
  */
 @Composable
-fun SetupRequiredScreen(target: FirestoreTarget, problems: List<String>, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Split Party", style = MaterialTheme.typography.headlineLarge)
-        Text("Setup required", color = Brand.InkSecondary)
-        Card(colors = CardDefaults.cardColors(containerColor = Brand.Card)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(target.summary)
-                problems.forEach { Text(it, color = warningColor, fontSize = 14.sp) }
-            }
-        }
-    }
+fun SetupRequiredScreen(target: FirestoreTarget, problems: List<String>, modifier: Modifier = Modifier, focusOnAppear: Boolean = true) {
+    var username by rememberSaveable { mutableStateOf("") }
+    LoginScreen(
+        state = LoginUiState(
+            username = username,
+            targetSummary = target.summary,
+            setupProblems = problems.toImmutableList()
+        ),
+        onAction = { action -> if (action is LoginAction.UsernameChanged) username = action.value },
+        modifier = modifier,
+        focusOnAppear = focusOnAppear
+    )
 }
 
 @Preview(showBackground = true)

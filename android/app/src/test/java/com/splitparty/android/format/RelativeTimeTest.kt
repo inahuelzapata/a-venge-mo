@@ -11,10 +11,10 @@ class RelativeTimeTest {
     private fun ago(millis: Long) = RelativeTime.format(now - millis, now, utc)
 
     @Test
-    fun `recent and slightly future times read just now`() {
-        assertEquals("just now", ago(10_000))
-        assertEquals("just now", ago(-5_000))
-        assertEquals("just now", RelativeTime.format(null, now, utc))
+    fun `recent and slightly future times read Just now, as on iOS`() {
+        assertEquals("Just now", ago(10_000))
+        assertEquals("Just now", ago(-5_000))
+        assertEquals("Just now", RelativeTime.format(null, now, utc))
     }
 
     @Test
@@ -26,8 +26,10 @@ class RelativeTimeTest {
     }
 
     @Test
-    fun `older than a week shows the date, with the year only when it differs`() {
-        assertEquals("Jan 5", ago(10 * 86_400_000L))
-        assertEquals("Dec 26, 2026", ago(20 * 86_400_000L))
+    fun `older rows use weeks, months and years like the iOS formatter`() {
+        assertEquals("1 week ago", ago(10 * 86_400_000L))
+        assertEquals("2 weeks ago", ago(20 * 86_400_000L))
+        assertEquals("1 month ago", ago(40 * 86_400_000L))
+        assertEquals("1 year ago", ago(400 * 86_400_000L))
     }
 }

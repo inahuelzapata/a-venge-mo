@@ -26,6 +26,9 @@ class LargeFontScreenshotTest {
 
     @Test
     fun homeLoaded() = paparazzi.screen {
-        HomeScreen(HomeUiState("Maxi", feed = LiveState.Ready(PreviewData.transactions), users = PreviewData.users), PaddingValues())
+        HomeScreen(
+            HomeUiState("Maxi", "avatar_maxi", feed = LiveState.Ready(PreviewData.transactions), users = PreviewData.users),
+            PaddingValues()
+        )
     }
 }
