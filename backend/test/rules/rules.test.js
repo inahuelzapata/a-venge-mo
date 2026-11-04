@@ -22,6 +22,14 @@ function party(over = {}) {
 }
 
 before(async () => {
+  // @firebase/rules-unit-testing only works against the emulator: it loads the
+  // rules file into it and clears data between runs. Never let it near hosted.
+  if (process.env.FIREBASE_TARGET === 'hosted' || !process.env.FIRESTORE_EMULATOR_HOST) {
+    throw new Error(
+      'The security-rules suite runs only under the Firestore emulator (FIREBASE_TARGET=hosted or no emulator ' +
+        'running). Use: npm run test:rules. Hosted rules are checked by npm run test:hosted -- --wipe-demo-db.',
+    );
+  }
   env = await initializeTestEnvironment({
     projectId: 'demo-split-party-rules', // separate project so it never touches the acceptance data
     firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') },

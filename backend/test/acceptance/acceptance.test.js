@@ -1,18 +1,20 @@
-// Work-order acceptance checks against the Firestore emulator (npm run verify).
+// Work-order acceptance checks, run against the database in backend/.env:
+// the HOSTED demo database by default (npm run test:hosted -- --wipe-demo-db).
+// The runner deploys rules + indexes, resets before and after, so this file may
+// wipe freely. It refuses to run unless that runner started it.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue, Timestamp, GeoPoint } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, GeoPoint } from 'firebase-admin/firestore';
+import { BACKEND_DIR, openFirestore, readConfig } from '../../lib/env.js';
 import { seed, reset } from '../../lib/ops.js';
 import { buildSeed, MERCHANT_ID } from '../../lib/seedData.js';
 import { computeSplit } from '../../lib/split.js';
 import { joinCodeLockId, partyTransactionId, PARTY_TTL_MS } from '../../lib/schema.js';
 import { validateParty, validateTransaction, validateUser } from '../../lib/validate.js';
 
-const PROJECT = 'demo-split-party';
-const firebaseDir = fileURLToPath(new URL('../..', import.meta.url));
+const firebaseDir = BACKEND_DIR;
+let config;
 let db;
 
 async function wipe() {
@@ -36,9 +38,11 @@ async function snapshot() {
 }
 
 before(async () => {
-  assert.ok(process.env.FIRESTORE_EMULATOR_HOST, 'run via npm run verify (emulator)');
-  const app = getApps()[0] ?? initializeApp({ projectId: PROJECT });
-  db = getFirestore(app);
+  if (process.env.SPLIT_PARTY_ACCEPTANCE_RUNNER !== '1') {
+    throw new Error('This suite wipes the database. Run it through: npm run test:hosted -- --wipe-demo-db');
+  }
+  config = readConfig();
+  db = await openFirestore(config);
   await wipe();
 });
 
@@ -170,5 +174,60 @@ for (const script of ['seed', 'reset']) {
     assert.match(r.stderr, /FIREBASE_PROJECT_ID is not set/);
     assert.match(r.stderr, /Nothing was written/);
     assert.deepEqual(await snapshot(), before);
+  });
+}
+
+// ---- Deployed security rules, exercised as a phone would (no credentials) ----
+
+/** Firestore REST typed value for a plain JS value (Date -> timestamp). */
+function enc(v) {
+  if (v === null) return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'string') return { stringValue: v };
+  if (v instanceof Date) return { timestampValue: v.toISOString() };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(enc) } };
+  return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, enc(x)])) } };
+}
+
+/** Creates parties/{id} with an unauthenticated client request; returns the HTTP status. */
+async function clientCreateParty(id, data) {
+  const base = config.target === 'emulator'
+    ? `http://${config.emulatorHost}/v1`
+    : 'https://firestore.googleapis.com/v1';
+  const url = `${base}/projects/${config.projectId}/databases/(default)/documents/parties?documentId=${id}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ fields: enc(data).mapValue.fields }),
+  });
+  return res.status;
+}
+
+function clientParty(over = {}) {
+  const created = new Date(Math.floor(Date.now() / 1000) * 1000);
+  return {
+    hostId: 'maxi', merchantId: MERCHANT_ID, joinCode: ['🍕', '🍺', '🎉'], status: 'open',
+    createdAt: created, expiresAt: new Date(created.getTime() + PARTY_TTL_MS), paidAt: null,
+    billCents: 10000, tip: { type: 'percent', percent: 18 }, memberIds: ['maxi', 'annie'],
+    members: { maxi: { joinedAt: created, paid: false }, annie: { joinedAt: created, paid: false } },
+    wrongCodeAttempts: {},
+    ...over,
+  };
+}
+
+test('deployed rules: a client may create a schema-conforming party', async () => {
+  assert.equal(await clientCreateParty(`acceptance-ok-${Date.now()}`, clientParty()), 200);
+});
+
+for (const [name, over] of [
+  ['non-integer bill', { billCents: 12.5 }],
+  ['status outside the allowed set', { status: 'closed' }],
+  ['join code with 2 emojis', { joinCode: ['🍕', '🍺'] }],
+  ['emoji outside the palette', { joinCode: ['🍕', '🍺', '😀'] }],
+  ['stored share field', { shareCents: 3933 }],
+]) {
+  test(`deployed rules: a client party with ${name} is rejected`, async () => {
+    assert.equal(await clientCreateParty(`acceptance-bad-${Date.now()}`, clientParty(over)), 403);
   });
 }

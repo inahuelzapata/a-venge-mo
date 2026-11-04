@@ -2,13 +2,13 @@
 
 Setup and configuration — env vars, flags, how to run the project.
 
-## Firestore target is chosen by FIREBASE_TARGET
+## Firestore target is chosen by FIREBASE_TARGET, hosted by default
 
-What: The seed/reset scripts need FIREBASE_TARGET=emulator|hosted plus FIREBASE_PROJECT_ID; emulator also needs FIRESTORE_EMULATOR_HOST, hosted needs GOOGLE_APPLICATION_CREDENTIALS (a key outside the repo) and refuses to run if FIRESTORE_EMULATOR_HOST is set; reset on hosted needs --yes · Why: the work order forbids writing anywhere unless the target is explicit, and the Admin SDK silently honours FIRESTORE_EMULATOR_HOST · Where: backend/lib/env.js, backend/.env.example
+What: All three templates default to FIREBASE_TARGET=hosted; the emulator is an opt-in block. Backend hosted credentials: GOOGLE_APPLICATION_CREDENTIALS=service-account.json (key at backend/service-account.json, git-ignored, relative paths resolve from backend/), or empty to use gcloud application-default credentials. readConfig exits 2 before any SDK call on: missing target/project id, the template placeholder id, a demo- id for hosted, FIRESTORE_EMULATOR_HOST set with hosted, a key that is missing/unreadable/not a service account/for another project, or no credentials at all. reset on hosted needs --yes · Why: the work order wants the hosted project as the real demo path and forbids writing anywhere unless the target is explicit; the Admin SDK silently honours FIRESTORE_EMULATOR_HOST · Where: backend/lib/env.js, backend/.env.example, docs/integration-setup-guide.md
 
-## Emulator tests need Java and run serially
+## Backend test and deploy commands
 
-What: npm run verify (backend/) runs the Firestore emulator through emulators:exec, which needs a JDK 21 on PATH (e.g. /opt/homebrew/opt/openjdk@21/bin, or a Temurin 21 JAVA_HOME); emulator test files run with --test-concurrency=1, and the rules test uses its own project id (demo-split-party-rules, hence singleProjectMode false) · Why: the acceptance test asserts exact collection contents and would race with the rules test on shared data · Where: backend/package.json, backend/firebase.json
+What: `npm run deploy:firestore` deploys rules + indexes to FIREBASE_PROJECT_ID from .env (no .firebaserc; it is git-ignored). `npm run test:hosted -- --wipe-demo-db` = deploy, reset, wait for composite indexes READY, node --test test/acceptance/, reset in finally (also on failure/Ctrl-C); refuses without the flag. `npm run test:rules` = emulators:exec on project demo-split-party-rules, ignores .env, needs JDK 21 on PATH; the rules test refuses if FIREBASE_TARGET=hosted or no emulator host. `npm test` = unit tests · Why: the acceptance suite runs on the same database as the demo; @firebase/rules-unit-testing only works against the emulator · Where: backend/package.json, backend/scripts/test-hosted.js, backend/lib/deploy.js
 
 ## iOS emulator target needs no GoogleService-Info.plist
 

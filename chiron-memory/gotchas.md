@@ -65,3 +65,11 @@ What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDe
 
 What: Without Simulator.app (not shipped with this Xcode), simctl offers no hardware-keyboard toggle, so a focused field always brings up the iOS keyboard, plus a "slide to type" tutorial card on first use; capture-ios.sh disables the card via `defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true` · Why: the login field autofocuses, so login captures include the keyboard · Where: docs/design/capture/capture-ios.sh, android ParityScreenshotTest (329 dp keyboard stand-in)
 
+## Hosted deploy needs extra IAM roles on the Admin SDK service account
+
+What: With only the default roles, `firebase deploy --only firestore` with the firebase-adminsdk key fails with 403 on serviceusage (API-enabled check) and then on firebaserules.googleapis.com:test; granting "Firebase Admin" + "Service Usage Consumer" in Cloud IAM fixes it after 1-2 minutes of propagation · Why: the Admin SDK service agent role covers Firestore data, not deploys · Where: backend/lib/deploy.js (prints the hint), docs/integration-setup-guide.md step 1 · Learned: seed/reset work with the default roles; a fresh production-mode database denies all client reads until the repo rules are deployed, so phones show "Can't load payments" (PERMISSION_DENIED)
+
+## Probing a composite index with a query is unreliable
+
+What: While the transactions(participantIds, createdAt desc) index was still building, the Me query with limit(1) succeeded but the same query without a limit failed FAILED_PRECONDITION; a query on an empty collection also succeeds. test-hosted therefore lists indexes through the Firestore admin REST API (collectionGroups/-/indexes) and waits for state READY · Where: backend/scripts/test-hosted.js waitForIndexes
+

@@ -8,9 +8,11 @@
   "scripts": {
     "seed": "node --env-file-if-exists=.env scripts/seed.js",
     "reset": "node --env-file-if-exists=.env scripts/reset.js",
-    "emulators": "firebase emulators:start --only firestore --project demo-split-party",
+    "deploy:firestore": "node --env-file-if-exists=.env scripts/deploy-firestore.js",
     "test": "node --test test/unit/",
-    "verify": "firebase emulators:exec --only firestore --project demo-split-party \"node --test --test-concurrency=1 test/emulator/\""
+    "test:hosted": "node --env-file-if-exists=.env scripts/test-hosted.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-split-party-rules \"node --test test/rules/\"",
+    "emulators": "firebase emulators:start --only firestore --project demo-split-party"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0"
