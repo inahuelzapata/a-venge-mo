@@ -28,6 +28,7 @@ Side-by-side comparisons (iOS on the left, Android on the right, same width) and
 | Hairlines | black at 6–8% | Search/QR capsule outline (8%), tab bar outline (6%). There are **no separators between rows**: rows are separate cards with a 12 gap |
 | Tab bar fill | `#F2F2F4` | Capsule over the page. iOS draws a translucent material over the content |
 | Selected tab pill | black at 6% over the tab bar | Behind Home or Me when selected. Never behind Pay/Request |
+| Mark navy | `#021F40` | The Aven-mo mark on the login screen and in the Home header (white inside the centre button) |
 | Avatars | Maxi `#0087E0`, Annie `#E5487D`, Christophe `#2EAF6F`, other `#8E8E93` | Circle with white initials |
 
 There is no dark appearance. iOS forces light mode, so Android renders this
@@ -57,7 +58,7 @@ Spacing values used: **4, 6, 8, 12, 14, 16, 20, 24, 28, 32**.
 | Header height | 44 (avatar, title, capsule all 44 tall). Content starts 16 below it |
 | Header avatar | 44 diameter, 2 white outline, soft shadow (black 8%, radius 4, y 1) |
 | Search/QR capsule | 105 × 44, white, 8% hairline, icons 20 pt with 22 between, 18 side padding |
-| Home title | Centred on the screen width, "Home" |
+| Home title | Centred on the screen width, "Home", with the Aven-mo mark (24) 6 to its left. The mark does not move the title |
 | Feed card | Radius 28, padding 20, white. 187.33 tall with a two-line sentence |
 | Gap between cards | 12 |
 | Card inner spacing | 14 between time line, sentence and chips |
@@ -68,7 +69,7 @@ Spacing values used: **4, 6, 8, 12, 14, 16, 20, 24, 28, 32**.
 | Profile card | Padding 20, avatar 80, 10 between lines. Balance block 12 above and below, 4 between label and amount |
 | "Your payments" heading | 20 from the left edge, 8 above |
 | Pay/Request placeholder | Blue `$` circle 64, title, subtitle, 12 apart, centred in the space above the tab bar |
-| Login | Column centred vertically. Wordmark and subtitle 8 apart, 32 above the field. Field and button 24 side margins, 12 apart, button 8 extra above |
+| Login | Column centred vertically. Aven-mo mark (72) 20 above the wordmark. Wordmark and subtitle 8 apart, 32 above the field. Field and button 24 side margins, 12 apart, button 8 extra above |
 | Login field | 56 tall white capsule, 20 inner padding, 18 text. Error adds a 1.5 `#D92D20` outline |
 | Inline error | Below the field, 8 from the field's left edge: filled `!` circle icon + text, 15, `#D92D20`, wraps under the text |
 | Login footer | Database icon + target text, 13, secondary, centred, 16 above the bottom safe area. Setup problem below it, 6 apart, setup-warning orange |
@@ -85,12 +86,40 @@ screen. The only hairline is the capsule's own outline.
 | Position | 16 from the left and right, 4 above the bottom safe area (gesture area) |
 | Size | Full width minus 32 × **92** tall (6 padding around 80 tall items) |
 | Fill / outline / shadow | `#F2F2F4` / black 6%, 1 / black 12%, radius 16, y 4 |
-| Items | Home, Pay/Request, Me. Equal widths, 4 apart. Icon above label |
+| Items | Home, Pay/Request, Me. Equal widths, 4 apart. Home and Me: icon above label. The centre third holds the Pay/Request button |
 | Item | 6 above, icon slot 52 tall, 3 gap, label 11, 6 below |
-| Selected | Icon and label primary (black), label semibold, pill behind the item (black 6%) |
+| Selected | Icon and label primary (black), label semibold, pill behind the item (black 6%). Home and Me only |
 | Unselected | Icon and label secondary `#7F7F7F`, label regular |
-| Centre slot | 52 brand-blue circle with a white mark. This is a neutral `$` placeholder until the brand mark exists. The brand work owns the art, this note owns the slot size |
+| Centre button | Circle **60** across, brand blue `#0087E0`, white Aven-mo mark 30, no label. **Seated in the bar**: centred horizontally and vertically on the 92 capsule (16 clear above and below), not lifted above it, and no shadow of its own (elevation 0). Looks the same whether Pay/Request is open or not. VoiceOver / TalkBack label "Pay or request" |
 | Content | Scrolls underneath the bar. The last row stays reachable thanks to 24 bottom padding plus the bar inset |
+
+## Brand mark
+
+Added by the Aven-mo brand work (values above in Layout and Bottom bar). The
+mark and icon are generated from [`brand/`](../../brand/) by
+`swift brand/generate-brand-assets.swift` (run from the repository root); never
+edit the generated files by hand. A mark size is its square box: the artwork
+fills the box's full height and 87% of its width.
+
+| Value | iOS (pt) and Android (dp) |
+| ----- | ------------------------- |
+| Mark colour on the page | Navy `#021F40` (login, Home header) |
+| Login mark | 72, 20 above the wordmark |
+| Home header mark | 24, 6 left of the title; header stays 44 tall |
+| Centre button | 60 circle, `#0087E0`, white mark 30, centred in the 92 tab bar, no lift, no shadow |
+| Home-screen name | "A-venge-mo" |
+
+| File | What it is |
+| ---- | ---------- |
+| `brand/source/aven-mo-mark-source.png` | Navy mark artwork as supplied (1254 × 1254) |
+| `brand/source/aven-mo-icon-glossy-source.png` | Glossy app icon as supplied (500 × 500, transparent corners) |
+| `brand/aven-mo-mark.svg` | Vector mark traced from the navy artwork; 1000 × 1000 viewBox |
+| `brand/aven-mo-icon-1024.png` | Icon master: the glossy icon upscaled to 1024 × 1024, opaque |
+| `ios/SplitParty/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` | iOS app icon (copy of the master; also the dark-mode variant, so iOS does not darken it) |
+| `ios/SplitParty/Assets.xcassets/AvenMoMark.imageset/aven-mo-mark.svg` | iOS in-app mark, kept as a vector, template-rendered |
+| `android/app/src/main/res/drawable/ic_aven_mo_mark.xml` | Android in-app mark, tinted in code |
+| `android/app/src/main/res/drawable/ic_launcher_foreground.xml`, `ic_launcher_background.xml` | Adaptive launcher icon layers: light mark inside the 66 dp safe zone, navy radial gradient |
+| `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`, `ic_launcher_round.xml` | Adaptive icon (vectors cover every density; minSdk is 26). No monochrome layer, so themed icons don't restyle it |
 
 ## Type
 
@@ -145,6 +174,10 @@ match the captures (measured in `comparisons/`).
 7. **Translucent tab bar**: iOS blurs the content scrolling under the bar. Android draws the same colour without the backdrop blur (Compose has no backdrop blur), so they look identical over the page and differ only while a card scrolls under the bar.
 
 ## Verification (Android against the captures, 2026-11-04)
+
+> The table below was measured before the brand mark landed. The brand work
+> changed the login, Home header and centre-button areas on both platforms, so
+> re-measure them once the Android renders and `comparisons/` are refreshed.
 
 Measured on the Android parity renders (`android-captures/`, same 402 × 874 at
 3x) with the same pixel sampling used for the iOS values:

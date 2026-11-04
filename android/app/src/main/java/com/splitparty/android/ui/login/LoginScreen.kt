@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.max
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.splitparty.android.R
 import com.splitparty.android.ui.components.PillButton
+import com.splitparty.android.ui.components.BrandMark
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.SplitPartyTheme
@@ -60,7 +61,7 @@ fun LoginRoute(modifier: Modifier = Modifier, viewModel: LoginViewModel = koinVi
 }
 
 /**
- * Layout of docs/design/ios-captures/login-*.png: the wordmark and form centred
+ * Layout of docs/design/ios-captures/login-*.png: the mark, wordmark and form centred
  * in the space above the keyboard, and the database footer at the bottom. The
  * field takes focus on open, as on iOS.
  */
@@ -76,6 +77,8 @@ fun LoginScreen(state: LoginUiState, onAction: (LoginAction) -> Unit, modifier: 
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.weight(1f))
+        BrandMark(size = Dimens.LoginMark)
+        Spacer(Modifier.height(Dimens.LoginMarkGap))
         Text("Split Party", style = Type.Wordmark, color = Brand.Blue)
         Spacer(Modifier.height(8.dp))
         Text("Sign in with your username", style = Type.Subtitle, color = Brand.InkSecondary)

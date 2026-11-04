@@ -10,6 +10,7 @@ app is built to match them screen for screen.
 | [`comparisons/`](comparisons/) | Each screen as iOS (left) and Android (right) at the same width, plus `-overlay.png` with Android at 50% over iOS |
 | [`android-captures/`](android-captures/) | The Android side of each comparison |
 | [`capture/`](capture/) | Scripts that recreate all of the above |
+| [`../../brand/`](../../brand/) | The Aven-mo mark and app icon sources, and the script that generates every platform's brand assets (see "Brand mark" in the conventions note) |
 | [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg), [`-2.jpg`](home-feed-reference-2.jpg) | The original inspiration screenshots from a real payments app. Only the layout idea is used: their ads, merchants and people are examples. They are not the contract |
 
 ## Refreshing
@@ -34,5 +35,7 @@ All images here are stored with Git LFS (see the repo `.gitattributes`).
 
 ## Glossary
 
+- **Adaptive icon**: Android launcher icon made of separate background and foreground layers, which each launcher crops to its own shape.
 - **dp**: density-independent pixel, the Android equivalent of an iOS point (pt).
 - **pt**: iOS point, the layout unit (3 physical pixels on the reference iPhone).
+- **Safe zone**: the middle 66 dp circle of a 108 dp adaptive icon, the only part every launcher shape is guaranteed to show.

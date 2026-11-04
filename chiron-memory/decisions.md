@@ -47,7 +47,15 @@ What: Koin 4.2 with the constructor DSL (singleOf/factoryOf/viewModelOf) and koi
 
 ## Android screenshot tests use Paparazzi 2.0 alpha on the stateless screens
 
-What: Paparazzi snapshots every stateless XScreen in each UI state (plus a 1.5x font-scale pass) on the reference iPhone geometry (402 x 874 dp at 3x, Snapshots.kt SnapshotDevice); goldens are committed in android/app/src/test/snapshots/images and `./gradlew check` depends on verifyPaparazziDebug · Why: catches visual regressions the semantics-based Robolectric tests can't; Paparazzi 2.0.0-alpha05.1 is the first release with AGP 9 support (1.3.x stops at AGP 8) · Where: android/app/src/test/java/com/splitparty/android/screenshots/Snapshots.kt, android/app/build.gradle.kts · Learned: plain testDebugUnitTest only renders snapshots and never compares them; stateless screens have no page background, so the shared `screen {}` helper wraps them in SplitPartyTheme + Brand.Page like the app root does
+What: Paparazzi snapshots every stateless XScreen in each UI state (plus a 1.5x font-scale pass) on DeviceConfig.PIXEL_5; goldens are committed in android/app/src/test/snapshots/images and `./gradlew check` depends on verifyPaparazziDebug · Why: catches visual regressions the semantics-based Robolectric tests can't; Paparazzi 2.0.0-alpha05.1 is the first release with AGP 9 support (1.3.x stops at AGP 8) · Where: android/app/src/test/java/com/splitparty/android/screenshots/Snapshots.kt, android/app/build.gradle.kts · Learned: plain testDebugUnitTest only renders snapshots and never compares them; stateless screens have no page background, so the shared `screen {}` helper wraps them in SplitPartyTheme + Brand.Page like the app root does
+
+## Brand assets are generated from brand/ by one Swift script
+
+What: The Aven-mo mark is hand-traced (measured coordinates) from brand/source/aven-mo-mark-source.png into brand/aven-mo-mark.svg, and `swift brand/generate-brand-assets.swift` writes the SVG, the iOS AppIcon and AvenMoMark imageset, and the Android mark, launcher foreground and background vectors; it prints a trace-vs-source overlap score (0.958 at first run) · Why: both platforms must trace back to one place, and this Mac has no ImageMagick/rsvg/Pillow, so CoreGraphics in a Swift script is the dependency-free renderer · Where: brand/generate-brand-assets.swift, docs/design/README.md "Brand mark" · Learned: never edit the generated files; change the geometry or colours in the script and re-run it
+
+## iOS icon master is the user's glossy icon upscaled, not rebuilt
+
+What: brand/aven-mo-icon-1024.png is the supplied 500×500 glossy icon cropped to its rounded square, upscaled to 1024 on navy #002458, with pixels below alpha 250 (the background-removal halo) painted navy so the PNG is opaque · Why: the user chose upscaling over rebuilding the glossy look from the vector; iOS rejects icons with transparency · Where: brand/generate-brand-assets.swift iconMaster() · Learned: it is slightly soft; a real 1024 export from the designer should replace brand/source/aven-mo-icon-glossy-source.png when available
 
 ## Android bundles Inter as the stand-in for SF Pro
 

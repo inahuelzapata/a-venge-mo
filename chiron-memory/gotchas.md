@@ -61,10 +61,13 @@ What: Robolectric 4.17 tests failed with "Failed to interact with raw FileDescri
 
 What: Paparazzi 2.0.0-alpha05.1 and Robolectric 4.17 tests share the :app testDebugUnitTest task without conflicts (69 tests pass together), although older Paparazzi docs advise keeping them in separate modules · Why: avoids a separate screenshot module, which could not depend on the application module's screens anyway · Where: android/app/build.gradle.kts, app/src/test/resources/robolectric.properties · Learned: if they start clashing after an upgrade, check this first; the fallback is moving screens into an Android library module
 
-## Headless iOS simulators always show the software keyboard
+## iOS snapshots shift slightly after the simulator restarts or captures run
 
-What: Without Simulator.app (not shipped with this Xcode), simctl offers no hardware-keyboard toggle, so a focused field always brings up the iOS keyboard, plus a "slide to type" tutorial card on first use; capture-ios.sh disables the card via `defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true` · Why: the login field autofocuses, so login captures include the keyboard · Where: docs/design/capture/capture-ios.sh, android ParityScreenshotTest (329 dp keyboard stand-in)
+What: After capture-ios.sh (status bar override) and a simulator shutdown/reboot, ScreenSnapshotTests failed on Home and Me with every pixel off by at most 3/255 and no layout change; re-recording on the current simulator state made two full runs pass · Why: the screens that failed are the ones with content blurred under the material tab bar, whose rendering moved with the fresh simulator state · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, docs/design/capture/capture-ios.sh · Learned: record snapshots and run them on the same booted simulator session; measure the diff before assuming a UI regression
 
+## iOS reference captures need the simulator's hardware keyboard disconnected
+
+What: With I/O ▸ Keyboard ▸ Connect Hardware Keyboard on (com.apple.iphonesimulator ConnectHardwareKeyboard), the login captures come out without the software keyboard, unlike the reference set and Android's keyboard stand-in · Why: the focused field only shows the on-screen keyboard when no hardware keyboard is attached · Where: docs/design/capture/capture-ios.sh, docs/design/ios-captures/README.md
 ## Hosted deploy needs extra IAM roles on the Admin SDK service account
 
 What: With only the default roles, `firebase deploy --only firestore` with the firebase-adminsdk key fails with 403 on serviceusage (API-enabled check) and then on firebaserules.googleapis.com:test; granting "Firebase Admin" + "Service Usage Consumer" in Cloud IAM fixes it after 1-2 minutes of propagation · Why: the Admin SDK service agent role covers Firestore data, not deploys · Where: backend/lib/deploy.js (prints the hint), docs/integration-setup-guide.md step 1 · Learned: seed/reset work with the default roles; a fresh production-mode database denies all client reads until the repo rules are deployed, so phones show "Can't load payments" (PERMISSION_DENIED)

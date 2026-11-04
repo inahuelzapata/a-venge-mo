@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aven-mo launcher icon; layers generated from brand/ by brand/generate-brand-assets.swift.
+     minSdk is 26, so this vector adaptive icon serves every density. No monochrome
+     layer on purpose: the icon keeps its colours when themed icons are on. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

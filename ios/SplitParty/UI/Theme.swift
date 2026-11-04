@@ -22,6 +22,21 @@ enum Theme {
     static let cardCornerRadius: CGFloat = 28
     static let cardPadding: CGFloat = 20
     static let screenGutter: CGFloat = 8
+
+    // Aven-mo mark and the centre Pay/Request button. Android uses the same
+    // numbers in dp; all are in docs/design/visual-conventions.md ("Brand mark").
+
+    /// Navy of the mark artwork (brand/aven-mo-mark.svg).
+    static let markNavy = Color(hex: 0x021F40)
+    /// Logo slot above the title on the login screen.
+    static let loginMarkSize: CGFloat = 72
+    /// Mark to the left of the "Home" title.
+    static let headerMarkSize: CGFloat = 24
+    static let headerMarkSpacing: CGFloat = 6
+    /// Tab bar items: 6 + 52 icon slot + 3 + 13 label + 6 = 80, inside 6 padding (bar 92).
+    static let tabIconSlot: CGFloat = 52
+    static let payButtonDiameter: CGFloat = 60
+    static let payButtonMarkSize: CGFloat = 30
 }
 
 extension Color {

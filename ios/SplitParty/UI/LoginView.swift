@@ -31,6 +31,9 @@ struct LoginView: View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 8) {
+                BrandMark(size: Theme.loginMarkSize)
+                    // 20 between the mark and the title, as on Android.
+                    .padding(.bottom, 12)
                 Text("Split Party")
                     .font(.system(size: 40, weight: .bold))
                     .foregroundStyle(Theme.brandBlue)

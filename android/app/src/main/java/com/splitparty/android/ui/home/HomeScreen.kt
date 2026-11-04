@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +38,7 @@ import com.splitparty.android.R
 import com.splitparty.android.domain.live.LiveState
 import com.splitparty.android.domain.live.OFFLINE_MESSAGE
 import com.splitparty.android.ui.components.Avatar
+import com.splitparty.android.ui.components.BrandMark
 import com.splitparty.android.ui.components.EmptyCard
 import com.splitparty.android.ui.components.FeedRow
 import com.splitparty.android.ui.components.LoadingCard
@@ -127,7 +129,7 @@ private fun HomeHeader(currentUserName: String, currentUserAvatar: String?, modi
         modifier = modifier.fillMaxWidth().height(Dimens.HeaderHeight).padding(horizontal = Dimens.HeaderMargin),
         contentAlignment = Alignment.Center
     ) {
-        Text("Home", style = Type.ScreenTitle, color = Brand.Ink)
+        HeaderTitle()
         // iOS strokes a 2 white ring centred on the 44 circle's edge: 46 outside, 42 of colour inside.
         Box(
             modifier = Modifier
@@ -163,6 +165,17 @@ private fun HomeHeader(currentUserName: String, currentUserAvatar: String?, modi
 @Composable
 private fun BannerSlot(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth())
+}
+
+/** The mark left of "Home"; an equal empty space on the right keeps the title itself centred, as on iOS. */
+@Composable
+private fun HeaderTitle(modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        BrandMark(size = Dimens.HeaderMark)
+        Spacer(Modifier.width(Dimens.HeaderMarkSpacing))
+        Text("Home", style = Type.ScreenTitle, color = Brand.Ink)
+        Spacer(Modifier.width(Dimens.HeaderMark + Dimens.HeaderMarkSpacing))
+    }
 }
 
 @Composable

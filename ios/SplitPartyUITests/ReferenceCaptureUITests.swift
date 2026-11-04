@@ -56,7 +56,7 @@ final class ReferenceCaptureUITests: XCTestCase {
         XCTAssertTrue(element("homeScreen").waitForExistence(timeout: Self.timeout))
         try capture("home-feed")
 
-        tapTab("Pay/Request")
+        tapTab("Pay or request")
         XCTAssertTrue(element("payRequestScreen").waitForExistence(timeout: Self.timeout))
         try capture("pay-request")
 

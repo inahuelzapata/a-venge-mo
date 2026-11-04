@@ -6,12 +6,12 @@ styled to match them. Measured values are in
 
 | | |
 | --- | --- |
-| Build | iOS shell from `main` at `633d880` (merged PR #3, "iOS mock app shell"), Debug configuration |
-| Device | **iPhone 18 Pro simulator**, iOS 27.2. Screen 402 × 874 pt at **@3x**, so each PNG is 1206 × 2622 px |
+| Build | iOS shell with the Aven-mo brand mark (branch `wo/aven-mo-brand-mark-app-icon-and-venmo-style-pay-df6eb2fb`, merged with `main` at `cb1a6bc`), Debug configuration |
+| Device | **iPhone 17 Pro simulator**, iOS 26.5 (`IOS_CAPTURE_DEVICE="iPhone 17 Pro"`): no iPhone 18 Pro / iOS 27.2 simulator was installed on the machine that re-took them. Same screen, 402 × 874 pt at **@3x**, so each PNG is 1206 × 2622 px. The first set (before the brand mark) was taken on an iPhone 18 Pro, iOS 27.2 |
 | Appearance | Light. The app forces light mode (`preferredColorScheme(.light)`) |
 | Status bar | Pinned to 9:41, full signal and Wi-Fi, charged battery (`simctl status_bar override`) |
 | Data | The app's Debug fixture (`-UITestFixture`), which serves the same users and payments as `backend/lib/seedData.js`, with ages relative to now ("3 hours ago" and so on) |
-| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift` |
+| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, Pay/Request button seated in the tab bar) |
 
 The work order asked for a physical iPhone. These come from the simulator at the
 same pt size and scale as an iPhone 17/18 Pro, because the project owner chose
@@ -33,5 +33,6 @@ run `docs/design/capture/capture-ios.sh`. Android then follows the new images.
 | [`pay-request.png`](pay-request.png) | Pay/Request placeholder tab |
 
 The login field focuses itself when the screen opens, so the login captures show
-the system keyboard. The keyboard is drawn by the OS (see the platform-difference
+the system keyboard. The simulator must have its hardware keyboard disconnected
+(I/O ▸ Keyboard ▸ Connect Hardware Keyboard off), or the software keyboard stays hidden. The keyboard is drawn by the OS (see the platform-difference
 list in the conventions note).

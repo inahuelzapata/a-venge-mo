@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -46,6 +47,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.splitparty.android.R
+import com.splitparty.android.ui.components.BrandMark
 import com.splitparty.android.ui.home.HomeRoute
 import com.splitparty.android.ui.me.MeRoute
 import com.splitparty.android.ui.pay.PayRequestScreen
@@ -103,7 +105,8 @@ fun ShellFrame(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modif
 /** The bottom bar's tabs, in bar order, and the destination each one opens. */
 enum class Tab(val destination: Any, val label: String) {
     Home(HomeDestination, "Home"),
-    Pay(PayDestination, "Pay/Request"),
+    /** No visible label: this is the TalkBack label of the centre button, as iOS's VoiceOver label. */
+    Pay(PayDestination, "Pay or request"),
     Me(MeDestination, "Me")
 }
 
@@ -131,13 +134,14 @@ object ShellTestTags {
 }
 
 /**
- * Floating capsule, 92 tall, 16 from the sides and 4 above the gesture area:
- * three equal items with the icon above the label. The centre slot is the
- * 52 brand-blue circle; its "$" is a neutral placeholder until the brand mark exists.
+ * Floating capsule, 92 tall, 16 from the sides and 4 above the gesture area,
+ * with three equal slots: Home and Me are icon-above-label tabs, and the centre
+ * slot holds the round Pay/Request button (Venmo-style), seated in the bar and
+ * centred on it rather than lifted above it.
  */
 @Composable
 private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
-    Row(
+    Box(
         modifier = modifier
             .padding(
                 start = Dimens.TabBarSideMargin,
@@ -146,23 +150,39 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, modifier: Modifier 
             )
             .fillMaxWidth()
             .height(Dimens.TabBarHeight)
-            .dropShadow(
-                CircleShape,
-                Shadow(radius = 16.dp, offset = DpOffset(0.dp, 4.dp), color = Brand.Shadow.copy(alpha = 0.12f))
-            )
-            .background(Brand.TabBar, CircleShape)
-            .border(1.dp, Brand.TabBarOutline, CircleShape)
-            .padding(Dimens.TabBarPadding),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Tab.entries.forEach { tab ->
-            TabItem(
-                tab = tab,
-                selected = current == tab,
-                onClick = { onSelect(tab) },
-                modifier = Modifier.weight(1f).testTag(ShellTestTags.tab(tab))
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(Dimens.TabBarHeight)
+                .dropShadow(
+                    CircleShape,
+                    Shadow(radius = 16.dp, offset = DpOffset(0.dp, 4.dp), color = Brand.Shadow.copy(alpha = 0.12f))
+                )
+                .background(Brand.TabBar, CircleShape)
+                .border(1.dp, Brand.TabBarOutline, CircleShape)
+                .padding(Dimens.TabBarPadding),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Tab.entries.forEach { tab ->
+                if (tab == Tab.Pay) {
+                    // Keeps Home and Me at their equal-thirds positions.
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    TabItem(
+                        tab = tab,
+                        selected = current == tab,
+                        onClick = { onSelect(tab) },
+                        modifier = Modifier.weight(1f).testTag(ShellTestTags.tab(tab))
+                    )
+                }
+            }
         }
+        PayRequestButton(
+            selected = current == Tab.Pay,
+            onClick = { onSelect(Tab.Pay) },
+            modifier = Modifier.align(Alignment.Center).testTag(ShellTestTags.tab(Tab.Pay))
+        )
     }
 }
 
@@ -172,7 +192,7 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit, modifier: 
     Column(
         modifier = modifier
             .height(Dimens.TabItemHeight)
-            .background(if (selected && tab != Tab.Pay) Brand.TabSelected else Color.Transparent, CircleShape)
+            .background(if (selected) Brand.TabSelected else Color.Transparent, CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -189,16 +209,40 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit, modifier: 
 
                 Tab.Me -> TabIcon(R.drawable.ic_person_fill, tint, width = 27.dp, height = 26.dp)
 
-                Tab.Pay -> Box(
-                    Modifier.size(Dimens.TabIconSlot).background(Brand.Blue, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("$", style = Type.DollarGlyph, color = Color.White)
-                }
+                // Drawn by PayRequestButton, never as a TabItem.
+                Tab.Pay -> Unit
             }
         }
         Spacer(Modifier.height(3.dp))
         Text(tab.label, style = if (selected) Type.TabLabelSelected else Type.TabLabel, color = tint)
+    }
+}
+
+/**
+ * Brand-blue circle carrying the white mark, no text, and no shadow of its own
+ * (it sits in the bar, not over it). It looks the same whether or not
+ * Pay/Request is open (only its selected semantics change) and, like every
+ * control here, has no ripple.
+ */
+@Composable
+private fun PayRequestButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(Dimens.PayButtonDiameter)
+            .background(Brand.Blue, CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
+            .semantics {
+                contentDescription = Tab.Pay.label
+                this.selected = selected
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        BrandMark(size = Dimens.PayButtonMark, color = Color.White)
     }
 }
 

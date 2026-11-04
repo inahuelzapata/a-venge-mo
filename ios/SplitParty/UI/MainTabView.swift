@@ -3,19 +3,12 @@ import SwiftUI
 enum AppTab: CaseIterable {
     case home, payRequest, me
 
+    /// Also the VoiceOver label of each bar item.
     var title: String {
         switch self {
         case .home: "Home"
-        case .payRequest: "Pay/Request"
+        case .payRequest: "Pay or request"
         case .me: "Me"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .home: "house.fill"
-        case .payRequest: "dollarsign"
-        case .me: "person.fill"
         }
     }
 }
@@ -47,55 +40,68 @@ struct MainTabView: View {
     }
 }
 
-/// Floating capsule with Home, Pay/Request and Me. Pay/Request is the round
-/// brand-blue button, like the action button in the reference.
+/// Floating capsule with Home and Me as regular tabs and, between them, the
+/// Pay/Request action as a round brand-blue button carrying the white
+/// Aven-mo mark (Venmo-style). Sizes: Theme, docs/design/visual-conventions.md "Brand mark".
 private struct BottomBar: View {
     @Binding var selectedTab: AppTab
 
-    private static let payButtonSize: CGFloat = 52
-
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(AppTab.allCases, id: \.self) { tab in
-                Button { selectedTab = tab } label: { item(for: tab) }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tab.title)
-                    .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+        ZStack {
+            HStack(spacing: 4) {
+                tabButton(.home, systemImage: "house.fill")
+                // The centre third stays empty under the button, so Home and Me
+                // keep their equal-thirds positions.
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                tabButton(.me, systemImage: "person.fill")
             }
+            .padding(6)
+            .background(Capsule().fill(.regularMaterial))
+            .overlay(Capsule().stroke(Color.black.opacity(0.06)))
+            .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
+
+            // Seated in the bar, centred on it: not lifted and no shadow of its own,
+            // so it reads as part of the bar rather than floating over it.
+            payRequestButton
         }
-        .padding(6)
-        .background(Capsule().fill(.regularMaterial))
-        .overlay(Capsule().stroke(Color.black.opacity(0.06)))
-        .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("bottomBar")
     }
 
-    @ViewBuilder
-    private func item(for tab: AppTab) -> some View {
+    private func tabButton(_ tab: AppTab, systemImage: String) -> some View {
         let isSelected = selectedTab == tab
-        VStack(spacing: 3) {
-            if tab == .payRequest {
-                Image(systemName: tab.systemImage)
-                    .font(.system(size: 22, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .frame(width: Self.payButtonSize, height: Self.payButtonSize)
-                    .background(Circle().fill(Theme.brandBlue))
-            } else {
-                Image(systemName: tab.systemImage)
+        return Button { selectedTab = tab } label: {
+            VStack(spacing: 3) {
+                Image(systemName: systemImage)
                     .font(.system(size: 22, weight: .semibold))
-                    .frame(height: Self.payButtonSize)
+                    .frame(height: Theme.tabIconSlot)
+                Text(tab.title)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
             }
-            Text(tab.title)
-                .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+            .foregroundStyle(isSelected ? Theme.primaryText : Theme.secondaryText)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(isSelected ? Color.black.opacity(0.06) : .clear))
+            .contentShape(Capsule())
         }
-        .foregroundStyle(isSelected ? Theme.primaryText : Theme.secondaryText)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(isSelected && tab != .payRequest ? Color.black.opacity(0.06) : .clear))
-        .contentShape(Capsule())
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// Looks the same whether or not Pay/Request is the open screen.
+    private var payRequestButton: some View {
+        Button { selectedTab = .payRequest } label: {
+            BrandMark(size: Theme.payButtonMarkSize, color: .white)
+                .frame(width: Theme.payButtonDiameter, height: Theme.payButtonDiameter)
+                .background(Circle().fill(Theme.brandBlue))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(AppTab.payRequest.title)
+        .accessibilityAddTraits(selectedTab == .payRequest ? .isSelected : [])
     }
 }
 

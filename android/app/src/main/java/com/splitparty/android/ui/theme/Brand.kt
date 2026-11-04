@@ -30,6 +30,9 @@ object Brand {
     val TabBarOutline = Color.Black.copy(alpha = 0.06f)
     val TabSelected = Color.Black.copy(alpha = 0.06f)
     val Shadow = Color.Black
+
+    /** Navy of the Aven-mo mark artwork (brand/aven-mo-mark.svg). */
+    val MarkNavy = Color(0xFF021F40)
 }
 
 /** Spacing and sizes in dp, equal to the iOS pt values in the conventions note. */
@@ -67,4 +70,16 @@ object Dimens {
 
     /** Padding below the last row of a list, above the bar (iOS: 24). */
     val ListBottomPadding = 24.dp
+
+    // Aven-mo mark and the centre Pay/Request button ("Brand mark" in the
+    // conventions note). A mark size is its square box, which includes a little
+    // room above and below the artwork.
+    val LoginMark = 72.dp
+    /** Between the login mark and the wordmark. */
+    val LoginMarkGap = 20.dp
+    val HeaderMark = 24.dp
+    /** Between the header mark and the "Home" title. */
+    val HeaderMarkSpacing = 6.dp
+    val PayButtonDiameter = 60.dp
+    val PayButtonMark = 30.dp
 }
