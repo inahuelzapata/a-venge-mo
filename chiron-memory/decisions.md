@@ -26,9 +26,9 @@ What: FirebaseBootstrap sets MemoryCacheSettings, and LiveDataStore shows an err
 
 What: Both apps render every feed row as "Payer paid Payee for memo" with display names, even for the signed-in user · Why: the checkpoint requires the 3 phones to show identical rows; "You" would differ per phone · Where: ios/SplitParty/UI/TransactionList.swift, docs/design/README.md
 
-## Avatars are initials on a fixed colour per avatar key
+## users.avatar holds the person's photo URL; initials are the fallback
 
-What: users.avatar keys map to fixed colours (avatar_maxi #0087E0, avatar_annie #E5487D, avatar_christophe #2EAF6F, unknown #8E8E93) drawn with initials; no image assets · Why: no avatar art exists, and fixed values let Android match iOS exactly · Where: ios/SplitParty/UI/AvatarView.swift, docs/design/README.md
+What: The seed writes each seeded user's taller.ai photo URL (Next.js image-optimizer link, w=1080, stored verbatim) into users.avatar, replacing the old avatar_* keys; the apps fetch and cache the image at runtime and draw initials when the value is missing, empty or not a URL. The backend stores URLs only, never the images · Why: the three demo users are real people whose photos now exist; the user validator allows no extra fields, so the URL replaces the value instead of becoming a new field, and only the seed (Admin SDK) can write it · Where: backend/lib/seedData.js, docs/firestore-schema.md, ios/SplitParty/UI/AvatarView.swift · Learned: until each app's avatar work lands it may still map the old avatar_* keys to fixed colours (#0087E0 / #E5487D / #2EAF6F), so a URL falls to that app's unknown-key fallback
 
 ## iOS snapshot and UI tests run on an in-memory fixture, not Firestore
 
