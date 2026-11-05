@@ -8,7 +8,9 @@ runs from `backend/` unless it says otherwise.
 Follow the [Integration & Setup Guide](integration-setup-guide.md): config
 files for the backend and both apps, the service-account key, and
 `npm run deploy:firestore` so the hosted project has the repo's rules and
-indexes.
+indexes, and the Demo reset backend (step 3b: `npm run deploy:functions` on
+Blaze, or `npm run deploy:reset-endpoint` plus `RESET_DEMO_URL` without Blaze;
+without one of them the in-app **Demo reset** button fails on every phone).
 
 ## 1. One database for everything
 

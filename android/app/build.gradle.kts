@@ -46,6 +46,9 @@ android {
         buildConfigField("String", "FIREBASE_TARGET", firestoreSetting("FIREBASE_TARGET"))
         buildConfigField("String", "FIREBASE_PROJECT_ID", firestoreSetting("FIREBASE_PROJECT_ID"))
         buildConfigField("String", "FIRESTORE_EMULATOR_HOST", firestoreSetting("FIRESTORE_EMULATOR_HOST"))
+        // Optional: the free Demo reset endpoint (backend/reset-endpoint) when the
+        // project has no Cloud Functions; empty = the resetDemo callable.
+        buildConfigField("String", "RESET_DEMO_URL", firestoreSetting("RESET_DEMO_URL"))
     }
 
     buildTypes {

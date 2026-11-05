@@ -95,6 +95,84 @@ repo's rules, and Firestore → **Indexes** shows the two composite indexes
 New indexes take a few minutes to build. Deploy again whenever the rules or
 indexes change; the hosted test run below also deploys them every time.
 
+### 3b. Deploy the Demo reset backend (required for the in-app Demo reset)
+
+The **Demo reset** button on the Me tab can't reset the database itself (the
+rules forbid it); it calls a server-side reset. Merging the code does not deploy
+it: pick **one** of the two options below once per project, and redeploy
+whenever `lib/ops.js`, `lib/callableReset.js` or the seed changes. Without
+either, the phone shows "Demo reset isn't set up on the server" and logcat
+shows `resetDemo failed: NOT_FOUND`.
+
+Both speak the same Firebase callable protocol and run the same `reset()` as
+`npm run reset`, so the app behaves identically; only the address differs.
+
+| | A. Cloud Function | B. Free endpoint on Vercel |
+| --- | --- | --- |
+| Firebase plan | **Blaze** (pay-as-you-go, card needed) | Spark (free) is enough |
+| Deploy | `npm run deploy:functions` | `npm run deploy:reset-endpoint` |
+| App setting (`android/firestore.properties`) | `RESET_DEMO_URL=` (empty) | `RESET_DEMO_URL=<printed URL>` |
+| Admin key lives | inside Google Cloud | as encrypted env vars on Vercel |
+
+After changing `RESET_DEMO_URL`, rebuild and reinstall the app.
+
+**Check it is live without resetting anything**: a plain GET on the address
+answers **400** when deployed and **404** when it is missing (a POST *does*
+reset, so never POST it by hand during a demo):
+
+```sh
+curl -s -o /dev/null -w "%{http_code}\n" https://us-central1-<project id>.cloudfunctions.net/resetDemo   # A
+curl -s -o /dev/null -w "%{http_code}\n" https://<project id>-demo-reset.vercel.app/api/resetDemo        # B
+```
+
+#### A. Cloud Function (projects on Blaze)
+
+```sh
+npm run deploy:functions
+```
+
+One-time prerequisites (a project **Owner** does these in the console):
+
+- The project is on the **Blaze** plan.
+- The APIs `cloudfunctions.googleapis.com`, `cloudbuild.googleapis.com`,
+  `artifactregistry.googleapis.com`, `run.googleapis.com` and
+  `eventarc.googleapis.com` are enabled. The service account can't enable them
+  itself; the deploy then stops with `Permissions denied enabling …` and prints
+  the console link to enable it.
+- The deploying credential also has **Service Account User**
+  ([backend/README.md](../backend/README.md#demo-reset-function-resetdemo)).
+
+#### B. Free endpoint on Vercel (projects without Blaze)
+
+`backend/reset-endpoint/` is a one-file Vercel function
+(`api/resetDemo.js`) that runs the reset with the service-account key.
+
+```sh
+npx vercel login                 # once per machine (free account)
+npm run deploy:reset-endpoint    # from backend/
+```
+
+The script copies `lib/` into `reset-endpoint/shared/`, links the folder to the
+Vercel project `<project id>-demo-reset`, sets `RESET_PROJECT_ID`,
+`RESET_CLIENT_EMAIL` and `RESET_PRIVATE_KEY` (production) from
+`backend/service-account.json` without printing them, deploys to production,
+checks the GET answers 400 and prints the URL to put in `RESET_DEMO_URL`.
+It needs the key file (application-default credentials can't be uploaded).
+
+Before choosing it, know that:
+
+- **The admin key leaves Google**: it is stored, encrypted, in the Vercel
+  project's environment variables. Anyone with access to that Vercel account can
+  read it. When someone leaves or you stop using the endpoint, delete the key in
+  Firebase console → Service accounts → Manage keys, and remove the Vercel
+  project. If you rotate the key, run `npm run deploy:reset-endpoint` again.
+- The endpoint is **open**, like the Cloud Function: anyone who knows the URL
+  can reset the demo database (PoC demo data only).
+- Vercel's free **Hobby** plan is for personal, non-commercial use; a team/Pro
+  plan may be required for company use.
+- The first call after a long idle period can take a second or two longer
+  (cold start).
+
 ## 4. Seed the demo database
 
 ```sh

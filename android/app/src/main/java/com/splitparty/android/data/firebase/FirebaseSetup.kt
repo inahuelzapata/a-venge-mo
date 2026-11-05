@@ -81,10 +81,13 @@ object FirebaseSetup {
      * [db], region us-central1 (backend/functions/index.js). On the emulator
      * target it talks to the Functions emulator on the Firestore emulator's host.
      */
-    fun functions(db: FirebaseFirestore, target: FirestoreTarget): FirebaseFunctions =
-        FirebaseFunctions.getInstance(db.app, FUNCTIONS_REGION).apply {
+    fun functions(db: FirebaseFirestore, target: FirestoreTarget): FirebaseFunctions = functions(db.app, target)
+
+    /** [emulatorPort] is only for DemoResetContractTest, which stands in for the Functions emulator. */
+    internal fun functions(app: FirebaseApp, target: FirestoreTarget, emulatorPort: Int = FUNCTIONS_EMULATOR_PORT): FirebaseFunctions =
+        FirebaseFunctions.getInstance(app, FUNCTIONS_REGION).apply {
             if (target is FirestoreTarget.Emulator) {
-                parseHostPort(target.host)?.let { (host, _) -> useEmulator(host, FUNCTIONS_EMULATOR_PORT) }
+                parseHostPort(target.host)?.let { (host, _) -> useEmulator(host, emulatorPort) }
             }
         }
 
@@ -103,7 +106,9 @@ object FirebaseSetup {
     }
 
     private val VALID_PORTS = 1..65_535
-    private const val FUNCTIONS_REGION = "us-central1"
+
+    /** backend/lib/deploy.js RESET_DEMO_REGION; DemoResetContractTest keeps them equal. */
+    internal const val FUNCTIONS_REGION = "us-central1"
 
     /** backend/firebase.json `emulators.functions.port`. */
     private const val FUNCTIONS_EMULATOR_PORT = 5001

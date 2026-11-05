@@ -1,0 +1,6 @@
+# Generated from backend/lib by scripts/build-functions.js.
+shared/
+# Vercel project link and pulled env (created by deploy:reset-endpoint).
+.vercel/
+.env*
+node_modules/

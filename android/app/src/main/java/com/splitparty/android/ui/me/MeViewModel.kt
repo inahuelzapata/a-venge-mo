@@ -8,6 +8,7 @@ import com.splitparty.android.domain.live.map
 import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.Username
+import com.splitparty.android.domain.repository.DemoResetFailure
 import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoResetResult
 import com.splitparty.android.domain.repository.DemoSettingsRepository
@@ -44,7 +45,17 @@ data class MeUiState(
 )
 
 /** The Demo reset button's state. Every phone's data comes back through the live listeners, not from here. */
-enum class DemoResetUi { Idle, Running, Done, Failed }
+@Immutable
+sealed interface DemoResetUi {
+    data object Idle : DemoResetUi
+
+    data object Running : DemoResetUi
+
+    data object Done : DemoResetUi
+
+    /** [message] is the function's own text (e.g. a partial reset), shown as is when present. */
+    data class Failed(val reason: DemoResetFailure, val message: String? = null) : DemoResetUi
+}
 
 sealed interface MeAction {
     data object LogOut : MeAction
@@ -65,7 +76,7 @@ class MeViewModel(
     private val demoSettings: DemoSettingsRepository,
     private val demoReset: DemoResetRepository
 ) : ViewModel() {
-    private val resetState = MutableStateFlow(DemoResetUi.Idle)
+    private val resetState = MutableStateFlow<DemoResetUi>(DemoResetUi.Idle)
 
     private val initial = MeUiState(userId = userId, displayName = Username.fallbackName(userId))
 
@@ -105,9 +116,9 @@ class MeViewModel(
         if (resetState.value == DemoResetUi.Running) return
         resetState.value = DemoResetUi.Running
         viewModelScope.launch {
-            resetState.value = when (demoReset.reset()) {
+            resetState.value = when (val result = demoReset.reset()) {
                 DemoResetResult.Done -> DemoResetUi.Done
-                DemoResetResult.Failed -> DemoResetUi.Failed
+                is DemoResetResult.Failed -> DemoResetUi.Failed(result.reason, result.message)
             }
         }
     }

@@ -13,6 +13,7 @@ import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
 import com.splitparty.android.domain.live.LiveState
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.repository.DemoResetFailure
 import com.splitparty.android.ui.components.PreviewData
 import com.splitparty.android.ui.me.DemoResetUi
 import com.splitparty.android.ui.me.MeScreen
@@ -104,7 +105,7 @@ class PayScreenshotTest {
                     transactions = LiveState.Ready(persistentListOf()),
                     users = PreviewData.users,
                     demoAtMerchant = true,
-                    reset = DemoResetUi.Failed
+                    reset = DemoResetUi.Failed(DemoResetFailure.Unreachable)
                 ),
                 contentPadding = padding,
                 onAction = {},

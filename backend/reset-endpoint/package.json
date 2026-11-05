@@ -1,0 +1,10 @@
+{
+  "name": "split-party-reset-endpoint",
+  "private": true,
+  "description": "The Demo reset as a callable-protocol endpoint on Vercel, for projects without Blaze. Deployed from backend/ with npm run deploy:reset-endpoint.",
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}

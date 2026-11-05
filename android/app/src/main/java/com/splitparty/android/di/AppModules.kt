@@ -2,6 +2,7 @@ package com.splitparty.android.di
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
+import com.splitparty.android.BuildConfig
 import com.splitparty.android.data.AndroidConnectivityObserver
 import com.splitparty.android.data.DataStoreDemoSettingsRepository
 import com.splitparty.android.data.DataStoreSessionRepository
@@ -55,13 +56,13 @@ val firebaseModule = module {
             is FirebaseConnection.SetupRequired -> error("Firestore requested while setup is required: ${connection.problems}")
         }
     }
-    single<FirebaseFunctions> { FirebaseSetup.functions(get(), get()) }
+    single<FirebaseFunctions> { FirebaseSetup.functions(get<FirebaseFirestore>(), get<FirestoreTarget>()) }
 }
 
 val dataModule = module {
     singleOf(::FirestoreSplitPartyRepository) { bind<SplitPartyRepository>() }
     single<PartyRepository> { FirestorePartyRepository(get()) }
-    singleOf(::FirebaseDemoResetRepository) { bind<DemoResetRepository>() }
+    single<DemoResetRepository> { FirebaseDemoResetRepository(get(), endpointUrl = BuildConfig.RESET_DEMO_URL) }
     singleOf(::DataStoreSessionRepository) { bind<SessionRepository>() }
     singleOf(::DataStoreDemoSettingsRepository) { bind<DemoSettingsRepository>() }
     singleOf(::AndroidConnectivityObserver) { bind<ConnectivityObserver>() }

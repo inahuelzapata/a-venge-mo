@@ -2,6 +2,7 @@ package com.splitparty.android.ui.me
 
 import app.cash.turbine.test
 import com.splitparty.android.domain.live.LiveState
+import com.splitparty.android.domain.repository.DemoResetFailure
 import com.splitparty.android.domain.repository.DemoResetResult
 import com.splitparty.android.domain.usecase.ObserveUserTransactionsUseCase
 import com.splitparty.android.domain.usecase.ObserveUserUseCase
@@ -105,12 +106,29 @@ class MeViewModelTest {
     }
 
     @Test
-    fun `a failed demo reset is an error and can be tried again`() = runTest {
-        demoReset.result = DemoResetResult.Failed
+    fun `a partial reset shows the function's message and tapping again completes it`() = runTest {
+        val partial = "Demo reset did not complete (boom). The database may be partially reset; tap Reset again."
+        demoReset.result = DemoResetResult.Failed(DemoResetFailure.Server, partial)
         viewModel.state.test {
             viewModel.onAction(MeAction.ResetDemo)
             runCurrent()
-            assertEquals(DemoResetUi.Failed, expectMostRecentItem().reset)
+            assertEquals(DemoResetUi.Failed(DemoResetFailure.Server, partial), expectMostRecentItem().reset)
+            demoReset.result = DemoResetResult.Done
+            viewModel.onAction(MeAction.ResetDemo)
+            runCurrent()
+            assertEquals(DemoResetUi.Done, expectMostRecentItem().reset)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(2, demoReset.calls)
+    }
+
+    @Test
+    fun `an unreachable server is an error and the button works again once back online`() = runTest {
+        demoReset.result = DemoResetResult.Failed(DemoResetFailure.Unreachable)
+        viewModel.state.test {
+            viewModel.onAction(MeAction.ResetDemo)
+            runCurrent()
+            assertEquals(DemoResetUi.Failed(DemoResetFailure.Unreachable), expectMostRecentItem().reset)
             demoReset.result = DemoResetResult.Done
             viewModel.onAction(MeAction.ResetDemo)
             runCurrent()
