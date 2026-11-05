@@ -10,6 +10,8 @@ import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.UserLookup
 import com.splitparty.android.domain.repository.ConnectivityObserver
 import com.splitparty.android.domain.repository.CreatePartyResult
+import com.splitparty.android.domain.repository.DemoResetRepository
+import com.splitparty.android.domain.repository.DemoResetResult
 import com.splitparty.android.domain.repository.DemoSettingsRepository
 import com.splitparty.android.domain.repository.JoinPartyResult
 import com.splitparty.android.domain.repository.PartyRepository
@@ -133,6 +135,18 @@ class FakePartyRepository : PartyRepository {
     override suspend fun leave(partyId: String, userId: String) =
         write(partyId, "leave:$userId") { p -> p.copy(members = p.members.filterNot { it.userId == userId }) }
 
+    /** Like the real settle: already paid is Done with nothing written; otherwise everyone is marked paid. */
+    override suspend fun settle(partyId: String, hostId: String): PartyWriteResult {
+        val already = (parties[partyId]?.value as? LiveEvent.Data)?.value?.status == PartyStatus.Paid
+        if (already) {
+            writes += "settle:noop"
+            return PartyWriteResult.Done
+        }
+        return write(partyId, "settle") { p ->
+            p.copy(status = PartyStatus.Paid, tip = p.tip ?: Tip.ZERO, members = p.members.map { it.copy(paid = true) })
+        }
+    }
+
     /** Like the real write: a stored-open party becomes expired, and its listeners see it. */
     override suspend fun expire(partyId: String) {
         expired += partyId
@@ -181,4 +195,16 @@ object TestData {
 
     /** A server-confirmed snapshot, as Firestore delivers it when online. */
     fun <T> server(value: T) = LiveEvent.Data(value, fromCache = false)
+}
+
+/** [DemoResetRepository] that records calls and returns [result], optionally after [gate]. */
+class FakeDemoResetRepository(var result: DemoResetResult = DemoResetResult.Done) : DemoResetRepository {
+    var gate: CompletableDeferred<Unit>? = null
+    var calls = 0
+
+    override suspend fun reset(): DemoResetResult {
+        calls++
+        gate?.await()
+        return result
+    }
 }

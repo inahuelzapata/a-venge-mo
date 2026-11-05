@@ -7,7 +7,9 @@ import com.splitparty.android.domain.Clock
 import com.splitparty.android.domain.countdown
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyMember
 import com.splitparty.android.domain.model.PartyStatus
+import com.splitparty.android.domain.model.PayBlocker
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.Username
 import com.splitparty.android.domain.repository.ConnectivityObserver
@@ -41,7 +43,7 @@ import kotlinx.coroutines.launch
 
 /** One seat in the member row, in join order (host first). */
 @Immutable
-data class MemberUi(val userId: String, val firstName: String, val avatar: String?, val isHost: Boolean)
+data class MemberUi(val userId: String, val firstName: String, val avatar: String?, val isHost: Boolean, val paid: Boolean = false)
 
 enum class PartyPhase { Loading, Open, Expired, Settled, NotFound }
 
@@ -78,6 +80,17 @@ data class TotalUi(
     val shareCents: Long?
 )
 
+/** The host's Pay button: enabled only when [Ready], otherwise disabled with the reason as its label. */
+enum class PayState { Ready, NeedsTotal, NeedsMembers, Expired }
+
+/**
+ * A settled party. [amountCents]: collected (host) or paid (member); null when
+ * this user was not settled (no longer a member). [animate]: this screen saw the
+ * party go from open to paid, so the ticks, confetti and check play (once).
+ */
+@Immutable
+data class SettlementUi(val isHost: Boolean, val amountCents: Long?, val animate: Boolean)
+
 /** Why a bill, tip, removal or leave write did not happen; shown inline. */
 enum class WriteError { NotAllowed, Failed }
 
@@ -97,7 +110,13 @@ data class PartyUiState(
     val total: TotalUi? = null,
     /** A bill, tip, removal or leave write is running. */
     val saving: Boolean = false,
-    val writeError: WriteError? = null
+    val writeError: WriteError? = null,
+    /** Host only (members never see a Pay button); null on a member's phone. */
+    val pay: PayState? = null,
+    /** The Pay write is running. */
+    val paying: Boolean = false,
+    /** Set once the party is paid. */
+    val settlement: SettlementUi? = null
 )
 
 sealed interface PartyEvent {
@@ -115,6 +134,12 @@ sealed interface PartyEvent {
 
     /** This user left: back to Home. */
     data object Left : PartyEvent
+
+    /** The party this screen showed was deleted (a Demo reset): straight back to Home. */
+    data object Gone : PartyEvent
+
+    /** The party this screen showed open just got paid: the settlement plays, with a success haptic. */
+    data object Settled : PartyEvent
 }
 
 /**
@@ -139,6 +164,9 @@ class PartyViewModel(
 
     /** Set before this user's own leave write, so the snapshot without them is not read as a removal. */
     private var leaving = false
+
+    /** This screen has seen the party stored `open`, so a later `paid` snapshot is a live settlement. */
+    private var sawOpen = false
     private val writeState = MutableStateFlow(WriteState())
     private var latestParty: Party? = null
 
@@ -174,14 +202,17 @@ class PartyViewModel(
                     else -> PartyPhase.Open
                 },
                 joinCode = party.joinCode.toImmutableList(),
-                members = party.members.map { it.userId.toMemberUi(users[it.userId], party.hostId) }.toImmutableList(),
+                members = party.members.map { it.toMemberUi(users[it.userId], party.hostId) }.toImmutableList(),
                 millisLeft = party.millisLeftAt(now),
                 reconnecting = !online || event.fromCache,
                 isHost = party.hostId == userId,
                 hostName = firstName(party.hostId, users[party.hostId]),
                 total = party.toTotalUi(),
                 saving = write.saving,
-                writeError = write.error
+                writeError = write.error,
+                pay = party.payState(now),
+                paying = write.paying,
+                settlement = party.toSettlementUi()
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PartyUiState())
@@ -212,6 +243,27 @@ class PartyViewModel(
         if (!canWrite() || latestParty?.hostId == userId) return
         leaving = true
         launchWrite(signalSaved = false, onDone = { _events.trySend(PartyEvent.Left) }) { parties.leave(partyId, userId) }
+    }
+
+    /**
+     * Host: settle everyone (no second confirmation: joining was consent). A
+     * doubled tap is ignored while the write runs, and the repository treats
+     * an already-paid party as done, so a retry never charges twice.
+     */
+    fun pay() {
+        val party = latestParty ?: return
+        if (writeState.value.saving || party.hostId != userId || party.payBlockerAt(clock.now()) != null) return
+        writeState.value = WriteState(saving = true, paying = true)
+        viewModelScope.launch {
+            val result = parties.settle(partyId, userId)
+            writeState.value = WriteState(
+                error = when (result) {
+                    PartyWriteResult.Done -> null
+                    PartyWriteResult.NotAllowed -> WriteError.NotAllowed
+                    PartyWriteResult.Failed -> WriteError.Failed
+                }
+            )
+        }
     }
 
     fun clearWriteError() {
@@ -262,7 +314,29 @@ class PartyViewModel(
         }
     }
 
-    private data class WriteState(val saving: Boolean = false, val error: WriteError? = null)
+    private data class WriteState(val saving: Boolean = false, val error: WriteError? = null, val paying: Boolean = false)
+
+    private fun Party.payState(now: Long): PayState? = if (hostId != userId) {
+        null
+    } else {
+        when (payBlockerAt(now)) {
+            null, PayBlocker.AlreadyPaid -> PayState.Ready
+            PayBlocker.Expired -> PayState.Expired
+            PayBlocker.NoTotal -> PayState.NeedsTotal
+            PayBlocker.NoMembers -> PayState.NeedsMembers
+        }
+    }
+
+    private fun Party.toSettlementUi(): SettlementUi? {
+        if (status != PartyStatus.Paid) return null
+        val shares = split?.shares
+        val amount = when {
+            shares == null || !hasMember(userId) -> null
+            hostId == userId -> joinees.sumOf { shares[memberIds.indexOf(it.userId)] }
+            else -> shareOf(userId)
+        }
+        return SettlementUi(isHost = hostId == userId, amountCents = amount, animate = sawOpen)
+    }
 
     init {
         // The host's phone writes `expired` (and frees the lock) once the clock passes
@@ -285,7 +359,13 @@ class PartyViewModel(
 
     /** Joins (haptic), this member's share moving (haptic) and this user dropping out of the list (removed). */
     private fun noticeChanges(event: LiveEvent<Party?>) {
-        val party = (event as? LiveEvent.Data)?.value ?: return
+        val data = event as? LiveEvent.Data ?: return
+        val party = data.value
+        if (party == null) {
+            noticeGone(data.fromCache)
+            return
+        }
+        noticeSettlement(party)
         val ids = party.memberIds
         val before = knownMembers
         knownMembers = ids
@@ -303,13 +383,28 @@ class PartyViewModel(
         knownShare = share
     }
 
+    /** Only the server can say a party this screen already showed no longer exists (a Demo reset deleted it). */
+    private fun noticeGone(fromCache: Boolean) {
+        if (latestParty != null && !fromCache) _events.trySend(PartyEvent.Gone)
+    }
+
+    /** Open → paid while this screen watched: the settlement plays. Opened already paid: it does not. */
+    private fun noticeSettlement(party: Party) {
+        if (party.status == PartyStatus.Open) {
+            sawOpen = true
+        } else if (party.status == PartyStatus.Paid && sawOpen && latestParty?.status == PartyStatus.Open) {
+            _events.trySend(PartyEvent.Settled)
+        }
+    }
+
     private fun firstName(id: String, user: User?): String = (user?.displayName ?: Username.fallbackName(id)).split(' ').first()
 
-    private fun String.toMemberUi(user: User?, hostId: String) = MemberUi(
-        userId = this,
-        firstName = firstName(this, user),
+    private fun PartyMember.toMemberUi(user: User?, hostId: String) = MemberUi(
+        userId = userId,
+        firstName = firstName(userId, user),
         avatar = user?.avatar,
-        isHost = this == hostId
+        isHost = userId == hostId,
+        paid = paid
     )
 
     private companion object {

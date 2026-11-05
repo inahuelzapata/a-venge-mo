@@ -18,6 +18,9 @@ object Brand {
     val Caret = Color(0xFF426BF2)
     val Chip = Color(0xFFF1F1F3)
     val Error = Color(0xFFD92D20)
+
+    /** iOS system green: the paid ticks and the settlement check (provisional until the iOS capture). */
+    val Success = Color(0xFF34C759)
     val Warning = Color(0xFFFF8D28)
 
     /** Brand blue at 14% over a white card. */

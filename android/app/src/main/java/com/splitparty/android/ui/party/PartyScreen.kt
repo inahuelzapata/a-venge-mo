@@ -103,7 +103,10 @@ fun PartyRoute(
 
                 is PartyEvent.Removed -> currentOnRemoval(event.hostName)
 
-                PartyEvent.Left -> currentOnHome()
+                PartyEvent.Left, PartyEvent.Gone -> currentOnHome()
+
+                // The settlement view plays its own tick and success haptics; any open entry screen closes.
+                PartyEvent.Settled -> step = null
             }
         }
     }
@@ -122,6 +125,8 @@ fun PartyRoute(
             override fun removeMember(userId: String) = viewModel.removeMember(userId)
 
             override fun leave() = viewModel.leave()
+
+            override fun pay() = viewModel.pay()
 
             private fun open(next: TotalStep) {
                 viewModel.clearWriteError()
@@ -180,7 +185,7 @@ fun PartyScreen(
                 frozen = state.total?.let { { TotalArea(state, TotalActions.None, frozen = true) } }
             )
 
-            PartyPhase.Settled -> PartyOver(stringResource(R.string.party_settled_title), "", onBack)
+            PartyPhase.Settled -> SettledParty(state, onBack, Modifier.weight(1f))
 
             PartyPhase.NotFound -> PartyOver(stringResource(R.string.party_not_found), "", onBack)
         }

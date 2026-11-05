@@ -191,6 +191,14 @@ object PartyTestTags {
     const val TIP_CHIPS = "party_tip_chips"
     const val WRITE_ERROR = "party_write_error"
     const val LEAVE = "party_leave"
+    const val PAY = "party_pay"
+    const val SETTLED = "party_settled"
+    const val PAID_SEATS = "party_paid_seats"
+    const val SUCCESS_CHECK = "party_success_check"
+    const val SUCCESS_AMOUNT = "party_success_amount"
+    const val SETTLED_HOME = "party_settled_home"
+
+    fun paidSeat(userId: String, paid: Boolean) = "party_paid_seat_${userId}_${if (paid) "paid" else "pending"}"
 
     const val DIALOG = "party_dialog"
     const val DIALOG_CONFIRM = "party_dialog_confirm"

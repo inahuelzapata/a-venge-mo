@@ -16,6 +16,7 @@ internal object FirestoreSchema {
     const val TRANSACTIONS = "transactions"
     const val PARTIES = "parties"
     const val JOIN_CODES = "joinCodes"
+    const val MERCHANTS = "merchants"
 }
 
 internal fun DocumentSnapshot.toUser(): User? = if (!exists()) {

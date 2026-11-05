@@ -122,3 +122,14 @@ What: A "-key value" launch argument whose value has spaces or an apostrophe (a 
 ## The iOS floating tab bar does not inset pushed screens
 
 What: The bottom bar is a safeAreaInset on MainTabView's ZStack, but scroll views on screens pushed in HomeNavigationStack still lay out to the screen bottom, so their last controls can sit under the bar with nothing to scroll. The party screen adds `.contentMargins(.bottom, Theme.floatingBarClearance /* 96 */, for: .scrollContent)` · Where: ios/SplitParty/UI/PartyView.swift, Theme.swift · Learned: any new pushed screen with controls near its end needs the same margin
+## Compose testTag placed after clearAndSetSemantics is invisible to tests
+
+What: `Modifier.clearAndSetSemantics { … }.testTag(x)` hides the tag (the later modifier is a cleared descendant); put `.testTag(x)` before clearAndSetSemantics. Likewise Text under clearAndSetSemantics can't be found by onNodeWithText; assert the contentDescription instead (the Me balance is now "Balance, 250 dollars") · Where: android ui/party/Settlement.kt, ui/shell MainShellNavigationTest
+
+## Android LoginScreenTest.showsTheInlineErrorAndTarget already fails on main
+
+What: It expects "Emulator test" on screen and fails on a clean checkout of main (ddf9907), so `./gradlew check` stops at testDebugUnitTest before verifyPaparazziDebug; run `./gradlew :app:verifyPaparazziDebug --tests '*ScreenshotTest*'` to verify goldens meanwhile. Re-recording also rewrites untouched Home goldens with sub-threshold noise; restore those with git checkout · Where: android app/src/test/.../ui/login/LoginScreenTest.kt:58
+
+## A Pay commit that loses to another Pay gets PERMISSION_DENIED, not a retry
+
+What: Two settle transactions on the same party racing: the loser's commit is rejected by the rules (`paid` is terminal for the party update, and its transactions/{partyId}_{payer} writes would be updates) with PERMISSION_DENIED instead of ABORTED, so the Firestore SDK does not retry it and the client sees a failure although the party was settled once. FirestorePartyRepository.settle therefore re-reads the party from the server after any failure and returns Done when it is paid · Why: the requirement is that Pay never fails because the party is already paid · Where: android data/FirestorePartyRepository.kt (settle, paidOnServer) · Learned: found by SettleRulesE2ETest against the emulator; iOS should handle its Pay failure the same way
