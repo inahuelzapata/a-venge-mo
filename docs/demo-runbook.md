@@ -50,7 +50,7 @@ to run again.
 
 1. Install the app on three phones (any mix of iPhone and Android) and log in
    as `maxi`, `annie` and `christophe`.
-2. Maxi (host) starts a Split Party at Tony's and reads out the three-emoji code.
+2. Maxi (host) starts a Split Party at Tony's and reads out the two-emoji code.
 3. Annie and Christophe enter the code within 5 minutes.
 4. Maxi enters the bill and tip; all three phones show the same shares.
 5. Maxi taps **Pay**; balances update and the payments appear in the feed.

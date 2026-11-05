@@ -13,7 +13,7 @@ service cloud.firestore {
     function isId(v) { return v is string && v.size() > 0; }
 
     function validJoinCode(code) {
-      return code is list && code.size() == 3 && code.hasOnly(palette());
+      return code is list && code.size() == 2 && code.hasOnly(palette());
     }
 
     function validTip(t) {

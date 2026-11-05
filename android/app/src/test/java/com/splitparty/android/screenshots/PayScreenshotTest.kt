@@ -54,7 +54,7 @@ class PayScreenshotTest {
     /** Annie hosts; 100.00 + 18% for three: Annie 39.34, Maxi and Christophe 39.33. */
     private val host = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(annie, maxi, christophe),
         millisLeft = Party.TTL_MILLIS,
         isHost = true,

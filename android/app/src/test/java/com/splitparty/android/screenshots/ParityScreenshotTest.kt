@@ -121,7 +121,7 @@ class ParityScreenshotTest {
     // Split Party (PoC-7..9). No iOS captures yet: compare.py pairs these once
     // join-banner.png etc. land in docs/design/ios-captures/.
     private val anniesParty = Party(
-        "p1", "annie", DemoMerchant.ID, listOf("🍕", "🍺", "🎉"), PartyStatus.Open, 0L, Party.TTL_MILLIS,
+        "p1", "annie", DemoMerchant.ID, listOf("🍕", "🍺"), PartyStatus.Open, 0L, Party.TTL_MILLIS,
         listOf(PartyMember("annie", 0L, false)), emptyMap()
     )
 
@@ -142,10 +142,10 @@ class ParityScreenshotTest {
                 phase = JoinPhase.Choosing,
                 hostName = "Annie",
                 options = persistentListOf(
-                    persistentListOf("🌮", "🔥", "🐶"),
-                    persistentListOf("🍕", "🍺", "🎉"),
-                    persistentListOf("🍣", "🍺", "🚀"),
-                    persistentListOf("🎸", "🍩", "🌵")
+                    persistentListOf("🌮", "🔥"),
+                    persistentListOf("🍕", "🍺"),
+                    persistentListOf("🍣", "🚀"),
+                    persistentListOf("🎸", "🌵")
                 )
             ),
             contentPadding = it,
@@ -156,7 +156,7 @@ class ParityScreenshotTest {
 
     private val partyOpen = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(MemberUi("annie", "Annie", "avatar_annie", isHost = true)),
         millisLeft = Party.TTL_MILLIS
     )

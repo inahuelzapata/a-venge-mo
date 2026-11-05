@@ -60,7 +60,7 @@ private const val MILLIS_PER_SECOND = 1_000L
 private const val SECONDS_PER_MINUTE = 60L
 
 /**
- * Three emoji tiles. With [animated], they pop in one by one and then bob
+ * The join code's emoji tiles (two). With [animated], they pop in one by one and then bob
  * gently, each a little out of phase. The caller sets the TalkBack label (the
  * emoji names); the tiles themselves are decorative.
  */

@@ -146,7 +146,7 @@ private fun PartyBannersPreview() {
     SplitPartyTheme {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             JoinBanner(User("maxi", "maxi", "Maxi", "avatar_maxi", 0), "maxi", onJoin = {})
-            BackToPartyCard(listOf("🍕", "🍺", "🎉"), onOpen = {})
+            BackToPartyCard(listOf("🍕", "🍺"), onOpen = {})
         }
     }
 }

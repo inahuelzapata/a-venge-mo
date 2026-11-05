@@ -74,7 +74,7 @@ async function runPartyToPaid() {
   const partyRef = db.collection('parties').doc();
   const createdAt = Timestamp.now();
   const expiresAt = Timestamp.fromMillis(createdAt.toMillis() + PARTY_TTL_MS);
-  const joinCode = ['🍕', '🍺', '🎉'];
+  const joinCode = ['🍕', '🍺'];
   const lockRef = db.doc(`joinCodes/${joinCodeLockId(MERCHANT_ID, joinCode)}`);
   await lockRef.set({ merchantId: MERCHANT_ID, joinCode, partyId: partyRef.id, expiresAt });
   await partyRef.set({
@@ -100,7 +100,7 @@ async function runPartyToPaid() {
     tx.update(partyRef, update);
   });
   const open = db.collection('parties').doc();
-  const openCode = ['🌮', '🔥', '🚀'];
+  const openCode = ['🌮', '🔥'];
   await open.set({ ...(await partyRef.get()).data(), joinCode: openCode, status: 'open', paidAt: null });
   await db.doc(`joinCodes/${joinCodeLockId(MERCHANT_ID, openCode)}`)
     .set({ merchantId: MERCHANT_ID, joinCode: openCode, partyId: open.id, expiresAt });

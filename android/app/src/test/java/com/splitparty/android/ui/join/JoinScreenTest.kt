@@ -28,10 +28,10 @@ class JoinScreenTest {
         phase = JoinPhase.Choosing,
         hostName = "Annie",
         options = persistentListOf(
-            persistentListOf("🌮", "🔥", "🐶"),
-            persistentListOf("🍕", "🍺", "🎉"),
-            persistentListOf("🍣", "🍺", "🚀"),
-            persistentListOf("🎸", "🍩", "🌵")
+            persistentListOf("🌮", "🔥"),
+            persistentListOf("🍕", "🍺"),
+            persistentListOf("🍣", "🚀"),
+            persistentListOf("🎸", "🌵")
         )
     )
 
@@ -44,7 +44,7 @@ class JoinScreenTest {
         show(choosing)
         compose.onNodeWithText("Join Annie's party").assertIsDisplayed()
         compose.onNodeWithTag(JoinTestTags.option(1))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("pizza, beer, party popper")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("pizza, beer")))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .performClick()
         assertEquals(listOf(1), picks)

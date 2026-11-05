@@ -12,7 +12,7 @@ Collections:
 | `users`        | username, e.g. `maxi`          | Account, mock balance, friends                        |
 | `merchants`    | slug, e.g. `tonys-greenwich`   | Partner merchant: name, logo, offer, geofence         |
 | `parties`      | auto id                        | One Split Party: host, members, bill, tip, status     |
-| `joinCodes`    | `{merchantId}_{e1}{e2}{e3}`    | Lock that keeps a join code unique per merchant       |
+| `joinCodes`    | `{merchantId}_{e1}{e2}`        | Lock that keeps a join code unique per merchant       |
 | `transactions` | auto id, or `{partyId}_{payerId}` | Payments shown in the feed and on the Me tab       |
 
 Conventions that apply everywhere:
@@ -93,7 +93,7 @@ One document per Split Party. The id is a Firestore auto id.
 | ------------------- | ----------------------------- | ----------- |
 | `hostId`            | string                        | `users` id of the host. The host is also a member. |
 | `merchantId`        | string                        | `merchants` id where the party happens. |
-| `joinCode`          | array\<string\>, length 3     | The three-emoji join code, one emoji per element, each from the **emoji palette** below. Repeats are allowed. Example: `["🍕","🍺","🎉"]`. |
+| `joinCode`          | array\<string\>, length 2     | The two-emoji join code, one emoji per element, each from the **emoji palette** below. Repeats are allowed (e.g. `["🍕","🍕"]`). Example: `["🍕","🍺"]`. |
 | `status`            | string enum                   | `"open"`, `"paid"` or `"expired"`. See *Lifecycle*. |
 | `createdAt`         | Timestamp                     | When the host created the party. **The client writes this value itself** (not `serverTimestamp()`) so that `expiresAt` can be computed in the same write. |
 | `expiresAt`         | Timestamp (derived, stored)   | Always `createdAt + 5 minutes`. Written once at creation, never changed. |
@@ -122,7 +122,7 @@ variation selectors, so every client compares strings the same way):
 🍕 🍔 🌮 🍣 🍩 🍺 🎉 🔥 🚀 🎸 🐶 🌵
 ```
 
-That gives 12³ = 1728 possible codes per merchant.
+That gives 12² = 144 possible codes per merchant.
 
 ### Lifecycle
 
@@ -149,13 +149,13 @@ That gives 12³ = 1728 possible codes per merchant.
 Uniqueness is guaranteed by a lock document whose **id is the code itself**:
 
 ```
-joinCodes/{merchantId}_{e1}{e2}{e3}       e.g.  joinCodes/tonys-greenwich_🍕🍺🎉
+joinCodes/{merchantId}_{e1}{e2}           e.g.  joinCodes/tonys-greenwich_🍕🍺
 ```
 
 | Field       | Type      | Description |
 | ----------- | --------- | ----------- |
 | `merchantId`| string    | Same as in the id. |
-| `joinCode`  | array\<string\> | Same three emojis as the party. |
+| `joinCode`  | array\<string\> | Same two emojis as the party. |
 | `partyId`   | string    | The party that holds the code. |
 | `expiresAt` | Timestamp | Copy of the party's `expiresAt`. |
 
@@ -291,7 +291,7 @@ party document is **invalid** (rejected) if, among other things:
 
 - `billCents` is not an integer (e.g. `12.5`, `"1250"`) or is negative;
 - `status` is not one of `open`, `paid`, `expired`;
-- `joinCode` does not have exactly 3 elements, or an element is not in the
+- `joinCode` does not have exactly 2 elements, or an element is not in the
   emoji palette (so `["🍕","🍺"]` and `["🍕","🍺","🎉","🔥"]` are both rejected);
 - `tip` has neither or both of `percent`/`amountCents`, or a percent outside
   the presets;

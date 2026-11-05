@@ -64,7 +64,7 @@ class TotalScreenshotTest {
 
     private val party = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(maxi, annie, christophe),
         millisLeft = Party.TTL_MILLIS,
         hostName = "Maxi"

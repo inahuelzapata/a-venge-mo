@@ -480,7 +480,7 @@ private fun PartyScreenPreview() {
         PartyScreen(
             PartyUiState(
                 phase = PartyPhase.Open,
-                joinCode = persistentListOf("🍕", "🍺", "🎉"),
+                joinCode = persistentListOf("🍕", "🍺"),
                 members = persistentListOf(MemberUi("annie", "Annie", "avatar_annie", isHost = true)),
                 millisLeft = 299_000
             ),

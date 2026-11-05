@@ -173,7 +173,7 @@ object TestData {
     val users = listOf(maxi, annie)
     val everyone = listOf(maxi, annie, christophe)
 
-    val CODE = listOf("🍕", "🍺", "🎉")
+    val CODE = listOf("🍕", "🍺")
 
     /** An open party at Tony's created at [createdAt] (epoch millis), members in join order. */
     fun party(

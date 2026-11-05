@@ -1,9 +1,10 @@
 // firestore.rules accepts schema-conforming parties and rejects the invalid
 // shapes listed in docs/firestore-schema.md ("Validation").
 import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { deleteField, doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { deleteDoc, deleteField, doc, getDoc, getDocs, collection, runTransaction, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
 let env;
 let db;
@@ -12,7 +13,7 @@ const expires = Timestamp.fromMillis(created.toMillis() + 5 * 60 * 1000);
 
 function party(over = {}) {
   return {
-    hostId: 'maxi', merchantId: 'tonys-greenwich', joinCode: ['🍕', '🍺', '🎉'], status: 'open',
+    hostId: 'maxi', merchantId: 'tonys-greenwich', joinCode: ['🍕', '🍺'], status: 'open',
     createdAt: created, expiresAt: expires, paidAt: null, billCents: 10000, tip: { type: 'percent', percent: 18 },
     memberIds: ['maxi', 'annie'],
     members: { maxi: { joinedAt: created, paid: false }, annie: { joinedAt: created, paid: false } },
@@ -45,9 +46,10 @@ for (const [name, over] of [
   ['non-integer bill', { billCents: 12.5 }],
   ['string bill', { billCents: '10000' }],
   ['status outside the allowed set', { status: 'closed' }],
-  ['join code with 2 emojis', { joinCode: ['🍕', '🍺'] }],
+  ['join code with 1 emoji', { joinCode: ['🍕'] }],
+  ['join code with 3 emojis', { joinCode: ['🍕', '🍺', '🎉'] }],
   ['join code with 4 emojis', { joinCode: ['🍕', '🍺', '🎉', '🔥'] }],
-  ['emoji outside the palette', { joinCode: ['🍕', '🍺', '😀'] }],
+  ['emoji outside the palette', { joinCode: ['🍕', '😀'] }],
   ['expiresAt not createdAt + 5 min', { expiresAt: Timestamp.fromMillis(created.toMillis() + 60000) }],
   ['stored share field', { shareCents: 3933 }],
   ['tip percent outside presets', { tip: { type: 'percent', percent: 17 } }],
@@ -95,4 +97,56 @@ test('a user document whose avatar is a photo URL: phone may move the balance, n
   }));
   await assertSucceeds(updateDoc(doc(db, 'users/maxi'), { balanceCents: 20000 }));
   await assertFails(updateDoc(doc(db, 'users/maxi'), { avatar: 'avatar_maxi' }));
+});
+
+// joinCodes/{merchantId}_{e1}{e2}: the lock that keeps a code unique per merchant.
+function lock(code, over = {}) {
+  return { merchantId: 'tonys-greenwich', joinCode: code, partyId: 'p1', expiresAt: expires, ...over };
+}
+
+test('accepts a two-emoji lock keyed {merchantId}_{e1}{e2}, and its delete', async () => {
+  await assertSucceeds(setDoc(doc(db, 'joinCodes/tonys-greenwich_🍕🍺'), lock(['🍕', '🍺'])));
+  await assertSucceeds(setDoc(doc(db, 'joinCodes/tonys-greenwich_🍕🍕'), lock(['🍕', '🍕'])));
+  await assertSucceeds(deleteDoc(doc(db, 'joinCodes/tonys-greenwich_🍕🍕')));
+});
+
+test('rejects a lock with a three-emoji or one-emoji code, or an id that does not match its code', async () => {
+  await assertFails(setDoc(doc(db, 'joinCodes/tonys-greenwich_🍕🍺🎉'), lock(['🍕', '🍺', '🎉'])));
+  await assertFails(setDoc(doc(db, 'joinCodes/tonys-greenwich_🍕'), lock(['🍕'])));
+  await assertFails(setDoc(doc(db, 'joinCodes/tonys-greenwich_🍕🎉'), lock(['🍕', '🍺'])));
+});
+
+// Two hosts at the same merchant start parties at the same moment, both drawing
+// the same first code. The create transaction (as in the apps) reserves the lock
+// with the party, retrying the next code when the lock is held by a live party.
+test('concurrent creates at one merchant never hold the same two-emoji code', async () => {
+  const merchantId = 'race-merchant';
+  const candidates = [['🍕', '🍺'], ['🌮', '🔥'], ['🚀', '🎸'], ['🐶', '🌵']];
+  const create = (hostId) => runTransaction(db, async (tx) => {
+    const partyRef = doc(collection(db, 'parties'));
+    for (const code of candidates) {
+      const lockRef = doc(db, `joinCodes/${merchantId}_${code.join('')}`);
+      const held = await tx.get(lockRef);
+      if (held.exists() && held.get('expiresAt').toMillis() > Date.now()) continue;
+      const createdAt = Timestamp.fromMillis(Math.floor(Date.now() / 1000) * 1000);
+      const expiresAt = Timestamp.fromMillis(createdAt.toMillis() + 5 * 60 * 1000);
+      tx.set(lockRef, { merchantId, joinCode: code, partyId: partyRef.id, expiresAt });
+      tx.set(partyRef, party({
+        hostId, merchantId, joinCode: code, createdAt, expiresAt, billCents: null, tip: null,
+        memberIds: [hostId], members: { [hostId]: { joinedAt: createdAt, paid: false } }, wrongCodeAttempts: {},
+      }));
+      return code.join('');
+    }
+    throw new Error('no free code');
+  });
+  const codes = await Promise.all([create('maxi'), create('annie'), create('christophe')]);
+  assert.equal(new Set(codes).size, 3, `distinct codes, got ${codes}`);
+  const locks = await getDocs(collection(db, 'joinCodes'));
+  const raceLocks = locks.docs.filter((d) => d.id.startsWith(`${merchantId}_`));
+  assert.equal(raceLocks.length, 3);
+  for (const d of raceLocks) {
+    assert.equal(d.id, `${merchantId}_${d.get('joinCode').join('')}`);
+    assert.equal(d.get('joinCode').length, 2);
+    assert.ok((await getDoc(doc(db, `parties/${d.get('partyId')}`))).exists());
+  }
 });

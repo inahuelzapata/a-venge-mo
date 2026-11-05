@@ -45,7 +45,7 @@ class MemberActionsTest {
 
     private val state = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(
             MemberUi("maxi", "Maxi", null, isHost = true),
             MemberUi("annie", "Annie", null, isHost = false),
