@@ -2,20 +2,24 @@
   "name": "split-party-firebase",
   "private": true,
   "version": "0.1.0",
-  "description": "Firestore schema tooling for the Split Party PoC: seed, reset, rules, verification",
+  "description": "Firestore schema tooling for the Split Party PoC: seed, reset, rules, resetDemo function, verification",
   "type": "module",
   "engines": { "node": ">=20.12" },
   "scripts": {
     "seed": "node --env-file-if-exists=.env scripts/seed.js",
     "reset": "node --env-file-if-exists=.env scripts/reset.js",
     "deploy:firestore": "node --env-file-if-exists=.env scripts/deploy-firestore.js",
+    "deploy:functions": "node --env-file-if-exists=.env scripts/deploy-functions.js",
+    "build:functions": "node scripts/build-functions.js",
     "test": "node --test test/unit/",
     "test:hosted": "node --env-file-if-exists=.env scripts/test-hosted.js",
     "test:rules": "firebase emulators:exec --only firestore --project demo-split-party-rules \"node --test test/rules/\"",
+    "test:functions": "node scripts/build-functions.js && firebase emulators:exec --only firestore,functions --project demo-split-party-functions \"node --test --test-concurrency=1 test/functions/\"",
     "emulators": "firebase emulators:start --only firestore --project demo-split-party"
   },
   "dependencies": {
-    "firebase-admin": "^14.5.0"
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",

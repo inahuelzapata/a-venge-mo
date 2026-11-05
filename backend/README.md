@@ -1,8 +1,8 @@
 # backend — Firestore for Split Party
 
 Everything server-side for the PoC: Firestore security rules and indexes, the
-Firestore emulator configuration, and the seed/reset scripts with their
-tests. The data contract the rules enforce is
+Firestore emulator configuration, the seed/reset scripts, the `resetDemo`
+Cloud Function behind the apps' Demo reset button, and their tests. The data contract the rules enforce is
 [`docs/firestore-schema.md`](../docs/firestore-schema.md).
 
 The default target is the **hosted** Firebase project. The Firestore
@@ -15,16 +15,19 @@ configured and started. Full walkthrough:
 | `firestore.rules`, `firestore.indexes.json` | Deployed to the hosted project with `npm run deploy:firestore`; loaded by the emulator |
 | `firebase.json` | Rules/index paths and emulator config (Firestore on `0.0.0.0:8080`, so phones on the LAN can reach it) |
 | `scripts/seed.js`, `scripts/reset.js` | Seed and reset commands |
-| `scripts/deploy-firestore.js` | Deploys rules and indexes to `FIREBASE_PROJECT_ID` |
+| `functions/index.js` | The `resetDemo` callable: runs the same reset as `npm run reset` with admin rights |
+| `scripts/build-functions.js` | Copies `lib/{ops,schema,seedData}.js` into `functions/shared/` (generated, git-ignored) before deploy and tests |
+| `scripts/deploy-firestore.js`, `scripts/deploy-functions.js` | Deploy rules + indexes / the `resetDemo` function to `FIREBASE_PROJECT_ID` |
 | `scripts/test-hosted.js` | Hosted acceptance run: deploy, reset, test, reset |
 | `lib/` | Target and credential checks (`env.js`), deploy, seed data, split rule, validators |
 | `test/unit/` | Unit tests (no database) |
 | `test/acceptance/` | Acceptance suite, run by `test:hosted` |
 | `test/rules/` | Security-rules suite, emulator only |
+| `test/functions/` | `resetDemo` suite, on the Firestore + Functions emulators |
 
 ## Setup
 
-Requires Node 20.12+. The emulator and `test:rules` also need a JDK 21+ on `PATH`.
+Requires Node 20.12+. The emulator, `test:rules` and `test:functions` also need a JDK 21+ on `PATH`.
 
 ```sh
 cd backend
@@ -59,6 +62,7 @@ service-account key or for another project, or no credentials at all.
 
 ```sh
 npm run deploy:firestore   # hosted: deploy firestore.rules + firestore.indexes.json to FIREBASE_PROJECT_ID
+npm run deploy:functions   # hosted: deploy the resetDemo callable (us-central1) to FIREBASE_PROJECT_ID
 npm run seed               # 3 friends (Maxi, Annie, Christophe), Tony's, seeded feed; safe to re-run
 npm run reset -- --yes     # delete all parties and party transactions, restore balances and feed
                            # (--yes is required for hosted; without it reset refuses and exits 2)
@@ -71,12 +75,47 @@ leaves the database exactly as it is after a fresh seed.
 The deploy always goes to `FIREBASE_PROJECT_ID` from `.env`. There is no
 `.firebaserc`, and it is git-ignored, so don't run `firebase use`.
 
+## Demo reset function (`resetDemo`)
+
+The apps' **Demo reset** button can't reset the database itself: the rules
+forbid clients from deleting parties and transactions. It calls this Cloud
+Function instead, which runs `reset()` from `lib/ops.js` (the exact code behind
+`npm run reset`) with admin rights.
+
+| | |
+| --- | --- |
+| Callable name | `resetDemo` |
+| Region | `us-central1` (the Firebase SDKs' default, so the apps need no region setting) |
+| Project | the same Firebase project as the Firestore database (`FIREBASE_PROJECT_ID`) |
+| Arguments | none |
+| Success | `{ ok: true, resetAt: "<ISO-8601 time>", removed: {…}, seeded: {…} }` |
+| Failure | callable error `internal`, message says the reset did not complete and may be partial; calling again is safe and finishes it |
+| Auth | **none**: an open callable, anyone with the project config can invoke it (PoC demo database only) |
+
+Deploy (after `npm run deploy:firestore`):
+
+```sh
+npm run deploy:functions
+```
+
+It needs the project on the **Blaze** plan (Cloud Functions requires it) and,
+besides the deploy roles above, *Service Account User* on the credential so it
+can deploy as the runtime service account. The deploy makes the function
+publicly invokable; an organisation policy that forbids `allUsers` will block
+that. Reset is idempotent, so two taps at once both succeed. A cold start
+adds a few seconds to the first call after the function has been idle.
+
+`functions/shared/` is generated from `lib/` by `npm run build:functions`
+(also run automatically by the deploy and by `test:functions`). Edit `lib/`,
+never the copy.
+
 ## Tests
 
 ```sh
 npm test                                 # unit tests: split rule, validators, target/credential checks
 npm run test:hosted -- --wipe-demo-db    # acceptance suite on the HOSTED demo database
 npm run test:rules                       # security-rules suite on a throwaway emulator
+npm run test:functions                   # resetDemo callable on throwaway Firestore + Functions emulators
 ```
 
 `test:hosted` runs against **the demo database** and deletes every live party
@@ -94,3 +133,10 @@ environment or no emulator is running. `PERMISSION_DENIED` lines in its output
 are expected: they come from the invalid parties being rejected. The deployed
 hosted rules are checked by `test:hosted`, which writes one valid and several
 invalid parties as an unauthenticated client.
+
+`test:functions` (JDK 21 on `PATH`) seeds, runs a party to paid, then calls
+`resetDemo` over HTTP as an app would and checks that the database equals
+the fresh-seed state, that a call on a seeded database changes nothing, that
+two simultaneous calls both succeed, and that `npm run reset` and `resetDemo`
+leave identical databases. It uses the `demo-split-party-functions` emulator
+project and ignores `.env`.
