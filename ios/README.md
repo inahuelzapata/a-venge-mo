@@ -17,7 +17,17 @@ three-emoji code and a 5-minute expiry (or reopens the one you are in). Friends'
 phones get a Join banner, pick the host's code out of four (three wrong picks
 lock that party for them) and appear live in everyone's member row. Every phone
 expires the party by the clock; the host's phone writes `expired` and releases
-the code lock. No bill, tip, share or Pay yet.
+the code lock.
+
+Pay and Demo reset (PoC-11, PoC-12): once a total is confirmed and a friend
+has joined, the host taps **Pay** once. One Firestore transaction writes a
+payment `transactions/{partyId}_{friend}` per friend, moves every balance and
+marks the party paid, so a double tap or a retry never charges twice. Every
+phone ticks the friends paid one by one, then shows confetti and the amount
+collected or paid; the payments drop onto the top of every feed and balances
+roll. **Demo reset** at the bottom of Me (with a confirmation) calls the
+backend's `resetDemo` function over HTTPS and every phone returns to the seeded
+feed, balances and Home.
 
 ## Layout
 
@@ -132,16 +142,16 @@ xcodebuild test -project SplitParty.xcodeproj -scheme SplitParty \
 
 | Suite | What it covers | Needs |
 | ----- | -------------- | ----- |
-| `SplitPartyTests` (unit) | Money formatting from cents, username rules, Firestore document mapping, join codes (palette, four distinct options, reshuffle), clock-based expiry, three-strike lockout | Nothing |
+| `SplitPartyTests` (unit) | Money formatting from cents, username rules, Firestore document mapping, join codes (palette, four distinct options, reshuffle), clock-based expiry, three-strike lockout, the Pay settlement (shares, zero tip, memo limit, Pay blockers) and the `resetDemo` request and answers | Nothing |
 | `ScreenSnapshotTests` | Pixel snapshots of login (empty, unknown user, not configured), Home (feed, empty, unreachable), Me and Pay/Request | **iOS 26.5 simulator** (references are recorded there; other iOS versions skip these tests) |
-| `SplitPartyUITests` | Sign in as maxi, "thor" error, empty field, stay signed in across relaunch, Log out, tab bar, a new payment appearing on top, empty and error states. `PartyFlowUITests`: demo switch, start a party (and again), inline error, Join banner in and out, code confirmation and lock, live members, Back to your party, relaunch into the party, expiry | Nothing |
+| `SplitPartyUITests` | Sign in as maxi, "thor" error, empty field, stay signed in across relaunch, Log out, tab bar, a new payment appearing on top, empty and error states. `PartyFlowUITests`: demo switch, start a party (and again), inline error, Join banner in and out, code confirmation and lock, live members, Back to your party, relaunch into the party, expiry. `PayFlowUITests`: Pay disabled reasons, no Pay for members, the full settle (ticks, success, feed, balances), no tip, double tap, removed member, expired party, a fresh party after Pay, Demo reset success and failure, reset sending a party screen Home | Nothing |
 
 Snapshot and UI tests never touch Firestore. In Debug builds the app accepts
 launch arguments that switch it to built-in seeded data (`FixtureDataSource`):
 `-UITestFixture seeded|empty|unreachable`, `-UITestResetSession YES`,
 `-UITestInsertIncomingPaymentAfter <seconds>`, and for parties
 `-UITestFriendParty <hostId>` (with `-UITestFriendPartyMembers`, `-UITestFriendPartyAge`,
-`-UITestFriendPartyAfter`) and `-UITestFriendsJoinEvery <seconds>`; see
+`-UITestFriendPartyAfter`), `-UITestFriendsJoinEvery <seconds>`, `-UITestPartyScript` (including `pay=host` and `reset=demo`), `-UITestDemoReset fail` and `-UITestWriteDelay <seconds>`; see
 `UITestLaunch` in `SplitParty/App/AppModel.swift`. Release builds ignore them.
 
 **After an intended visual change**, re-record the snapshots, look at every

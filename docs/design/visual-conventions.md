@@ -310,7 +310,52 @@ Pushed from the Join banner, inline title "Join Split Party".
 | Accessibility | Each option is read by emoji names ("pizza, beer, party popper") |
 | Reduce Motion | No shake or reshuffle animation; the outline, message and haptic stay |
 
-## Pay and settlement (PoC-11), Demo reset (PoC-12) — provisional
+## Pay and settlement (PoC-11), Demo reset (PoC-12)
+
+**iOS is the reference** (captures in `ios-captures/`: `pay-add-total`,
+`pay-ready`, `pay-pending`, `pay-confetti`, `pay-success-host`,
+`pay-success-member`, `home-paid-highlight`, `me-demo-section`,
+`demo-reset-confirm`, `demo-reset-progress`, `demo-reset-error`; taken
+2026-11-05 by `ReferenceCaptureUITests` tests 14–15). Measured on the iPhone 17
+Pro simulator (402 × 874 pt). Values live in `Theme` ("Pay and settlement").
+
+| Element | iOS (pt) |
+| ------- | -------- |
+| Pay button | Host only, its own row under the total card (not inside it), 16 in from the screen edges (gutter 8 + 8). Full-width capsule **56** tall, brand blue `#0087E0`, "Pay $78.66" (18 bold, white, monospaced digits). Under it, 10 apart: "Maxi and Christophe pay you their shares. Joining was their OK." (14 secondary, centred). Measured 370 × 56 |
+| Pay disabled | Same capsule in `#F1F1F3` with secondary text reading the reason: "Add the total", "Waiting for friends to join". No hint line under it. Members never get the button |
+| Paying | Capsule stays blue at the system disabled opacity with a white spinner + "Paying…"; every friend's seat gets the **pending** badge |
+| Pay expired | On the expired screen, under the frozen share card (12 lower): the disabled capsule reading "Party expired" |
+| Pay error | 10 under the button: `exclamationmark.circle.fill` + message, 15 medium, `#D92D20` ("Couldn't reach the database. Nothing was paid; try again."), error haptic |
+| Seat badges | **22** circle at the avatar's top-right, offset 4 right and 4 up, 2 white ring. Pending: `#F1F1F3` with a secondary `clock` (11 heavy). Paid: brand blue with a white `checkmark` (11 heavy). The host never gets one |
+| Paid screen | Replaces the open cards. Seat card titled "Everyone's paid" (17 semibold), same 56 avatars. 16 below, the success card (white, radius 28): **72** brand-blue circle with a white `checkmark` (34 heavy), 8 lower "You collected" / "You paid" (15 medium, secondary), the amount (**40 bold**, monospaced), then "from Maxi and Christophe · Tony's Split Party" / "to Annie · Tony's Split Party" (15 secondary). 16 below, the black "Back to Home" pill |
+| Settlement motion | Plays once per party per phone (the phone that saw Pay land, or the first look after reconnecting or relaunching): 100 ms, then each friend's badge turns to paid 280 ms apart (spring 0.3 / 0.55, light impact haptic each), 150 ms, then the success card scales in from 0.85 (spring 0.45 / 0.7) with the check springing from 0.4 (spring 0.4 / 0.5), a 90-piece confetti burst from the top over the whole screen (blue `#0087E0`, yellow `#FFC83D`, pink `#FF5C8A`, green `#2BC48A`, light blue `#6CC4FF`; 6–10 × 10–16 pieces, gravity, spin, fading over the last 40% of 2.4 s) and a success haptic. Reduce Motion: final state at once, no confetti, haptic kept |
+| Feed after Pay | The payments drop onto the top of every feed 250 ms apart, oldest first so the newest ends on top, each with the existing new-row highlight (brand blue 14%, fading after 1.5 s over 1 s). Row text unchanged: "Maxi paid Annie for Tony's Split Party", amount top right |
+| Balance (Me) | Digits roll old → new (`numericText`, spring 0.8 s), through zero into "-$12.34"; instant with Reduce Motion |
+| Demo section (Me) | Last item of the Me list, 16 below the payments: "Demo" (20 semibold, header trait) 12 in, 10 above a white card (radius 28, 20 padding): hint "Puts every phone back to the seeded feed and balances and ends any party. Everyone stays signed in." (14 secondary), 12 below a full-width `#F1F1F3` capsule **48** tall with `arrow.counterclockwise` + "Demo reset" in red `#D92D20` (17 semibold). Measured 386 × 184 |
+| Demo reset confirm | System confirmation dialog "Reset the demo?", "All parties and new payments are removed and balances go back to their seeded values on every phone.", destructive "Reset demo" |
+| Demo reset states | Running: spinner + "Resetting…", disabled. Done: brand-blue `checkmark.circle.fill` "Demo reset done" (15 medium) for 4 s, success haptic. Failed: red error line (15 medium), error haptic; the button can be tapped again |
+| Accessibility | Pay: "Pay, collect 78 dollars and 66 cents from Maxi and Christophe" or "Pay, unavailable: Add the total". Seats: "Maxi, pending" / "Maxi, paid". Success: one announcement "Maxi, paid. Christophe, paid. You collected 78 dollars and 66 cents."; the card reads "Paid. You collected …". New feed rows are announced ("Maxi paid Annie 39 dollars and 33 cents for Tony's Split Party."). Demo reset is a button with a hint; its confirmation is a system dialog |
+
+### Android reconciliation (Pay slice)
+
+Android built these first, provisionally (below). Where it differs from the iOS reference:
+
+| Element | Android (provisional) | iOS (reference) |
+| ------- | --------------------- | --------------- |
+| Pay button | Inside the total card, 52 tall, "Pay · $78.66" | Own row under the card, 56 tall, "Pay $78.66" (18 bold) with a hint line under it |
+| Pay disabled | `#ACACAD` capsule; expired reads "This party has expired" | `#F1F1F3` capsule with secondary text; expired reads "Party expired" |
+| Paid badge | Green `#34C759`, offset 4 right and down, no pending state | Brand blue, offset 4 right and up; a grey clock "pending" badge while Pay runs |
+| Success | 76 green circle, amount 36 bold, "Everyone's share is in your balance." / "Paid to {Host} for Tony's." | 72 brand-blue circle, amount 40 bold, "from Maxi and Christophe · Tony's Split Party" / "to Annie · Tony's Split Party"; seat card titled "Everyone's paid" |
+| Confetti | 48 pieces, 1.4 s | 90 pieces, 2.4 s, from the top over the whole screen |
+| Balance roll | 600 ms ease out | `numericText` spring 0.8 s (platform digit roll; allowed difference) |
+| Demo reset | Black "Demo reset" pill; own dialog card ("Reset", "Cancel") | Grey capsule with red text and an icon; system confirmation dialog ("Reset demo") |
+
+Both platforms agree on the data and behaviour: one transaction per friend
+(`{partyId}_{payerId}`, memo "Tony's Split Party"), balances may go negative,
+Pay never fails because the party is already paid, the ticks are 280 ms apart,
+the settlement plays once, and Reduce Motion keeps the haptics.
+
+### Android values recorded before the iOS captures — provisional
 
 Built on Android before the iOS captures exist; reconcile with iOS once its
 slice records these states. Android goldens: `PayScreenshotTest`

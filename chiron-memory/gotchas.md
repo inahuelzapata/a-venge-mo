@@ -141,3 +141,11 @@ What: The Android Demo reset showed the generic connection error because the hos
 ## Koin singleOf() injects defaulted constructor parameters too
 
 What: `singleOf(::FirebaseDemoResetRepository)` crashed the Me tab at runtime with `NoDefinitionFoundException: java.lang.Long` once the class gained `timeoutMs: Long = TIMEOUT_MS`; `singleOf`/`viewModelOf` resolve every constructor parameter and ignore Kotlin defaults, and KoinModulesTest's `verify()` did not flag it · Why: constructor references carry no default values · Where: android di/AppModules.kt · Learned: give a class with test-only defaulted parameters an explicit `single<I> { Impl(get()) }`, and open the screen on a device after a DI change
+
+## iOS UI tests: Home and hittability lie under pushed screens and the tab bar
+
+What: `homeScreen` stays in the accessibility tree while a party screen is pushed over it, so waiting for it to exist proves nothing; wait for `partyScreen` to stop existing instead. An element behind the translucent floating tab bar still reports `isHittable == true`, so "swipe until hittable" leaves it half hidden in a capture; swipe a fixed number of times. System confirmation dialog buttons match twice: use `.firstMatch` · Where: ios/SplitPartyUITests/PayFlowUITests.swift, ReferenceCaptureUITests.swift (test15DemoReset)
+
+## iOS expiry and 3-second UI tests fail when another simulator runs at the same time
+
+What: PartyFlowUITests' expiry tests (parties built to expire ~10 s after launch) and the receipt scan's 3 s bar failed in a full run while a second simulator ran tests, and passed on an idle machine · Learned: run the full iOS UI suite with nothing else on the simulators before calling a failure real
