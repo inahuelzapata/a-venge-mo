@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { deleteField, doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
 let env;
 let db;
@@ -60,4 +60,35 @@ test('accepts a valid paid update, rejects reopening a paid party', async () => 
     status: 'paid', paidAt: Timestamp.now(), 'members.maxi.paid': true, 'members.annie.paid': true,
   }));
   await assertFails(updateDoc(doc(db, 'parties/ok'), { status: 'open' }));
+});
+
+// The total slice's client writes (iOS and Android "capture the total" work orders).
+test('accepts the total slice writes: bill with tip, tip change, 0% as custom 0', async () => {
+  const ref = doc(db, 'parties/total');
+  await assertSucceeds(setDoc(ref, party({ billCents: null, tip: null })));
+  await assertSucceeds(updateDoc(ref, { billCents: 4850, tip: { type: 'custom', amountCents: 0 } }));
+  await assertSucceeds(updateDoc(ref, { tip: { type: 'percent', percent: 18 } }));
+  await assertSucceeds(updateDoc(ref, { tip: { type: 'custom', amountCents: 700 } }));
+  await assertSucceeds(updateDoc(ref, { billCents: 1 }));
+  await assertSucceeds(updateDoc(ref, { billCents: 999999 }));
+});
+
+test('rejects a 0% percent tip and a negative bill', async () => {
+  const ref = doc(db, 'parties/total-bad');
+  await assertSucceeds(setDoc(ref, party()));
+  await assertFails(updateDoc(ref, { tip: { type: 'percent', percent: 0 } }));
+  await assertFails(updateDoc(ref, { billCents: -1 }));
+});
+
+test('accepts dropping a member from memberIds and members together, rejects a half drop', async () => {
+  const ref = doc(db, 'parties/leave');
+  await assertSucceeds(setDoc(ref, party()));
+  await assertFails(updateDoc(ref, { memberIds: ['maxi'] }));
+  await assertSucceeds(updateDoc(ref, { memberIds: ['maxi'], 'members.annie': deleteField() }));
+});
+
+test('rejects removing the host', async () => {
+  const ref = doc(db, 'parties/no-host');
+  await assertSucceeds(setDoc(ref, party()));
+  await assertFails(updateDoc(ref, { memberIds: ['annie'], 'members.maxi': deleteField() }));
 });

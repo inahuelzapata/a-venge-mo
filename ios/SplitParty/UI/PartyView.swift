@@ -7,20 +7,76 @@ import SwiftUI
 @Observable
 final class PartyRoomModel {
     let partyId: String
+    /// The signed-in user looking at this party.
+    let userId: String
     private(set) var party: SplitParty?
     private(set) var hasLoaded = false
     /// Firestore is serving the cache, i.e. the server is out of reach.
     private(set) var isFromCache = false
+    /// True once this user was seen in the party and then dropped by someone else
+    /// (the host removed them). Leaving on purpose does not set it.
+    private(set) var wasRemoved = false
+    /// A write is in flight; buttons that would write again are disabled.
+    private(set) var isSaving = false
 
     @ObservationIgnored private let repository: any PaymentDataSource
+    @ObservationIgnored private let connection: ConnectionMonitor
     @ObservationIgnored private var subscription: LiveSubscription?
     @ObservationIgnored private var isStopped = false
+    @ObservationIgnored private var hasBeenMember = false
+    @ObservationIgnored private var isLeaving = false
     private static let relistenDelay: Duration = .seconds(2)
 
-    init(partyId: String, repository: any PaymentDataSource) {
+    init(partyId: String, userId: String, repository: any PaymentDataSource, connection: ConnectionMonitor) {
         self.partyId = partyId
+        self.userId = userId
         self.repository = repository
+        self.connection = connection
         listen()
+    }
+
+    var isHost: Bool {
+        party?.hostId == userId
+    }
+
+    // MARK: Actions
+
+    /// Each returns nil on success or the inline error to show; on failure the
+    /// party is unchanged.
+
+    func confirmBill(cents: Int) async -> String? {
+        await write { try await $0.setBill(partyId: self.partyId, billCents: cents) }
+    }
+
+    func chooseTip(_ tip: TipChoice) async -> String? {
+        await write { try await $0.setTip(partyId: self.partyId, tip: tip) }
+    }
+
+    /// Host only; the host can never remove themselves.
+    func removeMember(_ memberId: String) async -> String? {
+        guard memberId != party?.hostId else { return nil }
+        return await write { try await $0.removeMember(partyId: self.partyId, memberId: memberId) }
+    }
+
+    /// Non-host members only.
+    func leave() async -> String? {
+        guard !isHost else { return nil }
+        isLeaving = true
+        let error = await write { try await $0.removeMember(partyId: self.partyId, memberId: self.userId) }
+        if error != nil { isLeaving = false }
+        return error
+    }
+
+    private func write(_ operation: (any PaymentDataSource) async throws -> Void) async -> String? {
+        guard connection.isNetworkAvailable else { return PartyActionError.offline.changeMessage }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await operation(repository)
+            return nil
+        } catch {
+            return (error as? PartyActionError ?? .unreachable).changeMessage
+        }
     }
 
     func stop() {
@@ -28,14 +84,26 @@ final class PartyRoomModel {
         subscription?.cancel()
     }
 
+    private func noticeRemoval(in party: SplitParty?) {
+        guard let party else { return }
+        if party.isMember(userId) {
+            hasBeenMember = true
+        } else if hasBeenMember && !isLeaving && party.isActive(at: Date()) {
+            wasRemoved = true
+        }
+    }
+
     private func listen() {
         subscription = repository.listenToParty(id: partyId) { [weak self] result in
             guard let self else { return }
             switch result {
             case let .success(document):
+                // One state change per delivery: total, headcount and share all
+                // come from this value, so they always change in the same frame.
                 Motion.animate(.spring(response: 0.45, dampingFraction: 0.7)) {
                     self.party = document.item
                 }
+                self.noticeRemoval(in: document.item)
                 self.isFromCache = document.isFromCache
                 self.hasLoaded = true
             case .failure:
@@ -75,9 +143,19 @@ struct PartyView: View {
         .navigationTitle("Split Party at \(hub.merchantName)")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if room == nil { room = PartyRoomModel(partyId: partyId, repository: hub.repository) }
+            if room == nil {
+                room = PartyRoomModel(partyId: partyId, userId: hub.userId, repository: hub.repository,
+                                      connection: hub.connection)
+            }
         }
         .onDisappear { room?.stop(); room = nil }
+        // Removed by the host: back to Home, where the Join banner offers a rejoin.
+        .onChange(of: room?.wasRemoved == true) { _, wasRemoved in
+            guard wasRemoved, let party = room?.party else { return }
+            let hostName = liveData.usersById[party.hostId]?.firstName ?? party.hostId
+            hub.showHomeNotice("You were removed from \(hostName)'s party")
+            onBackToHome()
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("partyScreen")
         // Lets UI tests tell parties apart; VoiceOver users never land on the container.
@@ -88,14 +166,17 @@ struct PartyView: View {
     private func content(room: PartyRoomModel, hub: PartyHub) -> some View {
         if let party = room.party {
             if party.isExpired(at: hub.now) {
+                // The last total, tip and share stay on screen, frozen (no controls).
                 PartyClosedView(title: "This party has expired", message: "Nothing was charged.",
-                                systemImage: "clock.badge.xmark", onBackToHome: onBackToHome)
+                                systemImage: "clock.badge.xmark", onBackToHome: onBackToHome,
+                                frozenSplit: party.split, frozenTip: party.tip, userId: room.userId)
             } else if party.status == .paid {
                 PartyClosedView(title: "This party is settled", message: "Everyone's share has been paid.",
                                 systemImage: "checkmark.circle", onBackToHome: onBackToHome)
             } else {
-                OpenPartyContent(party: party, now: hub.now, usersById: liveData.usersById,
-                                 isReconnecting: room.isFromCache || !hub.connection.isNetworkAvailable)
+                OpenPartyContent(party: party, room: room, now: hub.now, usersById: liveData.usersById,
+                                 isReconnecting: room.isFromCache || !hub.connection.isNetworkAvailable,
+                                 onLeft: onBackToHome)
             }
         } else if room.hasLoaded {
             PartyClosedView(title: "This party isn't available", message: "It may have been cleared.",
@@ -110,9 +191,15 @@ struct PartyView: View {
 
 private struct OpenPartyContent: View {
     let party: SplitParty
+    let room: PartyRoomModel
     let now: Date
     let usersById: [String: UserAccount]
     let isReconnecting: Bool
+    let onLeft: () -> Void
+
+    @State private var memberToRemove: String?
+    @State private var isConfirmingLeave = false
+    @State private var memberError: String?
 
     var body: some View {
         ScrollView {
@@ -132,10 +219,27 @@ private struct OpenPartyContent: View {
                     }
                 }
                 PartyCard {
-                    MemberRow(memberIds: party.memberIds, hostId: party.hostId, usersById: usersById)
+                    VStack(alignment: .leading, spacing: 10) {
+                        MemberRow(memberIds: party.memberIds, hostId: party.hostId, usersById: usersById,
+                                  onTapMember: room.isHost ? { memberToRemove = $0 } : nil)
+                        if let memberError {
+                            Label(memberError, systemImage: "exclamationmark.circle.fill")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.errorText)
+                                .accessibilityIdentifier("memberError")
+                        }
+                    }
                 }
                 PartyCard {
-                    TotalPlaceholder()
+                    PartyTotalSection(party: party, room: room, usersById: usersById)
+                }
+                if !room.isHost {
+                    Button("Leave party", role: .destructive) { isConfirmingLeave = true }
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.errorText)
+                        .frame(minHeight: 44)
+                        .disabled(room.isSaving)
+                        .accessibilityIdentifier("leavePartyButton")
                 }
             }
             .padding(.top, 8)
@@ -143,10 +247,58 @@ private struct OpenPartyContent: View {
             .animation(.easeInOut(duration: 0.25), value: isReconnecting)
         }
         .scrollIndicators(.hidden)
+        .confirmationDialog(removeTitle, isPresented: isConfirmingRemove, titleVisibility: .visible) {
+            if let memberId = memberToRemove {
+                Button("Remove \(firstName(memberId))", role: .destructive) { remove(memberId) }
+                    .accessibilityIdentifier("confirmRemoveMember")
+            }
+        } message: {
+            Text("Everyone's share is recalculated. They can rejoin with the code while the party is open.")
+        }
+        .confirmationDialog("Leave \(firstName(party.hostId))'s party?", isPresented: $isConfirmingLeave,
+                            titleVisibility: .visible) {
+            Button("Leave party", role: .destructive) { leave() }
+                .accessibilityIdentifier("confirmLeaveParty")
+        } message: {
+            Text("Your share goes back to the others. You can rejoin with the code while the party is open.")
+        }
+        // The floating tab bar is drawn over pushed screens without insetting them;
+        // without this the tip chips and total buttons could end up under it.
+        .contentMargins(.bottom, Theme.floatingBarClearance, for: .scrollContent)
         // A haptic on the phones already in the party when someone new arrives.
         // The first delivery (0 → n) is the party loading, not news.
         .sensoryFeedback(trigger: party.memberIds.count) { old, new in
             new > old && old > 0 ? .success : nil
+        }
+    }
+}
+
+private extension OpenPartyContent {
+    var isConfirmingRemove: Binding<Bool> {
+        Binding(get: { memberToRemove != nil }, set: { if !$0 { memberToRemove = nil } })
+    }
+
+    var removeTitle: String {
+        "Remove \(firstName(memberToRemove ?? "")) from the party?"
+    }
+
+    func firstName(_ userId: String) -> String {
+        usersById[userId]?.firstName ?? userId
+    }
+
+    func remove(_ memberId: String) {
+        memberError = nil
+        Task { memberError = await room.removeMember(memberId) }
+    }
+
+    func leave() {
+        memberError = nil
+        Task {
+            if let failure = await room.leave() {
+                memberError = failure
+            } else {
+                onLeft()
+            }
         }
     }
 }
@@ -250,6 +402,8 @@ private struct MemberRow: View {
     let memberIds: [String]
     let hostId: String
     let usersById: [String: UserAccount]
+    /// Host only: tapping a non-host seat offers to remove that member.
+    let onTapMember: ((String) -> Void)?
 
     /// The demo party is the host plus two friends; a bigger party just grows.
     private static let minimumSeats = 3
@@ -262,7 +416,7 @@ private struct MemberRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(alignment: .top, spacing: Theme.memberSeatSpacing) {
                 ForEach(memberIds, id: \.self) { memberId in
-                    MemberSeat(user: usersById[memberId], userId: memberId, isHost: memberId == hostId)
+                    seat(for: memberId)
                         .transition(.scale(scale: 0.3).combined(with: .opacity))
                 }
                 ForEach(0..<max(0, Self.minimumSeats - memberIds.count), id: \.self) { _ in
@@ -273,6 +427,18 @@ private struct MemberRow: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memberRow")
+    }
+
+    @ViewBuilder
+    private func seat(for memberId: String) -> some View {
+        let seat = MemberSeat(user: usersById[memberId], userId: memberId, isHost: memberId == hostId)
+        if let onTapMember, memberId != hostId {
+            Button { onTapMember(memberId) } label: { seat }
+                .buttonStyle(.plain)
+                .accessibilityHint("Double-tap to remove from the party")
+        } else {
+            seat
+        }
     }
 }
 
@@ -340,8 +506,8 @@ private struct EmptySeat: View {
 
 // MARK: Total
 
-/// Reserved for the total / tip / share slice (PoC-10, FR-3/FR-4).
-private struct TotalPlaceholder: View {
+/// What members see until the host confirms a bill.
+struct TotalPlaceholder: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "hourglass")
@@ -369,6 +535,10 @@ struct PartyClosedView: View {
     let message: String
     let systemImage: String
     let onBackToHome: () -> Void
+    /// An expired party that had a bill keeps its last numbers on screen.
+    var frozenSplit: PartySplit?
+    var frozenTip: TipChoice?
+    var userId = ""
 
     var body: some View {
         VStack(spacing: 12) {
@@ -384,6 +554,15 @@ struct PartyClosedView: View {
                 .font(.system(size: 17))
                 .foregroundStyle(Theme.secondaryText)
                 .multilineTextAlignment(.center)
+            if let frozenSplit {
+                ShareSummary(split: frozenSplit, tip: frozenTip, userId: userId)
+                    .padding(Theme.cardPadding)
+                    .background(RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous)
+                        .fill(Theme.card))
+                    .opacity(0.7)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("frozenShareSummary")
+            }
             Button("Back to Home", action: onBackToHome)
                 .buttonStyle(PillButtonStyle())
                 .padding(.top, 12)

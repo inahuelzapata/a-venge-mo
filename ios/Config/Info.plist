@@ -10,6 +10,9 @@
 	<key>FirestoreEmulatorHost</key>
 	<string>$(FIRESTORE_EMULATOR_HOST)</string>
 	<!-- Needed to reach the emulator on the laptop's LAN IP (iOS local network privacy). -->
+	<!-- Receipt scan (PoC-10). The photo is read on the phone and discarded; it is never saved. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Split Party reads the total from your receipt. The photo stays on this phone and is discarded right after.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Split Party connects to the demo database running on your local network.</string>
 </dict>

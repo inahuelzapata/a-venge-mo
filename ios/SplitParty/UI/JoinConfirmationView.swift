@@ -29,7 +29,10 @@ struct JoinConfirmationView: View {
         .navigationTitle("Join Split Party")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if room == nil { room = PartyRoomModel(partyId: partyId, repository: hub.repository) }
+            if room == nil {
+                room = PartyRoomModel(partyId: partyId, userId: hub.userId, repository: hub.repository,
+                                      connection: hub.connection)
+            }
         }
         .onDisappear { room?.stop(); room = nil }
         .accessibilityElement(children: .contain)

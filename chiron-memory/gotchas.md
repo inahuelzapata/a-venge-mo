@@ -99,3 +99,7 @@ What: The party transactions live in PartyWriter, a nonisolated struct, instead 
 ## SwiftUI accessibilityIdentifier on a plain stack overwrites its children's identifiers
 
 What: An .accessibilityIdentifier applied to a VStack that is not an accessibility element is copied onto every child, so the "Back to Home" button lost its own id; UI tests now find the expired state by its text · Why: SwiftUI propagates the modifier when the view is not a single element · Where: ios/SplitParty/UI/PartyView.swift (PartyClosedView), ios/SplitPartyUITests/PartyFlowUITests.swift · Learned: put identifiers on leaf views, or make the container .accessibilityElement(children: .contain) first
+
+## iOS Home and Me snapshots fail on 2026-11-05 on the unmodified base commit
+
+What: ScreenSnapshotTests testHomeFeed, testHomeEmpty and testMe fail by one pixel (match 0.9999997, perceptual precision 0.977 < 0.98) on the iPhone 17 / iOS 26.5 simulator, both on the total-slice branch and on its untouched base commit 3958861; they passed there the day before · Why: unknown; not caused by party code (verified on a clean worktree of the base). Likely date- or simulator-dependent rendering · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift · Learned: before blaming a branch for these failures, rerun them on a clean worktree of the base commit

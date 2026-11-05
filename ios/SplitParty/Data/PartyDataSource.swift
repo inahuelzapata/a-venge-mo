@@ -8,9 +8,9 @@ struct LiveDocument<Item> {
     let isFromCache: Bool
 }
 
-/// Split Party reads and writes (PoC-7 to PoC-9). Only the `parties` and
-/// `joinCodes` documents of docs/firestore-schema.md; nothing here touches
-/// balances, transactions, the bill or the tip.
+/// Split Party reads and writes (PoC-7 to PoC-10, FR-2.5, FR-3, FR-4). Only the
+/// `parties` and `joinCodes` documents of docs/firestore-schema.md; nothing here
+/// touches balances or transactions (the settle slice owns those).
 @MainActor
 protocol PartyDataSource: AnyObject {
     /// `parties where merchantId == m && status == "open"`. Some of these may be
@@ -43,4 +43,17 @@ protocol PartyDataSource: AnyObject {
     /// lock if the lock still belongs to it. Does nothing (and never throws) when
     /// another phone already did it, or the party is not due.
     func expireParty(id: String) async
+
+    /// Host only: sets the pre-tip bill. If no tip was chosen yet, the same update
+    /// stores the 0% tip, so no phone ever sees a bill without a tip state.
+    /// Refused once the party is no longer open. Throws `PartyActionError`.
+    func setBill(partyId: String, billCents: Int) async throws
+
+    /// Host only: replaces the tip. Throws `PartyActionError`.
+    func setTip(partyId: String, tip: TipChoice) async throws
+
+    /// Drops a non-host member from `memberIds` and `members` in one transaction,
+    /// so a join landing at the same moment is kept. Used both for the host
+    /// removing someone and for a member leaving. Throws `PartyActionError`.
+    func removeMember(partyId: String, memberId: String) async throws
 }

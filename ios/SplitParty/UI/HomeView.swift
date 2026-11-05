@@ -14,6 +14,10 @@ struct HomeView: View {
         ScrollView {
             VStack(spacing: 16) {
                 HomeHeader(user: liveData.signedInUser, fallbackName: liveData.userId)
+                if let notice = liveData.parties.homeNotice {
+                    HomeNotice(message: notice)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 HomeBannerSlot(onStartParty: onStartParty, onOpenParty: onOpenParty, onJoin: onJoin)
                 TransactionList(state: liveData.feed,
                                 emptyTitle: "No payments yet",
@@ -28,6 +32,24 @@ struct HomeView: View {
             await liveData.parties.revealMerchantCardWhenReady()
         }
         .accessibilityIdentifier("homeScreen")
+    }
+}
+
+/// One-off message under the header, e.g. "You were removed from Maxi's party".
+private struct HomeNotice: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "person.crop.circle.badge.minus")
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.black.opacity(0.85)))
+            .padding(.horizontal, Theme.screenGutter)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("homeNotice")
     }
 }
 

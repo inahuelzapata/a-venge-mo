@@ -57,6 +57,18 @@ extension PaymentRepository {
     func expireParty(id: String) async {
         await PartyWriter(firestore: firestore).expireParty(id: id)
     }
+
+    func setBill(partyId: String, billCents: Int) async throws {
+        try await PartyWriter(firestore: firestore).setBill(partyId: partyId, billCents: billCents)
+    }
+
+    func setTip(partyId: String, tip: TipChoice) async throws {
+        try await PartyWriter(firestore: firestore).setTip(partyId: partyId, tip: tip)
+    }
+
+    func removeMember(partyId: String, memberId: String) async throws {
+        try await PartyWriter(firestore: firestore).removeMember(partyId: partyId, memberId: memberId)
+    }
 }
 
 /// The party transactions. Deliberately not main-actor isolated: Firestore runs
@@ -246,6 +258,64 @@ private struct PartyWriter: @unchecked Sendable {
                 errorPointer?.pointee = error as NSError
                 return nil
             }
+        }
+    }
+
+    // MARK: Total, tip and members
+
+    func setBill(partyId: String, billCents: Int) async throws {
+        try await updateOpenParty(id: partyId) { party in
+            var update: [AnyHashable: Any] = [PartySchema.PartyField.billCents: billCents]
+            if party.tip == nil {
+                update[PartySchema.PartyField.tip] = TipChoice.zero.firestoreValue
+            }
+            return update
+        }
+    }
+
+    func setTip(partyId: String, tip: TipChoice) async throws {
+        try await updateOpenParty(id: partyId) { _ in
+            [PartySchema.PartyField.tip: tip.firestoreValue]
+        }
+    }
+
+    func removeMember(partyId: String, memberId: String) async throws {
+        try await updateOpenParty(id: partyId) { party in
+            // The host can never be dropped (the rules also demand memberIds[0] == hostId).
+            guard memberId != party.hostId, party.isMember(memberId) else { return nil }
+            return [
+                PartySchema.PartyField.memberIds: party.memberIds.filter { $0 != memberId },
+                FieldPath([PartySchema.PartyField.members, memberId]): FieldValue.delete(),
+            ]
+        }
+    }
+
+    /// Reads the party in a transaction and applies `makeUpdate` only while it is
+    /// open and unexpired. A transaction (not a blind update) because the member
+    /// list is rewritten whole: Firestore retries the block on top of any join or
+    /// leave that commits first, so no two phones overwrite each other. A nil
+    /// update means there is nothing to change.
+    private func updateOpenParty(id: String,
+                                 _ makeUpdate: @escaping @Sendable (SplitParty) -> [AnyHashable: Any]?)
+        async throws {
+        let partyReference = parties.document(id)
+        try await withPartyTimeout {
+            let outcome = try await firestore.runTransaction { transaction, errorPointer -> Any? in
+                do {
+                    let snapshot = try transaction.getDocument(partyReference)
+                    guard let party = Self.party(from: snapshot), party.isActive(at: Date()) else {
+                        return PartyActionError.partyNoLongerOpen
+                    }
+                    if let update = makeUpdate(party) {
+                        transaction.updateData(update, forDocument: partyReference)
+                    }
+                    return nil
+                } catch {
+                    errorPointer?.pointee = error as NSError
+                    return nil
+                }
+            }
+            if let refusal = outcome as? PartyActionError { throw refusal }
         }
     }
 
