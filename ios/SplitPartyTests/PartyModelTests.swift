@@ -7,10 +7,10 @@ import XCTest
 final class JoinCodeTests: XCTestCase {
     private let palette = Set(JoinCode.palette.map(\.emoji))
 
-    func testRandomCodesUseThreePaletteEmojis() {
+    func testRandomCodesUseTwoPaletteEmojis() {
         for _ in 0..<500 {
             let code = JoinCode.random()
-            XCTAssertEqual(code.emojis.count, 3)
+            XCTAssertEqual(code.emojis.count, 2)
             XCTAssertTrue(code.emojis.allSatisfy(palette.contains))
         }
     }
@@ -20,29 +20,29 @@ final class JoinCodeTests: XCTestCase {
     }
 
     func testCodeOutsidePaletteOrWrongLengthIsRejected() {
-        XCTAssertNil(JoinCode(["🍕", "🍺"]))
-        XCTAssertNil(JoinCode(["🍕", "🍺", "🎉", "🔥"]))
-        XCTAssertNil(JoinCode(["🍕", "🍺", "😀"]))
-        XCTAssertNotNil(JoinCode(["🍕", "🍕", "🍕"]), "Repeats are allowed")
+        XCTAssertNil(JoinCode(["🍕"]))
+        XCTAssertNil(JoinCode(["🍕", "🍺", "🎉"]), "A three-emoji code from an older build is rejected")
+        XCTAssertNil(JoinCode(["🍕", "😀"]))
+        XCTAssertNotNil(JoinCode(["🍕", "🍕"]), "Repeats are allowed")
     }
 
     func testSpokenNamesReadEveryEmoji() {
-        XCTAssertEqual(JoinCode(["🍕", "🍺", "🎉"])?.spokenNames, "pizza, beer, party popper")
+        XCTAssertEqual(JoinCode(["🍕", "🍺"])?.spokenNames, "pizza, beer")
     }
 
     func testChoicesHoldTheRealCodeOnceAndThreeDistinctDecoys() {
-        let code = JoinCode(["🍕", "🍺", "🎉"])!
+        let code = JoinCode(["🍕", "🍺"])!
         for _ in 0..<500 {
             let options = JoinCodeChoices.make(for: code)
             XCTAssertEqual(options.count, 4)
             XCTAssertEqual(options.filter { $0 == code }.count, 1)
             XCTAssertEqual(Set(options).count, 4, "Decoys differ from the code and from each other")
-            XCTAssertTrue(options.allSatisfy { $0.emojis.allSatisfy(palette.contains) })
+            XCTAssertTrue(options.allSatisfy { $0.emojis.count == 2 && $0.emojis.allSatisfy(palette.contains) })
         }
     }
 
     func testReshuffleAlwaysChangesTheArrangement() {
-        let code = JoinCode(["🔥", "🔥", "🌵"])!
+        let code = JoinCode(["🔥", "🔥"])!
         var options = JoinCodeChoices.make(for: code)
         for _ in 0..<200 {
             let next = JoinCodeChoices.make(for: code, previous: options)
@@ -52,8 +52,8 @@ final class JoinCodeTests: XCTestCase {
     }
 
     func testLockIdMatchesTheSchemaFormat() {
-        XCTAssertEqual(PartySchema.joinCodeLockId(merchantId: "tonys-greenwich", code: JoinCode(["🍕", "🍺", "🎉"])!),
-                       "tonys-greenwich_🍕🍺🎉")
+        XCTAssertEqual(PartySchema.joinCodeLockId(merchantId: "tonys-greenwich", code: JoinCode(["🍕", "🍺"])!),
+                       "tonys-greenwich_🍕🍺")
     }
 }
 
@@ -61,7 +61,7 @@ final class SplitPartyDocumentTests: XCTestCase {
     private let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func party(status: PartyStatus = .open, attempts: [String: Int] = [:]) -> SplitParty {
-        SplitParty(id: "p1", hostId: "maxi", merchantId: DemoMerchant.id, joinCode: JoinCode(["🍕", "🍺", "🎉"])!,
+        SplitParty(id: "p1", hostId: "maxi", merchantId: DemoMerchant.id, joinCode: JoinCode(["🍕", "🍺"])!,
                    status: status, createdAt: createdAt, expiresAt: createdAt.addingTimeInterval(300),
                    memberIds: ["maxi", "annie"], wrongCodeAttempts: attempts)
     }
@@ -89,7 +89,7 @@ final class SplitPartyDocumentTests: XCTestCase {
 
     func testDocumentMapping() throws {
         let data: [String: Any] = [
-            "hostId": "maxi", "merchantId": "tonys-greenwich", "joinCode": ["🍕", "🍺", "🎉"], "status": "open",
+            "hostId": "maxi", "merchantId": "tonys-greenwich", "joinCode": ["🍕", "🍺"], "status": "open",
             "createdAt": createdAt, "expiresAt": createdAt.addingTimeInterval(300),
             "memberIds": ["maxi", "annie"], "wrongCodeAttempts": ["christophe": NSNumber(value: Int64(2))],
             "billCents": NSNull(), "tip": NSNull(), "paidAt": NSNull(), "members": [:] as [String: Any],
@@ -98,5 +98,7 @@ final class SplitPartyDocumentTests: XCTestCase {
         XCTAssertEqual(parsed.memberIds, ["maxi", "annie"])
         XCTAssertEqual(parsed.wrongAttempts(by: "christophe"), 2)
         XCTAssertNil(SplitParty(id: "bad", data: data.merging(["joinCode": ["🍕"]]) { $1 }, dateOf: { $0 as? Date }))
+        XCTAssertNil(SplitParty(id: "older-build", data: data.merging(["joinCode": ["🍕", "🍺", "🎉"]]) { $1 },
+                                dateOf: { $0 as? Date }), "A party with a three-emoji code is skipped, not a crash")
     }
 }

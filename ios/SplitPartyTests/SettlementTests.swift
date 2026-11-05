@@ -9,7 +9,7 @@ final class SettlementTests: XCTestCase {
     private func party(memberIds: [String] = ["annie", "maxi", "christophe"], billCents: Int? = 10_000,
                        tip: TipChoice? = .percent(18), status: PartyStatus = .open) -> SplitParty {
         SplitParty(id: "p1", hostId: memberIds[0], merchantId: DemoMerchant.id,
-                   joinCode: JoinCode(["🍕", "🍺", "🎉"])!, status: status, createdAt: createdAt,
+                   joinCode: JoinCode(["🍕", "🍺"])!, status: status, createdAt: createdAt,
                    expiresAt: createdAt.addingTimeInterval(300), memberIds: memberIds, wrongCodeAttempts: [:],
                    billCents: billCents, tip: tip)
     }
@@ -68,7 +68,7 @@ final class SettlementTests: XCTestCase {
     func testPaidMembersAndPaidAtAreRead() throws {
         let paidAt = createdAt.addingTimeInterval(60)
         let data: [String: Any] = [
-            "hostId": "annie", "merchantId": DemoMerchant.id, "joinCode": ["🍕", "🍺", "🎉"], "status": "paid",
+            "hostId": "annie", "merchantId": DemoMerchant.id, "joinCode": ["🍕", "🍺"], "status": "paid",
             "createdAt": createdAt, "expiresAt": createdAt.addingTimeInterval(300), "paidAt": paidAt,
             "memberIds": ["annie", "maxi"], "wrongCodeAttempts": [:] as [String: Any],
             "billCents": NSNumber(value: Int64(10_000)), "tip": ["type": "custom", "amountCents": 0],

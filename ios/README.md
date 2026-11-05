@@ -13,7 +13,7 @@ Pay/Request (placeholder) and Me. The phone stays signed in until Log out.
 Split Party (PoC-7 to PoC-9): a "Demo mode: at Tony's" switch on Me (on by
 default, remembered) stands in for the geofence and makes the "Split the check"
 card slide in on Home. "Start a party" creates a party at Tony's with a
-three-emoji code and a 5-minute expiry (or reopens the one you are in). Friends'
+two-emoji code and a 5-minute expiry (or reopens the one you are in). Friends'
 phones get a Join banner, pick the host's code out of four (three wrong picks
 lock that party for them) and appear live in everyone's member row. Every phone
 expires the party by the clock; the host's phone writes `expired` and releases
