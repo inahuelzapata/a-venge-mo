@@ -37,8 +37,12 @@ final class AppModel {
             if launch.resetsSession {
                 sessionStore.clear()
                 DemoModeStore().reset()
+                LastPartyStore().partyId = nil
+                CelebrationLedger().clear()
             }
             let fixture = FixtureDataSource(scenario: launch.scenario)
+            fixture.demoResetFails = launch.demoResetFails
+            if let delay = launch.writeDelaySeconds { fixture.writeDelay = .seconds(delay) }
             launch.applyPartySetup(to: fixture)
             if let delay = launch.insertsIncomingPaymentAfter {
                 Task { @MainActor in
@@ -54,7 +58,8 @@ final class AppModel {
         let target = FirestoreTarget.fromBundle()
         switch FirebaseBootstrap.configure(target: target) {
         case let .ready(firestore):
-            self.init(dataSource: PaymentRepository(firestore: firestore), targetSummary: target.summary)
+            self.init(dataSource: PaymentRepository(firestore: firestore, demoReset: DemoResetClient(target: target)),
+                      targetSummary: target.summary)
         case let .failed(reason):
             self.init(dataSource: nil, targetSummary: target.summary, setupProblem: reason)
         }
@@ -92,6 +97,7 @@ final class AppModel {
 
     func logOut() {
         sessionStore.clear()
+        LastPartyStore().partyId = nil
         liveData?.stop()
         liveData = nil
         signedInUserId = nil
@@ -122,6 +128,10 @@ final class AppModel {
 /// - `-UITestPartyScript "2:tip=20;4:join=christophe;6:remove=annie;8:bill=20000"`:
 ///   changes other phones make to that party, each at its second after sign-in
 ///   (typing the username takes a variable few seconds, so launch is no anchor).
+///   "pay=host" settles the party as the host's phone would; "reset=demo" runs
+///   Demo reset as if another phone had tapped it.
+/// - `-UITestDemoReset fail`: the Demo reset function answers with an error.
+/// - `-UITestWriteDelay <seconds>`: how long the fake Pay and Demo reset take.
 ///   (Receipt-scan arguments: `ReceiptScanTestLaunch` in ReceiptScanView.swift.)
 struct UITestLaunch {
     static let fixtureKey = "UITestFixture"
@@ -135,6 +145,8 @@ struct UITestLaunch {
     static let friendPartyBillKey = "UITestFriendPartyBill"
     static let friendPartyTipKey = "UITestFriendPartyTip"
     static let partyScriptKey = "UITestPartyScript"
+    static let demoResetKey = "UITestDemoReset"
+    static let writeDelayKey = "UITestWriteDelay"
 
     let scenario: FixtureDataSource.Scenario
     let resetsSession: Bool
@@ -147,6 +159,8 @@ struct UITestLaunch {
     var friendPartyBillCents: Int?
     var friendPartyTip: TipChoice?
     var partyScript: [(seconds: Double, change: String)] = []
+    var demoResetFails = false
+    var writeDelaySeconds: Double?
 
     @MainActor
     func applyPartySetup(to fixture: FixtureDataSource) {
@@ -183,7 +197,7 @@ struct UITestLaunch {
         }
     }
 
-    /// "tip=18", "tip=custom:700", "bill=20000", "join=christophe", "remove=annie".
+    /// "tip=18", "tip=custom:700", "bill=20000", "join=christophe", "remove=annie", "pay=host".
     @MainActor
     private static func apply(_ change: String, to partyId: String, in fixture: FixtureDataSource) async throws {
         let parts = change.split(separator: "=", maxSplits: 1).map(String.init)
@@ -193,6 +207,8 @@ struct UITestLaunch {
         case "bill": if let cents = Int(parts[1]) { try await fixture.setBill(partyId: partyId, billCents: cents) }
         case "join": try await fixture.joinParty(id: partyId, userId: parts[1])
         case "remove": try await fixture.removeMember(partyId: partyId, memberId: parts[1])
+        case "pay": try await fixture.settleParty(id: partyId)
+        case "reset": try await fixture.resetDemo()
         default: break
         }
     }
@@ -222,6 +238,9 @@ struct UITestLaunch {
             ? nil : defaults.double(forKey: friendsJoinEveryKey)
         launch.friendPartyBillCents = defaults.string(forKey: friendPartyBillKey).flatMap { Int($0) }
         launch.friendPartyTip = defaults.string(forKey: friendPartyTipKey).flatMap(parseTip)
+        launch.demoResetFails = defaults.string(forKey: demoResetKey) == "fail"
+        launch.writeDelaySeconds = defaults.object(forKey: writeDelayKey) == nil
+            ? nil : defaults.double(forKey: writeDelayKey)
         launch.partyScript = (defaults.string(forKey: partyScriptKey) ?? "").split(separator: ";").compactMap { step in
             let parts = step.split(separator: ":", maxSplits: 1).map(String.init)
             guard parts.count == 2, let seconds = Double(parts[0]) else { return nil }

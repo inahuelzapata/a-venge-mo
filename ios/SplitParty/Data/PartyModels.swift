@@ -131,8 +131,7 @@ enum JoinCodeChoices {
     }
 }
 
-/// `parties/{id}`, with what the app reads. `paidAt` is not read yet: the
-/// settle slice owns it.
+/// `parties/{id}`, with what the app reads.
 struct SplitParty: Equatable, Identifiable {
     let id: String
     let hostId: String
@@ -148,6 +147,10 @@ struct SplitParty: Equatable, Identifiable {
     let billCents: Int?
     /// Nil until the first bill is confirmed (shown as 0%).
     let tip: TipChoice?
+    /// When the host tapped Pay; nil until then (or while the server time is pending).
+    let paidAt: Date?
+    /// Members whose `members.{uid}.paid` is true. Pay sets every member at once.
+    let paidMemberIds: Set<String>
 
     /// Nil when a required field is missing or malformed.
     init?(id: String, data: [String: Any], dateOf: (Any?) -> Date?) {
@@ -162,15 +165,20 @@ struct SplitParty: Equatable, Identifiable {
         }
         let rawAttempts = data[PartySchema.PartyField.wrongCodeAttempts] as? [String: Any] ?? [:]
         let billCents = FirestoreValue.integer(data[PartySchema.PartyField.billCents]).flatMap { $0 >= 0 ? $0 : nil }
+        let members = data[PartySchema.PartyField.members] as? [String: Any] ?? [:]
+        let paidMemberIds = members.compactMap { memberId, value in
+            (value as? [String: Any])?[PartySchema.MemberField.paid] as? Bool == true ? memberId : nil
+        }
         self.init(id: id, hostId: hostId, merchantId: merchantId, joinCode: joinCode, status: status,
                   createdAt: createdAt, expiresAt: expiresAt, memberIds: memberIds,
                   wrongCodeAttempts: rawAttempts.compactMapValues { FirestoreValue.integer($0) },
-                  billCents: billCents, tip: TipChoice(firestoreValue: data[PartySchema.PartyField.tip]))
+                  billCents: billCents, tip: TipChoice(firestoreValue: data[PartySchema.PartyField.tip]),
+                  paidAt: dateOf(data[PartySchema.PartyField.paidAt]), paidMemberIds: Set(paidMemberIds))
     }
 
     init(id: String, hostId: String, merchantId: String, joinCode: JoinCode, status: PartyStatus,
          createdAt: Date, expiresAt: Date, memberIds: [String], wrongCodeAttempts: [String: Int],
-         billCents: Int? = nil, tip: TipChoice? = nil) {
+         billCents: Int? = nil, tip: TipChoice? = nil, paidAt: Date? = nil, paidMemberIds: Set<String> = []) {
         self.id = id
         self.hostId = hostId
         self.merchantId = merchantId
@@ -182,6 +190,8 @@ struct SplitParty: Equatable, Identifiable {
         self.wrongCodeAttempts = wrongCodeAttempts
         self.billCents = billCents
         self.tip = tip
+        self.paidAt = paidAt
+        self.paidMemberIds = paidMemberIds
     }
 
     /// Every member's share, or nil while there is no bill.
@@ -198,6 +208,21 @@ struct SplitParty: Equatable, Identifiable {
     /// Expired by status or by the clock (a paid party is settled, not expired).
     func isExpired(at now: Date) -> Bool {
         status == .expired || (status == .open && now >= expiresAt)
+    }
+
+    /// Everyone but the host: the people Pay charges.
+    var joineeIds: [String] {
+        memberIds.filter { $0 != hostId }
+    }
+
+    /// Why Pay can't run yet, or nil when it can (open, unexpired, bill set and
+    /// at least one friend in). A paid party has nothing left to pay.
+    func payBlocker(at now: Date) -> PayBlocker? {
+        if status == .paid { return .alreadyPaid }
+        guard isActive(at: now) else { return .expired }
+        guard billCents != nil else { return .needsTotal }
+        guard !joineeIds.isEmpty else { return .needsFriends }
+        return nil
     }
 
     func isMember(_ userId: String) -> Bool {
@@ -217,6 +242,23 @@ struct SplitParty: Equatable, Identifiable {
     }
 }
 
+/// Why the host's Pay button is disabled. `label` is what the button reads.
+enum PayBlocker: Equatable {
+    case needsTotal
+    case needsFriends
+    case expired
+    case alreadyPaid
+
+    var label: String {
+        switch self {
+        case .needsTotal: "Add the total"
+        case .needsFriends: "Waiting for friends to join"
+        case .expired: "Party expired"
+        case .alreadyPaid: "Paid"
+        }
+    }
+}
+
 /// Why a party action failed, worded for the inline error.
 enum PartyActionError: Error, Equatable {
     case offline
@@ -225,6 +267,8 @@ enum PartyActionError: Error, Equatable {
     /// The party expired, was settled or filled up before the join landed.
     case partyNoLongerOpen
     case lockedOut
+    /// Pay was asked for a party without a bill or without any friend in it.
+    case notReadyToPay
 
     var message: String {
         switch self {
@@ -233,6 +277,18 @@ enum PartyActionError: Error, Equatable {
         case .rejected: "The database refused the party. Nothing was created; try again."
         case .partyNoLongerOpen: "This party is no longer open."
         case .lockedOut: "Too many wrong codes for this party."
+        case .notReadyToPay: "Add the total and wait for a friend to join before paying."
+        }
+    }
+
+    /// For Pay: says that nothing moved, so the host knows a retry is safe.
+    var payMessage: String {
+        switch self {
+        case .offline: "You're offline. Nothing was paid; try again when you're connected."
+        case .unreachable: "Couldn't reach the database. Nothing was paid; try again."
+        case .rejected: "The database refused the payment. Nothing was paid."
+        case .partyNoLongerOpen: "This party is no longer open. Nothing was paid."
+        case .lockedOut, .notReadyToPay: message
         }
     }
 
@@ -243,7 +299,7 @@ enum PartyActionError: Error, Equatable {
         case .offline: "You're offline. Nothing was saved; try again when you're connected."
         case .unreachable: "Couldn't reach the database. Nothing was saved; try again."
         case .rejected: "The database refused the change. Nothing was saved."
-        case .partyNoLongerOpen, .lockedOut: message
+        case .partyNoLongerOpen, .lockedOut, .notReadyToPay: message
         }
     }
 }

@@ -18,6 +18,10 @@ final class PartyRoomModel {
     private(set) var wasRemoved = false
     /// A write is in flight; buttons that would write again are disabled.
     private(set) var isSaving = false
+    /// The host's Pay is in flight: the joinees' seats show "pending".
+    private(set) var isPaying = false
+    /// The party was there and then deleted (Demo reset): the screen goes Home.
+    private(set) var wasDeleted = false
 
     @ObservationIgnored private let repository: any PaymentDataSource
     @ObservationIgnored private let connection: ConnectionMonitor
@@ -67,6 +71,22 @@ final class PartyRoomModel {
         return error
     }
 
+    /// Host only. Nil on success (the listener then turns the screen to paid),
+    /// or the inline error; on failure nothing was paid. A second call while one
+    /// is in flight does nothing, and a retry after a failure is always safe.
+    func pay() async -> String? {
+        guard isHost, !isPaying else { return nil }
+        guard connection.isNetworkAvailable else { return PartyActionError.offline.payMessage }
+        isPaying = true
+        defer { isPaying = false }
+        do {
+            try await repository.settleParty(id: partyId)
+            return nil
+        } catch {
+            return (error as? PartyActionError ?? .unreachable).payMessage
+        }
+    }
+
     private func write(_ operation: (any PaymentDataSource) async throws -> Void) async -> String? {
         guard connection.isNetworkAvailable else { return PartyActionError.offline.changeMessage }
         isSaving = true
@@ -104,6 +124,7 @@ final class PartyRoomModel {
                     self.party = document.item
                 }
                 self.noticeRemoval(in: document.item)
+                if document.item == nil, self.hasLoaded, !document.isFromCache { self.wasDeleted = true }
                 self.isFromCache = document.isFromCache
                 self.hasLoaded = true
             case .failure:
@@ -143,17 +164,25 @@ struct PartyView: View {
         .navigationTitle("Split Party at \(hub.merchantName)")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            hub.rememberLastParty(partyId)
             if room == nil {
                 room = PartyRoomModel(partyId: partyId, userId: hub.userId, repository: hub.repository,
                                       connection: hub.connection)
             }
         }
         .onDisappear { room?.stop(); room = nil }
+        // Demo reset deleted the party: every phone on it goes back Home.
+        .onChange(of: room?.wasDeleted == true) { _, wasDeleted in
+            guard wasDeleted else { return }
+            hub.forgetLastParty()
+            onBackToHome()
+        }
         // Removed by the host: back to Home, where the Join banner offers a rejoin.
         .onChange(of: room?.wasRemoved == true) { _, wasRemoved in
             guard wasRemoved, let party = room?.party else { return }
             let hostName = liveData.usersById[party.hostId]?.firstName ?? party.hostId
             hub.showHomeNotice("You were removed from \(hostName)'s party")
+            hub.forgetLastParty()
             onBackToHome()
         }
         .accessibilityElement(children: .contain)
@@ -168,11 +197,16 @@ struct PartyView: View {
             if party.isExpired(at: hub.now) {
                 // The last total, tip and share stay on screen, frozen (no controls).
                 PartyClosedView(title: "This party has expired", message: "Nothing was charged.",
-                                systemImage: "clock.badge.xmark", onBackToHome: onBackToHome,
-                                frozenSplit: party.split, frozenTip: party.tip, userId: room.userId)
+                                systemImage: "clock.badge.xmark", onBackToHome: leaveScreen,
+                                frozenSplit: party.split, frozenTip: party.tip, userId: room.userId,
+                                showsDisabledPay: room.isHost)
+            } else if party.status == .paid && party.isMember(room.userId) {
+                PaidPartyContent(party: party, userId: room.userId, usersById: liveData.usersById,
+                                 merchantName: hub.merchantName, celebrations: hub.celebrations,
+                                 onBackToHome: leaveScreen)
             } else if party.status == .paid {
                 PartyClosedView(title: "This party is settled", message: "Everyone's share has been paid.",
-                                systemImage: "checkmark.circle", onBackToHome: onBackToHome)
+                                systemImage: "checkmark.circle", onBackToHome: leaveScreen)
             } else {
                 OpenPartyContent(party: party, room: room, now: hub.now, usersById: liveData.usersById,
                                  isReconnecting: room.isFromCache || !hub.connection.isNetworkAvailable,
@@ -180,10 +214,16 @@ struct PartyView: View {
             }
         } else if room.hasLoaded {
             PartyClosedView(title: "This party isn't available", message: "It may have been cleared.",
-                            systemImage: "questionmark.circle", onBackToHome: onBackToHome)
+                            systemImage: "questionmark.circle", onBackToHome: leaveScreen)
         } else {
             ProgressView()
         }
+    }
+
+    /// "Back to Home" from a finished party: also stops a relaunch reopening it.
+    private func leaveScreen() {
+        liveData.parties.forgetLastParty()
+        onBackToHome()
     }
 }
 
@@ -200,6 +240,7 @@ private struct OpenPartyContent: View {
     @State private var memberToRemove: String?
     @State private var isConfirmingLeave = false
     @State private var memberError: String?
+    @State private var payError: String?
 
     var body: some View {
         ScrollView {
@@ -221,7 +262,8 @@ private struct OpenPartyContent: View {
                 PartyCard {
                     VStack(alignment: .leading, spacing: 10) {
                         MemberRow(memberIds: party.memberIds, hostId: party.hostId, usersById: usersById,
-                                  onTapMember: room.isHost ? { memberToRemove = $0 } : nil)
+                                  onTapMember: room.isHost && !room.isPaying ? { memberToRemove = $0 } : nil,
+                                  payStates: room.isPaying ? pendingStates : [:])
                         if let memberError {
                             Label(memberError, systemImage: "exclamationmark.circle.fill")
                                 .font(.system(size: 15, weight: .medium))
@@ -232,6 +274,10 @@ private struct OpenPartyContent: View {
                 }
                 PartyCard {
                     PartyTotalSection(party: party, room: room, usersById: usersById)
+                }
+                if room.isHost {
+                    PayArea(party: party, now: now, usersById: usersById, isPaying: room.isPaying,
+                            error: payError, onPay: pay)
                 }
                 if !room.isHost {
                     Button("Leave party", role: .destructive) { isConfirmingLeave = true }
@@ -291,6 +337,16 @@ private extension OpenPartyContent {
         Task { memberError = await room.removeMember(memberId) }
     }
 
+    /// While Pay is in flight every friend's seat reads "pending".
+    var pendingStates: [String: SeatPayState] {
+        Dictionary(uniqueKeysWithValues: party.joineeIds.map { ($0, .pending) })
+    }
+
+    func pay() {
+        payError = nil
+        Task { payError = await room.pay() }
+    }
+
     func leave() {
         memberError = nil
         Task {
@@ -304,7 +360,7 @@ private extension OpenPartyContent {
 }
 
 /// White rounded section card, like the feed rows.
-private struct PartyCard<Content: View>: View {
+struct PartyCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -398,19 +454,22 @@ private struct CountdownLabel: View {
 
 /// Every member in join order (host first) with avatar, first name and a Host
 /// badge, then empty seats that pulse while waiting for friends.
-private struct MemberRow: View {
+struct MemberRow: View {
     let memberIds: [String]
     let hostId: String
     let usersById: [String: UserAccount]
     /// Host only: tapping a non-host seat offers to remove that member.
     let onTapMember: ((String) -> Void)?
+    /// Pay status badges (pending while Pay runs, paid once settled).
+    var payStates: [String: SeatPayState] = [:]
+    var title = "Who's in"
 
     /// The demo party is the host plus two friends; a bigger party just grows.
     private static let minimumSeats = 3
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Who's in")
+            Text(title)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -431,7 +490,8 @@ private struct MemberRow: View {
 
     @ViewBuilder
     private func seat(for memberId: String) -> some View {
-        let seat = MemberSeat(user: usersById[memberId], userId: memberId, isHost: memberId == hostId)
+        let seat = MemberSeat(user: usersById[memberId], userId: memberId, isHost: memberId == hostId,
+                              payState: payStates[memberId])
         if let onTapMember, memberId != hostId {
             Button { onTapMember(memberId) } label: { seat }
                 .buttonStyle(.plain)
@@ -442,10 +502,17 @@ private struct MemberRow: View {
     }
 }
 
+/// A seat's Pay status: "pending" while the host's Pay runs, then a tick.
+enum SeatPayState: Equatable {
+    case pending
+    case paid
+}
+
 private struct MemberSeat: View {
     let user: UserAccount?
     let userId: String
     let isHost: Bool
+    var payState: SeatPayState?
 
     var body: some View {
         VStack(spacing: 6) {
@@ -463,6 +530,13 @@ private struct MemberSeat: View {
                             .offset(y: 7)
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    if let payState {
+                        SeatPayBadge(state: payState)
+                            .offset(x: 4, y: -4)
+                            .transition(.scale(scale: 0.2).combined(with: .opacity))
+                    }
+                }
             Text(user?.firstName ?? userId)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Theme.primaryText)
@@ -473,8 +547,21 @@ private struct MemberSeat: View {
         }
         .frame(width: Theme.memberSeatWidth)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(isHost ? "\(user?.firstName ?? userId), host" : (user?.firstName ?? userId))
+        .accessibilityLabel(accessibilityText)
         .accessibilityIdentifier("memberSeat")
+    }
+}
+
+private extension MemberSeat {
+    /// "Annie, host", "Maxi, paid", "Christophe, pending".
+    var accessibilityText: String {
+        let name = user?.firstName ?? userId
+        if isHost { return "\(name), host" }
+        switch payState {
+        case .paid: return "\(name), paid"
+        case .pending: return "\(name), pending"
+        case nil: return name
+        }
     }
 }
 
@@ -539,6 +626,8 @@ struct PartyClosedView: View {
     var frozenSplit: PartySplit?
     var frozenTip: TipChoice?
     var userId = ""
+    /// The host of an expired party still sees Pay, disabled, saying why.
+    var showsDisabledPay = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -562,6 +651,10 @@ struct PartyClosedView: View {
                     .opacity(0.7)
                     .padding(.top, 12)
                     .accessibilityIdentifier("frozenShareSummary")
+            }
+            if showsDisabledPay {
+                PayButton(blocker: .expired, collectCents: nil, payerNames: [], isPaying: false, action: {})
+                    .padding(.top, 12)
             }
             Button("Back to Home", action: onBackToHome)
                 .buttonStyle(PillButtonStyle())

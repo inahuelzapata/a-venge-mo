@@ -24,3 +24,20 @@ struct DemoModeStore {
         defaults.removeObject(forKey: Self.isAtMerchantKey)
     }
 }
+
+/// The party screen the user last had open, so a relaunch right after Pay
+/// (or during it) can show the paid party instead of plain Home.
+struct LastPartyStore {
+    private static let partyIdKey = "lastPartyId"
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    var partyId: String? {
+        get { defaults.string(forKey: Self.partyIdKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.partyIdKey) }
+    }
+}

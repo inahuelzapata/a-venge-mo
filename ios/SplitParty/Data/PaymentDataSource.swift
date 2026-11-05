@@ -42,4 +42,9 @@ protocol PaymentDataSource: PartyDataSource {
 
     /// Reconnects immediately after the network comes back.
     func reconnectNow()
+
+    /// The Me tab's Demo reset: asks the backend's `resetDemo` function to put the
+    /// database back to its seeded state. Throws `DemoResetError`; the phone
+    /// changes nothing itself, the live listeners pick up the reset.
+    func resetDemo() async throws
 }

@@ -60,6 +60,12 @@ final class PartyHub {
     /// Party id → when this phone last asked to expire it.
     @ObservationIgnored private var expiryRequests: [String: Date] = [:]
     @ObservationIgnored private var isStopped = false
+    /// Which paid parties this phone already celebrated (ticks and confetti once).
+    @ObservationIgnored let celebrations = CelebrationLedger()
+    @ObservationIgnored private let lastPartyStore = LastPartyStore()
+    @ObservationIgnored private var launchPartyCheck: LiveSubscription?
+    /// A relaunch reopens a just-paid party only this soon after Pay.
+    private static let reopenPaidPartyWindow: TimeInterval = 15 * 60
 
     /// The geofence stand-in: how long after the parties have loaded the card
     /// slides in, and the longest Home waits for them first.
@@ -84,6 +90,7 @@ final class PartyHub {
 
     func stop() {
         isStopped = true
+        launchPartyCheck?.cancel()
         subscriptions.forEach { $0.cancel() }
         subscriptions = []
         clockTask?.cancel()
@@ -220,11 +227,40 @@ final class PartyHub {
         }
     }
 
-    /// Relaunch mid-party lands straight back on the party screen.
+    /// Relaunch mid-party lands straight back on the party screen. With no open
+    /// party, the party screen the user last had open is reopened if it was paid
+    /// in the last few minutes, so a phone killed during Pay shows the paid state.
     private func openLaunchPartyOnce() {
         guard !hasCheckedLaunchParty else { return }
         hasCheckedLaunchParty = true
-        partyToOpenOnLaunch = myParty?.id
+        if let myParty {
+            partyToOpenOnLaunch = myParty.id
+            return
+        }
+        guard let lastPartyId = lastPartyStore.partyId else { return }
+        launchPartyCheck = repository.listenToParty(id: lastPartyId) { [weak self] result in
+            guard let self, case let .success(document) = result, !document.isFromCache else { return }
+            self.launchPartyCheck?.cancel()
+            self.launchPartyCheck = nil
+            if let party = document.item, party.status == .paid, party.isMember(self.userId),
+               Date().timeIntervalSince(party.paidAt ?? Date()) < Self.reopenPaidPartyWindow {
+                self.partyToOpenOnLaunch = party.id
+            } else {
+                self.lastPartyStore.partyId = nil
+            }
+        }
+    }
+
+    // MARK: Last party screen
+
+    /// The party screen remembers itself so a relaunch can come back to it.
+    func rememberLastParty(_ partyId: String) {
+        lastPartyStore.partyId = partyId
+    }
+
+    /// The user left a finished party (Back to Home, removed, reset).
+    func forgetLastParty() {
+        lastPartyStore.partyId = nil
     }
 
     // MARK: Clock and expiry

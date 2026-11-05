@@ -225,6 +225,7 @@ extension PartyActionError {
         case .rejected: "The database refused the join. Try again."
         case .partyNoLongerOpen: "This party is no longer open."
         case .lockedOut: "Too many wrong codes for this party."
+        case .notReadyToPay: "This party is no longer open."
         }
     }
 }
