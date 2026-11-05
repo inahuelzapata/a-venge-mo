@@ -23,6 +23,8 @@ final class FixtureDataSource: PaymentDataSource {
     private var participantListeners: [UUID: (userId: String,
                                               onChange: (Result<LiveList<PaymentTransaction>, Error>) -> Void)] = [:]
 
+    private var userListeners: [UUID: (Result<[String: UserAccount], Error>) -> Void] = [:]
+
     private struct FixtureUnreachableError: Error {}
 
     // Split Party state (see the "Parties" extension below).
@@ -37,6 +39,10 @@ final class FixtureDataSource: PaymentDataSource {
     var friendsJoinInterval: Double?
     /// Runs once, after the next successful sign-in (UI tests' scripted changes).
     var afterSignIn: (() -> Void)?
+    /// How Demo reset answers (UI tests: `-UITestDemoReset fail`).
+    var demoResetFails = false
+    /// How long the fake Pay and Demo reset take, so the in-flight states show.
+    var writeDelay: Duration = .milliseconds(300)
 
     init(scenario: Scenario, now: Date = .now) {
         self.scenario = scenario
@@ -79,19 +85,75 @@ final class FixtureDataSource: PaymentDataSource {
 
     func listenToUsers(_ onChange: @escaping (Result<[String: UserAccount], Error>) -> Void)
         -> LiveSubscription {
-        onChange(scenario == .unreachable ? .failure(FixtureUnreachableError()) : .success(usersById))
-        return FixtureSubscription {}
+        let id = UUID()
+        userListeners[id] = onChange
+        onChange(usersResult())
+        return FixtureSubscription { [weak self] in self?.userListeners[id] = nil }
     }
 
     func reconnectNow() {}
+
+    /// Mirrors `resetDemo`: seeded users, seeded payments, no parties.
+    func resetDemo() async throws {
+        try? await Task.sleep(for: writeDelay)
+        guard !demoResetFails, scenario != .unreachable else { throw DemoResetError.failed(message: nil) }
+        usersById = Self.seededUsers
+        transactions = scenario == .seeded ? Self.seededTransactions(now: .now) : []
+        let removedPartyIds = Array(parties.keys)
+        parties = [:]
+        notifyUsers()
+        notifyTransactions()
+        openPartyListeners.values.forEach { $0.onChange(openPartiesResult(merchantId: $0.merchantId)) }
+        partyListeners.values.filter { removedPartyIds.contains($0.partyId) }
+            .forEach { $0.onChange(.success(LiveDocument(item: nil, isFromCache: false))) }
+    }
 
     // MARK: Test controls
 
     /// Adds a payment as if another phone had just written it; listeners fire.
     func insert(_ transaction: PaymentTransaction) {
         transactions.insert(transaction, at: 0)
+        notifyTransactions()
+    }
+
+    private func notifyTransactions() {
         feedListeners.values.forEach { $0(feedResult()) }
         participantListeners.values.forEach { $0.onChange(transactionsResult(involving: $0.userId)) }
+    }
+
+    private func notifyUsers() {
+        userListeners.values.forEach { $0(usersResult()) }
+    }
+
+    private func usersResult() -> Result<[String: UserAccount], Error> {
+        scenario == .unreachable ? .failure(FixtureUnreachableError()) : .success(usersById)
+    }
+
+    /// Applies a settlement the way the Firestore transaction does: payments,
+    /// balances and the paid party in one step (listeners fire after all of it).
+    fileprivate func apply(_ settlement: PartySettlement, to party: SplitParty) {
+        let now = Date()
+        for payment in settlement.payments where !transactions.contains(where: { $0.id == payment.transactionId }) {
+            transactions.insert(PaymentTransaction(id: payment.transactionId, payerId: payment.payerId,
+                                                   payeeId: settlement.hostId, amountCents: payment.amountCents,
+                                                   memo: settlement.memo, merchantName: settlement.merchantName,
+                                                   createdAt: now, likesCount: 0, commentsCount: 0), at: 0)
+            adjustBalance(of: payment.payerId, by: -payment.amountCents)
+        }
+        adjustBalance(of: settlement.hostId, by: settlement.collectedCents)
+        notifyUsers()
+        notifyTransactions()
+        store(SplitParty(id: party.id, hostId: party.hostId, merchantId: party.merchantId, joinCode: party.joinCode,
+                         status: .paid, createdAt: party.createdAt, expiresAt: party.expiresAt,
+                         memberIds: party.memberIds, wrongCodeAttempts: party.wrongCodeAttempts,
+                         billCents: party.billCents, tip: settlement.tip, paidAt: now,
+                         paidMemberIds: Set(party.memberIds)))
+    }
+
+    private func adjustBalance(of userId: String, by cents: Int) {
+        guard let user = usersById[userId] else { return }
+        usersById[userId] = UserAccount(id: user.id, displayName: user.displayName, avatarKey: user.avatarKey,
+                                        balanceCents: user.balanceCents + cents, friendIds: user.friendIds)
     }
 
     /// The payment UI tests insert while Home is open.
@@ -218,6 +280,23 @@ extension FixtureDataSource {
         let party = try openFixtureParty(partyId)
         guard memberId != party.hostId, party.isMember(memberId) else { return }
         replace(party, memberIds: party.memberIds.filter { $0 != memberId })
+    }
+
+    func settleParty(id: String) async throws {
+        guard scenario != .unreachable else { throw PartyActionError.unreachable }
+        try? await Task.sleep(for: writeDelay)
+        // Read after the delay, like the transaction: a second tap finds it paid.
+        guard let party = parties[id] else { throw PartyActionError.partyNoLongerOpen }
+        switch party.payBlocker(at: Date()) {
+        case .alreadyPaid: return
+        case .expired: throw PartyActionError.partyNoLongerOpen
+        case .needsTotal, .needsFriends: throw PartyActionError.notReadyToPay
+        case nil: break
+        }
+        guard let settlement = PartySettlement(party: party, merchantName: DemoMerchant.fallbackName) else {
+            throw PartyActionError.notReadyToPay
+        }
+        apply(settlement, to: party)
     }
 
     private func openFixtureParty(_ partyId: String) throws -> SplitParty {

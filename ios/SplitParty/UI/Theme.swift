@@ -112,6 +112,12 @@ enum Theme {
     static let laserLineHeight: CGFloat = 3
     static let laserGlowHeight: CGFloat = 36
     static let laserSweepDuration: Double = 1.1
+
+    // Pay and settlement (docs/design/visual-conventions.md "Pay and settlement").
+    static let payActionHeight: CGFloat = 56
+    static let seatBadgeSize: CGFloat = 22
+    static let successCheckSize: CGFloat = 72
+    static let successAmountFontSize: CGFloat = 40
 }
 
 extension Color {

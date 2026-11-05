@@ -173,6 +173,7 @@ extension Money {
     /// "39 dollars and 34 cents" for VoiceOver, so amounts are read as money
     /// rather than as "39 point 34".
     static func spoken(cents: Int) -> String {
+        if cents < 0 { return "minus " + spoken(cents: -cents) }
         let dollars = cents / 100
         let remainder = cents % 100
         let dollarPart = dollars == 1 ? "1 dollar" : "\(dollars) dollars"

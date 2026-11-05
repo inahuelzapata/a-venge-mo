@@ -8,6 +8,7 @@ struct TransactionList: View {
     let emptyMessage: String
 
     @Environment(LiveDataStore.self) private var liveData
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Relative times ("5 minutes ago") are refreshed this often.
     private static let relativeTimeRefreshInterval: TimeInterval = 30
@@ -36,7 +37,7 @@ struct TransactionList: View {
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
-                .animation(.spring(duration: 0.35), value: transactions.map(\.id))
+                .animation(reduceMotion ? nil : .spring(duration: 0.35), value: transactions.map(\.id))
             }
         }
     }

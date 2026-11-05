@@ -8,9 +8,9 @@ struct LiveDocument<Item> {
     let isFromCache: Bool
 }
 
-/// Split Party reads and writes (PoC-7 to PoC-10, FR-2.5, FR-3, FR-4). Only the
-/// `parties` and `joinCodes` documents of docs/firestore-schema.md; nothing here
-/// touches balances or transactions (the settle slice owns those).
+/// Split Party reads and writes (PoC-7 to PoC-11, FR-2.5, FR-3 to FR-5): the
+/// `parties` and `joinCodes` documents of docs/firestore-schema.md, plus the
+/// payments and balances Pay writes.
 @MainActor
 protocol PartyDataSource: AnyObject {
     /// `parties where merchantId == m && status == "open"`. Some of these may be
@@ -56,4 +56,12 @@ protocol PartyDataSource: AnyObject {
     /// so a join landing at the same moment is kept. Used both for the host
     /// removing someone and for a member leaving. Throws `PartyActionError`.
     func removeMember(partyId: String, memberId: String) async throws
+
+    /// Host only, Pay (FR-5.1–5.3): in ONE transaction, a payment from every
+    /// joinee to the host for their share (`PartySettlement`), the balances moved,
+    /// every member marked paid and the party set to `paid`. All or nothing.
+    /// Succeeds without writing when the party is already paid, so a double tap
+    /// or a retry after a dropped connection never charges twice. Throws
+    /// `PartyActionError` (expired, no bill or no friend, rules, network).
+    func settleParty(id: String) async throws
 }

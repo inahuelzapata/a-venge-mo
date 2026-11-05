@@ -273,6 +273,59 @@ final class ReferenceCaptureUITests: XCTestCase {
         try capture("leave-confirm")
     }
 
+    // MARK: Pay and settlement
+
+    private static let paidPartyArguments = ["-UITestFriendParty", "annie", "-UITestFriendPartyMembers",
+                                             "maxi,christophe", "-UITestFriendPartyBill", "10000",
+                                             "-UITestFriendPartyTip", "18"]
+
+    func test14Pay() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "annie", "-UITestFriendPartyMembers",
+                                               "maxi,christophe"])
+        signIn(as: "annie")
+        XCTAssertTrue(app.buttons["payButton"].waitForExistence(timeout: Self.timeout))
+        scrollToBottom()
+        try capture("pay-add-total")
+
+        app.terminate()
+        launch(resettingSession: true, extra: Self.paidPartyArguments + ["-UITestWriteDelay", "6"])
+        signIn(as: "annie")
+        let pay = app.buttons["payButton"]
+        XCTAssertTrue(pay.waitForExistence(timeout: Self.timeout))
+        scrollToBottom()
+        measure("pay button", pay)
+        try capture("pay-ready")
+        pay.tap()
+        Thread.sleep(forTimeInterval: 0.6)
+        try capture("pay-pending", settling: false)
+        XCTAssertTrue(element("settlementSuccess").waitForExistence(timeout: 10))
+        // Mid-burst: the confetti lasts about 2.6 s.
+        Thread.sleep(forTimeInterval: 0.5)
+        try capture("pay-confetti", settling: false)
+        Thread.sleep(forTimeInterval: 3)
+        measure("success card", element("settlementSuccess"))
+        try capture("pay-success-host")
+
+        app.terminate()
+        launch(resettingSession: true, extra: Self.paidPartyArguments + ["-UITestPartyScript", "3:pay=host"])
+        signIn(as: "christophe")
+        XCTAssertTrue(element("settlementSuccess").waitForExistence(timeout: 8))
+        Thread.sleep(forTimeInterval: 3)
+        try capture("pay-success-member")
+
+        // Maxi on Home while Annie settles with Christophe: the payment drops in, highlighted.
+        app.terminate()
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "annie", "-UITestFriendPartyMembers",
+                                               "christophe", "-UITestFriendPartyBill", "10000",
+                                               "-UITestFriendPartyTip", "18", "-UITestPartyScript", "4:pay=host"])
+        signIn(as: "maxi")
+        let newRow = app.descendants(matching: .any).matching(identifier: "transactionRow").firstMatch
+        let arrived = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS 'Christophe paid'"),
+                                                object: newRow)
+        XCTAssertEqual(XCTWaiter().wait(for: [arrived], timeout: 10), .completed)
+        try capture("home-paid-highlight", settling: false)
+    }
+
     // MARK: Helpers
 
     private func scrollToBottom() {

@@ -22,11 +22,13 @@ enum Schema {
         static let participantIds = "participantIds"
         static let amountCents = "amountCents"
         static let memo = "memo"
+        static let merchantId = "merchantId"
         static let merchantName = "merchantName"
         static let partyId = "partyId"
         static let createdAt = "createdAt"
         static let likesCount = "likesCount"
         static let commentsCount = "commentsCount"
+        static let source = "source"
     }
 
     /// The documented queries cap both lists at 50 rows.

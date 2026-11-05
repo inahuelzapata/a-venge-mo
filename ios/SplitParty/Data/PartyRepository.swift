@@ -69,6 +69,10 @@ extension PaymentRepository {
     func removeMember(partyId: String, memberId: String) async throws {
         try await PartyWriter(firestore: firestore).removeMember(partyId: partyId, memberId: memberId)
     }
+
+    func settleParty(id: String) async throws {
+        try await PartyWriter(firestore: firestore).settleParty(id: id)
+    }
 }
 
 /// The party transactions. Deliberately not main-actor isolated: Firestore runs
@@ -317,6 +321,118 @@ private struct PartyWriter: @unchecked Sendable {
             }
             if let refusal = outcome as? PartyActionError { throw refusal }
         }
+    }
+
+    // MARK: Pay
+
+    /// docs/firestore-schema.md "Paying a party", as one transaction: either every
+    /// payment, balance move and the paid party land together, or nothing does.
+    /// The party is read inside the transaction, so a second Pay (double tap,
+    /// retry after a dropped connection whose first commit did land) sees `paid`
+    /// and writes nothing; the deterministic payment ids are a second guard.
+    func settleParty(id: String) async throws {
+        do {
+            try await runSettlement(id: id)
+        } catch {
+            // Two racing Pays: the loser's commit is refused by the rules
+            // (PERMISSION_DENIED, not retried by the SDK), and a commit whose
+            // acknowledgement was lost times out. Either way, if the server says
+            // the party is paid, Pay succeeded exactly once.
+            if await isPaidOnServer(id: id) { return }
+            throw error
+        }
+    }
+
+    private func isPaidOnServer(id: String) async -> Bool {
+        guard let snapshot = try? await parties.document(id).getDocument(source: .server) else { return false }
+        return Self.party(from: snapshot)?.status == .paid
+    }
+
+    private func runSettlement(id: String) async throws {
+        let partyReference = parties.document(id)
+        let joinCodes = self.joinCodes
+        let merchants = firestore.collection(PartySchema.Collection.merchants)
+        let transactions = firestore.collection(Schema.Collection.transactions)
+        let users = firestore.collection(Schema.Collection.users)
+        try await withPartyTimeout {
+            let outcome = try await firestore.runTransaction { transaction, errorPointer -> Any? in
+                do {
+                    let snapshot = try transaction.getDocument(partyReference)
+                    guard let party = Self.party(from: snapshot) else { return PartyActionError.partyNoLongerOpen }
+                    switch party.payBlocker(at: Date()) {
+                    case .alreadyPaid: return nil
+                    case .expired: return PartyActionError.partyNoLongerOpen
+                    case .needsTotal, .needsFriends: return PartyActionError.notReadyToPay
+                    case nil: break
+                    }
+                    // Every read before the first write (a Firestore transaction rule).
+                    let merchant = try transaction.getDocument(merchants.document(party.merchantId))
+                    let lockReference = joinCodes.document(
+                        PartySchema.joinCodeLockId(merchantId: party.merchantId, code: party.joinCode))
+                    let lock = try transaction.getDocument(lockReference)
+                    let merchantName = merchant.get(PartySchema.MerchantField.name) as? String
+                        ?? DemoMerchant.fallbackName
+                    guard let settlement = PartySettlement(party: party, merchantName: merchantName) else {
+                        return PartyActionError.notReadyToPay
+                    }
+                    for payment in settlement.payments {
+                        transaction.setData(Self.transactionData(payment, of: settlement),
+                                            forDocument: transactions.document(payment.transactionId))
+                        transaction.updateData(
+                            [Schema.UserField.balanceCents: FieldValue.increment(Int64(-payment.amountCents))],
+                            forDocument: users.document(payment.payerId))
+                    }
+                    if settlement.collectedCents > 0 {
+                        transaction.updateData(
+                            [Schema.UserField.balanceCents: FieldValue.increment(Int64(settlement.collectedCents))],
+                            forDocument: users.document(settlement.hostId))
+                    }
+                    transaction.updateData(Self.paidPartyUpdate(party, tip: settlement.tip), forDocument: partyReference)
+                    // A paid party no longer holds its code (never release a newer party's lock).
+                    if lock.get(PartySchema.LockField.partyId) as? String == party.id {
+                        transaction.deleteDocument(lockReference)
+                    }
+                    return nil
+                } catch {
+                    errorPointer?.pointee = error as NSError
+                    return nil
+                }
+            }
+            if let refusal = outcome as? PartyActionError { throw refusal }
+        }
+    }
+
+    /// Exactly the fields the rules accept for a new transaction.
+    private static func transactionData(_ payment: PartySettlement.Payment,
+                                        of settlement: PartySettlement) -> [String: Any] {
+        [
+            Schema.TransactionField.payerId: payment.payerId,
+            Schema.TransactionField.payeeId: settlement.hostId,
+            Schema.TransactionField.participantIds: [payment.payerId, settlement.hostId],
+            Schema.TransactionField.amountCents: payment.amountCents,
+            Schema.TransactionField.memo: settlement.memo,
+            Schema.TransactionField.merchantId: settlement.merchantId,
+            Schema.TransactionField.merchantName: settlement.merchantName,
+            Schema.TransactionField.partyId: settlement.partyId,
+            Schema.TransactionField.createdAt: FieldValue.serverTimestamp(),
+            Schema.TransactionField.likesCount: 0,
+            Schema.TransactionField.commentsCount: 0,
+            Schema.TransactionField.source: PartySettlement.transactionSource,
+        ]
+    }
+
+    /// `status: paid`, `paidAt`, every member's `paid`, and the tip (0% custom
+    /// when none was chosen: the rules demand a non-null tip on a paid party).
+    private static func paidPartyUpdate(_ party: SplitParty, tip: TipChoice) -> [AnyHashable: Any] {
+        var update: [AnyHashable: Any] = [
+            PartySchema.PartyField.status: PartyStatus.paid.rawValue,
+            PartySchema.PartyField.paidAt: FieldValue.serverTimestamp(),
+            PartySchema.PartyField.tip: tip.firestoreValue,
+        ]
+        for memberId in party.memberIds {
+            update[FieldPath([PartySchema.PartyField.members, memberId, PartySchema.MemberField.paid])] = true
+        }
+        return update
     }
 
     // MARK: Errors

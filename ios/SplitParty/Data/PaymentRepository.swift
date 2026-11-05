@@ -10,9 +10,12 @@ final class PaymentRepository: PaymentDataSource {
     private static let loginTimeout: Duration = .seconds(5)
 
     let firestore: Firestore
+    /// Nil when the target has no project yet; Demo reset then reports unreachable.
+    private let demoReset: DemoResetClient?
 
-    init(firestore: Firestore) {
+    init(firestore: Firestore, demoReset: DemoResetClient? = nil) {
         self.firestore = firestore
+        self.demoReset = demoReset
     }
 
     // MARK: Login
@@ -84,6 +87,13 @@ final class PaymentRepository: PaymentDataSource {
         firestore.disableNetwork { [firestore] _ in
             firestore.enableNetwork { _ in }
         }
+    }
+
+    // MARK: Demo reset
+
+    func resetDemo() async throws {
+        guard let demoReset else { throw DemoResetError.unreachable }
+        try await demoReset.call()
     }
 
     // MARK: Helpers
