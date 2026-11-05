@@ -8,6 +8,7 @@ import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.Username
+import com.splitparty.android.domain.split.Tip
 
 /** Collection and field names from docs/firestore-schema.md. */
 internal object FirestoreSchema {
@@ -66,6 +67,21 @@ internal fun DocumentSnapshot.toParty(): Party? {
         createdAtMillis = createdAt,
         expiresAtMillis = expiresAt,
         members = members,
-        wrongCodeAttempts = attempts
+        wrongCodeAttempts = attempts,
+        billCents = (get("billCents") as? Number)?.toLong()?.takeIf { it >= 0 },
+        tip = (get("tip") as? Map<*, *>)?.toTip()
     )
+}
+
+/** Unknown or malformed shapes read as no tip (0%). */
+private fun Map<*, *>.toTip(): Tip? = when (get("type")) {
+    "percent" -> (get("percent") as? Number)?.toInt()?.takeIf { it >= 0 }?.let { Tip.Percent(it) }
+    "custom" -> (get("amountCents") as? Number)?.toLong()?.takeIf { it >= 0 }?.let { Tip.Custom(it) }
+    else -> null
+}
+
+/** `parties.tip` as written: exactly the schema's two shapes. */
+internal fun Tip.toFirestore(): Map<String, Any> = when (this) {
+    is Tip.Percent -> mapOf("type" to "percent", "percent" to percent.toLong())
+    is Tip.Custom -> mapOf("type" to "custom", "amountCents" to amountCents)
 }

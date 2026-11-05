@@ -162,7 +162,10 @@ class ParityScreenshotTest {
     )
 
     @Test
-    fun partyOneMember() = shell("party-one-member", Tab.Home) { PartyScreen(partyOpen, it, onBack = {}) }
+    fun partyOneMember() = shell("party-one-member", Tab.Home) {
+        // Alone in the party means this phone is the host's: "Add the total" since the total slice.
+        PartyScreen(partyOpen.copy(isHost = true), it, onBack = {})
+    }
 
     @Test
     fun partyThreeMembers() = shell("party-three-members", Tab.Home) {

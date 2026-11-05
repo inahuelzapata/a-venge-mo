@@ -5,6 +5,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +30,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +42,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -52,7 +58,9 @@ import com.splitparty.android.ui.components.ActivitySpinner
 import com.splitparty.android.ui.components.Avatar
 import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.components.PulsingDot
+import com.splitparty.android.ui.components.SoftPillButton
 import com.splitparty.android.ui.components.rememberBreathingAlpha
+import com.splitparty.android.ui.scan.ReceiptScanRoute
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.LocalReduceMotion
@@ -73,18 +81,71 @@ fun PartyRoute(
     contentPadding: PaddingValues,
     onHome: () -> Unit,
     modifier: Modifier = Modifier,
+    onRemoval: (hostName: String) -> Unit = { onHome() },
     viewModel: PartyViewModel = koinViewModel(key = "party_$partyId") { parametersOf(partyId, userId) }
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val view = LocalView.current
+    var step by rememberTotalStep()
+    val currentOnHome by rememberUpdatedState(onHome)
+    val currentOnRemoval by rememberUpdatedState(onRemoval)
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 PartyEvent.MemberJoined -> view.partyHaptic(success = true)
+
+                PartyEvent.ShareChanged -> view.shareTick()
+
+                PartyEvent.Saved -> {
+                    view.partyHaptic(success = true)
+                    step = null
+                }
+
+                is PartyEvent.Removed -> currentOnRemoval(event.hostName)
+
+                PartyEvent.Left -> currentOnHome()
             }
         }
     }
-    PartyScreen(state, contentPadding, onBack = onHome, modifier = modifier)
+    // Entry screens exist only while the party is open and this phone hosts it.
+    val current = step?.takeIf { state.phase == PartyPhase.Open && state.isHost }
+    val actions = remember(viewModel) {
+        object : TotalActions {
+            override fun scan() = open(TotalStep.Scan)
+
+            override fun enterTotal() = open(TotalStep.EnterBill(prefillCents = viewModel.state.value.total?.billCents))
+
+            override fun selectTip(choice: TipChoice) = viewModel.selectTip(choice)
+
+            override fun customTip() = open(TotalStep.EnterTip((viewModel.state.value.total?.tip as? TipChoice.Custom)?.amountCents))
+
+            override fun removeMember(userId: String) = viewModel.removeMember(userId)
+
+            override fun leave() = viewModel.leave()
+
+            private fun open(next: TotalStep) {
+                viewModel.clearWriteError()
+                step = next
+            }
+        }
+    }
+    Box(modifier.fillMaxSize()) {
+        PartyScreen(state, contentPadding, onBack = onHome, actions = actions)
+        if (current != null) {
+            TotalEntryOverlay(
+                step = current,
+                state = state,
+                contentPadding = contentPadding,
+                onStep = {
+                    viewModel.clearWriteError()
+                    step = it
+                },
+                onConfirmBill = viewModel::confirmBill,
+                onConfirmTip = { viewModel.selectTip(TipChoice.Custom(it)) },
+                scanScreen = { close -> ReceiptScanRoute(onBack = close, onResult = { step = it }) }
+            )
+        }
+    }
 }
 
 /**
@@ -93,7 +154,13 @@ fun PartyRoute(
  * Provisional layout (docs/design/visual-conventions.md, "Party screen").
  */
 @Composable
-fun PartyScreen(state: PartyUiState, contentPadding: PaddingValues, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun PartyScreen(
+    state: PartyUiState,
+    contentPadding: PaddingValues,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    actions: TotalActions = TotalActions.None
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -103,12 +170,14 @@ fun PartyScreen(state: PartyUiState, contentPadding: PaddingValues, onBack: () -
         when (state.phase) {
             PartyPhase.Loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { ActivitySpinner() }
 
-            PartyPhase.Open -> OpenParty(state, Modifier.weight(1f))
+            PartyPhase.Open -> OpenParty(state, actions, Modifier.weight(1f))
 
             PartyPhase.Expired -> PartyOver(
                 stringResource(R.string.party_expired_title),
                 stringResource(R.string.party_expired_body),
-                onBack
+                onBack,
+                // A total set before expiry stays visible, frozen, with no controls.
+                frozen = state.total?.let { { TotalArea(state, TotalActions.None, frozen = true) } }
             )
 
             PartyPhase.Settled -> PartyOver(stringResource(R.string.party_settled_title), "", onBack)
@@ -119,7 +188,7 @@ fun PartyScreen(state: PartyUiState, contentPadding: PaddingValues, onBack: () -
 }
 
 @Composable
-private fun OpenParty(state: PartyUiState, modifier: Modifier = Modifier) {
+private fun OpenParty(state: PartyUiState, actions: TotalActions, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -129,8 +198,43 @@ private fun OpenParty(state: PartyUiState, modifier: Modifier = Modifier) {
     ) {
         if (state.reconnecting) ReconnectingPill(Modifier.align(Alignment.CenterHorizontally))
         CodeCard(state.joinCode, state.millisLeft)
-        MembersCard(state.members)
-        TotalPlaceholder()
+        var removing by remember { mutableStateOf<MemberUi?>(null) }
+        var leaving by remember { mutableStateOf(false) }
+        MembersCard(state.members, onRemove = if (state.isHost) ({ removing = it }) else null)
+        TotalArea(state, actions)
+        if (!state.isHost) {
+            SoftPillButton(
+                stringResource(R.string.leave_action),
+                onClick = { leaving = true },
+                enabled = !state.saving,
+                modifier = Modifier.align(Alignment.CenterHorizontally).testTag(PartyTestTags.LEAVE)
+            )
+        }
+        removing?.let { member ->
+            ConfirmDialog(
+                title = stringResource(R.string.remove_title, member.firstName),
+                body = stringResource(R.string.remove_body, member.firstName),
+                confirmLabel = stringResource(R.string.remove_confirm),
+                cancelLabel = stringResource(R.string.dialog_cancel),
+                onConfirm = {
+                    actions.removeMember(member.userId)
+                    removing = null
+                },
+                onDismiss = { removing = null }
+            )
+        }
+        if (leaving) {
+            ConfirmDialog(
+                title = stringResource(R.string.leave_title, state.hostName),
+                body = stringResource(R.string.leave_body),
+                confirmLabel = stringResource(R.string.leave_confirm),
+                cancelLabel = stringResource(R.string.leave_cancel),
+                onConfirm = actions::leave,
+                onDismiss = { leaving = false },
+                busy = state.saving,
+                error = state.writeError
+            )
+        }
     }
 }
 
@@ -168,7 +272,7 @@ private fun CodeCard(code: List<String>, millisLeft: Long, modifier: Modifier = 
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MembersCard(members: List<MemberUi>, modifier: Modifier = Modifier) {
+private fun MembersCard(members: List<MemberUi>, modifier: Modifier = Modifier, onRemove: ((MemberUi) -> Unit)? = null) {
     // Members present when the screen opened are simply there; later ones spring in.
     val initial = remember { members.map { it.userId }.toSet() }
     PartyCard(modifier) {
@@ -184,7 +288,10 @@ private fun MembersCard(members: List<MemberUi>, modifier: Modifier = Modifier) 
             verticalArrangement = Arrangement.spacedBy(16.dp),
             maxItemsInEachRow = 4
         ) {
-            members.forEach { member -> MemberSeat(member, springIn = member.userId !in initial) }
+            members.forEach { member ->
+                val remove = onRemove?.takeIf { !member.isHost }?.let { { it(member) } }
+                MemberSeat(member, springIn = member.userId !in initial, onRemove = remove)
+            }
             repeat((MIN_SEATS - members.size).coerceAtLeast(0)) { EmptySeat() }
         }
     }
@@ -194,14 +301,30 @@ private val SeatWidth = 84.dp
 private val SeatAvatar = 60.dp
 
 @Composable
-private fun MemberSeat(member: MemberUi, springIn: Boolean, modifier: Modifier = Modifier) {
+private fun MemberSeat(member: MemberUi, springIn: Boolean, modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null) {
     val description = if (member.isHost) stringResource(R.string.party_member_host_description, member.firstName) else member.firstName
+    val removeLabel = stringResource(R.string.remove_title, member.firstName)
     val reduce = LocalReduceMotion.current
     val scale = remember { Animatable(if (springIn && !reduce) 0f else 1f) }
     LaunchedEffect(Unit) { scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)) }
     Column(
         modifier = modifier
             .width(SeatWidth)
+            .testTag(PartyTestTags.seat(member.userId))
+            // Host only, never on the host's own seat: tap to remove (after a confirmation).
+            .then(
+                if (onRemove == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(
+                        remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = removeLabel,
+                        onClick = onRemove
+                    )
+                }
+            )
             .clearAndSetSemantics { contentDescription = description },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -251,20 +374,6 @@ private fun EmptySeat(modifier: Modifier = Modifier) {
     }
 }
 
-/** Reserved for PoC-10/11 (bill, tip, share, Pay). Nothing here reads or writes money. */
-@Composable
-private fun TotalPlaceholder(modifier: Modifier = Modifier) {
-    PartyCard(modifier.testTag(PartyTestTags.TOTAL)) {
-        Text(stringResource(R.string.party_waiting_for_total), style = Type.SectionTitle, color = Brand.Ink)
-        Text(
-            stringResource(R.string.party_waiting_for_total_hint),
-            style = Type.Body,
-            color = Brand.InkSecondary,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
 @Composable
 private fun ReconnectingPill(modifier: Modifier = Modifier) {
     Row(
@@ -282,16 +391,32 @@ private fun ReconnectingPill(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PartyOver(title: String, body: String, onHome: () -> Unit, modifier: Modifier = Modifier) {
+private fun PartyOver(
+    title: String,
+    body: String,
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier,
+    frozen: (@Composable () -> Unit)? = null
+) {
     Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = 32.dp).testTag(PartyTestTags.EXPIRED),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag(PartyTestTags.EXPIRED),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(title, style = Type.PlaceholderTitle, color = Brand.Ink, textAlign = TextAlign.Center)
-        if (body.isNotEmpty()) Text(body, style = Type.Subtitle, color = Brand.InkSecondary, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(8.dp))
-        PillButton(stringResource(R.string.party_back_home), onClick = onHome)
+        Column(
+            Modifier.padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(title, style = Type.PlaceholderTitle, color = Brand.Ink, textAlign = TextAlign.Center)
+            if (body.isNotEmpty()) Text(body, style = Type.Subtitle, color = Brand.InkSecondary, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            PillButton(stringResource(R.string.party_back_home), onClick = onHome)
+        }
+        if (frozen != null) {
+            Spacer(Modifier.height(8.dp))
+            frozen()
+        }
     }
 }
 

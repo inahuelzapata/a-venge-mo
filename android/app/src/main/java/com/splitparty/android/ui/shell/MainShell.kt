@@ -22,8 +22,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.dropShadow
@@ -31,8 +36,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -58,6 +66,8 @@ import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.Type
 import com.splitparty.android.ui.theme.bottomInset
+import com.splitparty.android.ui.theme.topInset
+import kotlinx.coroutines.delay
 
 /**
  * Signed-in shell: Home, Pay/Request and Me behind the floating tab bar of
@@ -74,6 +84,8 @@ fun MainShell(userId: String, modifier: Modifier = Modifier) {
         onSelect = navController::switchTab,
         modifier = modifier
     ) { contentPadding ->
+        // "You were removed from Annie's party": shown over Home after the party screen pops.
+        var notice by rememberSaveable { mutableStateOf<String?>(null) }
         NavHost(
             navController = navController,
             startDestination = HomeDestination,
@@ -95,7 +107,16 @@ fun MainShell(userId: String, modifier: Modifier = Modifier) {
             // Forward from Home, so system back pops to Home with its scroll intact.
             composable<PartyDestination> { entry ->
                 val partyId = entry.toRoute<PartyDestination>().partyId
-                PartyRoute(partyId, userId, contentPadding, onHome = navController::backToHome)
+                PartyRoute(
+                    partyId,
+                    userId,
+                    contentPadding,
+                    onHome = navController::backToHome,
+                    onRemoval = { hostName ->
+                        navController.backToHome()
+                        notice = hostName
+                    }
+                )
             }
             composable<JoinDestination> { entry ->
                 val partyId = entry.toRoute<JoinDestination>().partyId
@@ -103,6 +124,11 @@ fun MainShell(userId: String, modifier: Modifier = Modifier) {
             }
             composable<PayDestination> { PayRequestScreen(contentPadding) }
             composable<MeDestination> { MeRoute(userId, contentPadding) }
+        }
+        notice?.let { hostName ->
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                ShellNotice(stringResource(R.string.removed_message, hostName), onDone = { notice = null })
+            }
         }
     }
 }
@@ -170,7 +196,36 @@ private fun NavHostController.switchTab(tab: Tab) {
 }
 
 object ShellTestTags {
+    const val NOTICE = "shell_notice"
+
     fun tab(tab: Tab) = "tab_${tab.name.lowercase()}"
+}
+
+private const val NOTICE_MS = 4_000L
+
+/**
+ * A short message at the top of the screen (white capsule, as the
+ * "Reconnecting…" pill), read out by TalkBack and gone after 4 s.
+ */
+@Composable
+internal fun ShellNotice(text: String, onDone: () -> Unit, modifier: Modifier = Modifier) {
+    val currentOnDone by rememberUpdatedState(onDone)
+    LaunchedEffect(text) {
+        delay(NOTICE_MS)
+        currentOnDone()
+    }
+    Text(
+        text,
+        style = Type.Amount,
+        color = Brand.Ink,
+        modifier = modifier
+            .padding(top = topInset() + Dimens.HeaderTop + Dimens.HeaderHeight + 8.dp, start = 24.dp, end = 24.dp)
+            .dropShadow(CircleShape, Shadow(radius = 16.dp, offset = DpOffset(0.dp, 4.dp), color = Brand.Shadow.copy(alpha = 0.12f)))
+            .background(Brand.Card, CircleShape)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag(ShellTestTags.NOTICE)
+    )
 }
 
 /**

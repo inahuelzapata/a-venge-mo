@@ -21,3 +21,7 @@ What: each ViewModel exposes one immutable StateFlow<XUiState> and an onAction(X
 ## Reduced motion through LocalReduceMotion
 
 What: Every Split Party animation (entrances, pop-in, bob, spring, pulse, sheen, shake) checks LocalReduceMotion, which defaults to !ValueAnimator.areAnimatorsEnabled() (animator scale 0 / Remove animations); haptics never depend on it. Paparazzi's screen() helper provides it as true so goldens show settled states · Where: android ui/theme/Motion.kt, ui/components/PartyMotion.kt, app/src/test/.../screenshots/Snapshots.kt
+
+## Android on-device tests host MainShell over the shared fakes
+
+What: Espresso/Compose tests in app/src/androidTest/.../e2e use PartyHarness. It restarts Koin (stopping the app's real modules first) with the fakes from app/src/sharedTest (FakePartyRepository and others, shared with the JVM tests via `kotlin.srcDir`) plus the real domain and ViewModel modules, then `setContent { MainShell(userId) }` in a ComponentActivity. They don't launch MainActivity, because FirebaseConnection.Ready needs a real FirebaseFirestore. Run with `./gradlew connectedDebugAndroidTest` (Orchestrator, clearPackageData, animations off) · Why: hermetic and deterministic, yet real CameraX, runtime permissions, system back and the bundled ML Kit model · Where: android app/src/androidTest, app/src/sharedTest, app/build.gradle.kts · Learned: with AGP 9's built-in Kotlin, `java.srcDir` isn't compiled as Kotlin; use `kotlin.srcDir`

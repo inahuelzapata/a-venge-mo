@@ -116,13 +116,37 @@ are already in `ParityScreenshotTest`).
 | Party header | As Home's (44 tall, 8 below the safe area): round 44 white back button with 8% hairline on the left, "Split Party at Tony's" centred (screen title). Tab bar stays, Home selected |
 | Code card | White card, 20 padding, 14 apart: "Party code" (body, secondary), three 76 tiles (chip grey, radius 20, emoji at 40), 12 apart, then the live dot and "Expires in 4:59" (amount role). Tiles pop in 120 ms apart (spring), then bob ±3 on a 1.8 s cycle, each a third out of phase. TalkBack: "Party code: pizza, beer, party popper" |
 | Members card | "Members" (section heading), then the seats spread evenly, up to 4 a row: 60 avatar, first name below (body). Host: black "Host" capsule (tab label semibold, white, 2 white ring) over the avatar's bottom edge. Empty seats until there are 3: 60 circle outlined 2 in placeholder grey, opacity breathing 1 → 0.45 (0.9 s). A member who joins while the screen is open springs in from 0 |
-| Total area | White card: "Waiting for the total" (section heading) over "The host enters the bill and tip here." (body, secondary). No Pay action in this slice |
+| Total area | Members before a bill: white card, "Waiting for the total" (section heading) over "The host enters the bill and tip here." (body, secondary). Filled in by the total slice below. No Pay action yet |
 | Reconnecting | White capsule centred above the code card: 14 spinner, 8 gap, "Reconnecting…" (body, secondary). Shown while offline or while the last snapshot came from the cache |
 | Expired / settled | Body replaced by a centred title ("This party has expired", placeholder title), "Nothing was charged. Start a new party from Home." (subtitle, secondary) and a pill button "Back to Home" |
 | Confirmation screen | Same header, title "Join Annie's party". "Pick the code shown on Annie's phone." (subtitle, secondary, centred), a 24-tall line for the error ("That's not the code. Try again.", body, error red), then four white option cards (radius 28, 16 vertical padding, three 60 tiles each). A wrong pick shakes the chosen card sideways (360 ms, ±14 decaying) with a red 2 outline, then the order is reshuffled. Each option is a TalkBack button read by emoji names |
 | Locked | "Too many wrong codes" (placeholder title), "You can't join Annie's party after three wrong picks. Ask them to start a new one." and "Back to Home" |
 | Demo switch row (Me) | White card under the profile card, 20 × 16 padding: "Demo mode: at Tony's" (amount role) over a one-line hint (body, secondary); iOS-style switch 51 × 31 (on #34C759, off #E9E9EA, 27 white knob) |
 | Motion off | With the animator scale at 0 ("Remove animations"), every entrance, pop-in, bob, spring, pulse, sheen and shake is skipped and the end state shows at once. Haptics (join: confirm, wrong code: reject) still fire |
+
+## Total, tip and share (PoC-10)
+
+**Android values, provisional.** No iOS captures of these screens existed when
+they were built. When the iOS total slice records its values here, replace these
+and reconcile Android, then commit the comparisons (`total-add`, `total-keypad`,
+`total-scanning`, `total-confirm`, `total-no-total-found`, `total-tip-chosen`,
+`total-share-1/2/3`, `removed-message`, `leave-confirm`; the Android renders are
+in `TotalScreenshotTest`).
+
+| Element | Value |
+| ------- | ----- |
+| Add the total (host, no bill) | Total card: "Add the total" (section heading), "Scan the receipt or type the amount. Everyone's share updates as you go." (body, secondary), then a black 52 pill "Scan receipt" and a chip-grey 52 pill "Enter total", 10 apart |
+| Share figures (everyone, bill set) | "Your share" (body, secondary) over the amount (balance role, 36 bold). Then three rows, 6 vertical padding: label (subtitle, secondary) left, value (amount role) right: Total, Tip ("18% · $18.00"), People. The share rolls old → new over 600 ms (ease out), integer cents; instant with animations off. A light tick haptic whenever this member's share changes |
+| Tip chips (host only) | "Tip" (amount role), then one row 6 apart: 0%, 15%, 18%, 20% (equal widths) and Custom (1.6 ×), each 44 tall, capsule. Chip grey with black text (chip-count role); the chosen one black with white text. Custom shows its amount once chosen ("$7.00"). No ripple, elevation or Material chip styling |
+| Change total (host) | Below the chips: two chip-grey 44 capsules, "Scan receipt" and "Change total", 8 apart |
+| Write error | 16 red exclamation, 6 gap, "Couldn't save. Check your connection and try again." (body, error red) at the bottom of the card |
+| Keypad screen | Party-style header ("Enter total" / "Custom tip"), the amount centred (balance role; "$0.00" in placeholder grey when empty), a 40-tall line for the inline error (body, error red), then a 3 × 4 keypad (white keys, radius 16, 56 tall, 8 gaps, digits in screen-title role; "." and ⌫), 16 margins, then the black "Confirm" pill. No system keyboard |
+| Scan screen | Header "Scan receipt", the camera in a black rounded (28) frame, 16 margins; status line (body, secondary): "Hold the receipt flat so the total line is in the frame, then tap Scan." / "Reading the receipt…"; black "Scan" pill (spinner while reading). Reading: the photo freezes and a 3-wide brand-blue line with a 28 glow sweeps down and up (1.1 s each way, linear); none with animations off |
+| Confirmation | Header "Confirm the total", "Found on the receipt" (body, secondary), the amount (balance role), 'From the line "Total"' (body, secondary), then "Confirm" (black pill) and "Edit amount" (grey pill) |
+| No total / no camera | The keypad screen with a centred explanation above the amount (body, secondary) |
+| Remove / leave confirmation | Custom dialog card (not Material): white, radius 28, 20 padding: title (section heading), body (body, secondary), black action pill and grey cancel pill, 10 apart. Remove: tap a non-host seat (host only). Leave: grey "Leave party" capsule under the total card (members only) |
+| Removed message | White capsule with 12% shadow, 52 below the header's top, "You were removed from Maxi's party" (amount role); gone after 4 s |
+| Dark mode | Identical to light: the app is light-only (`total-tip-chosen-dark` is byte-identical to `total-tip-chosen`) |
 
 ## Bottom (tab) bar
 
