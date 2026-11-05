@@ -105,7 +105,7 @@ final class ReferenceCaptureUITests: XCTestCase {
         try capture("home-error")
     }
 
-    // MARK: Split Party (fixture parties always use 🍕🍺🎉)
+    // MARK: Split Party (fixture parties always use 🍕🍺)
 
     func test07HostPartyFillsUp() throws {
         launch(resettingSession: true, extra: ["-UITestFriendsJoinEvery", "6"])
@@ -144,7 +144,7 @@ final class ReferenceCaptureUITests: XCTestCase {
         measure("second option", options.element(boundBy: 1))
 
         let wrong = app.buttons.matching(identifier: "codeOption")
-            .matching(NSPredicate(format: "label != %@", "pizza, beer, party popper")).firstMatch
+            .matching(NSPredicate(format: "label != %@", "pizza, beer")).firstMatch
         wrong.tap()
         // Mid-shake, with the red outline and the error.
         Thread.sleep(forTimeInterval: 0.12)
@@ -152,7 +152,7 @@ final class ReferenceCaptureUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         for _ in 0..<2 {
             app.buttons.matching(identifier: "codeOption")
-                .matching(NSPredicate(format: "label != %@", "pizza, beer, party popper")).firstMatch.tap()
+                .matching(NSPredicate(format: "label != %@", "pizza, beer")).firstMatch.tap()
             Thread.sleep(forTimeInterval: 1)
         }
         XCTAssertTrue(app.staticTexts["Too many wrong codes"].waitForExistence(timeout: Self.timeout))

@@ -2,7 +2,7 @@ import XCTest
 
 /// The total, tip and live split (PoC-10, FR-3, FR-4) and leaving/removal
 /// (FR-2.5) on the built-in fixture. Fixture parties are hosted at Tony's with
-/// the code 🍕🍺🎉; see `UITestLaunch` in AppModel.swift for the launch arguments.
+/// the code 🍕🍺; see `UITestLaunch` in AppModel.swift for the launch arguments.
 final class TotalFlowUITests: XCTestCase {
     private static let screenTimeout: TimeInterval = 2
     /// The work order's 1 s bar plus a little for the UI test runner itself.
@@ -208,7 +208,7 @@ final class TotalFlowUITests: XCTestCase {
         XCTAssertTrue(joinBanner.waitForExistence(timeout: Self.screenTimeout), "Join banner is back")
 
         joinBanner.buttons["Join"].tap()
-        let correct = app.buttons.matching(identifier: "codeOption")["pizza, beer, party popper"]
+        let correct = app.buttons.matching(identifier: "codeOption")["pizza, beer"]
         XCTAssertTrue(correct.waitForExistence(timeout: Self.screenTimeout))
         correct.tap()
         XCTAssertTrue(element("partyScreen").waitForExistence(timeout: Self.screenTimeout))

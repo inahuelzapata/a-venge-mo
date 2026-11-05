@@ -117,7 +117,7 @@ final class AppModel {
 /// - `-UITestFixture seeded|empty|unreachable`: use `FixtureDataSource` instead of Firestore.
 /// - `-UITestResetSession YES`: start signed out.
 /// - `-UITestInsertIncomingPaymentAfter <seconds>`: a new payment arrives after that delay.
-/// - `-UITestFriendParty <hostId>`: that user hosts an open party at Tony's (code 🍕🍺🎉).
+/// - `-UITestFriendParty <hostId>`: that user hosts an open party at Tony's (code 🍕🍺).
 ///   `-UITestFriendPartyMembers a,b` adds members after the host,
 ///   `-UITestFriendPartyAge <seconds>` makes it that old (295 expires 5 s in), and
 ///   `-UITestFriendPartyAfter <seconds>` makes it appear only after that delay.

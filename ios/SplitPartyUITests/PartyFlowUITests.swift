@@ -2,7 +2,7 @@ import XCTest
 
 /// Split Party flows (PoC-7 to PoC-9) on the built-in fixture: the demo switch,
 /// starting a party, the Join banner, code confirmation, the live member list
-/// and expiry. Fixture parties always use the code 🍕🍺🎉.
+/// and expiry. Fixture parties always use the code 🍕🍺.
 final class PartyFlowUITests: XCTestCase {
     /// The work order's bars: card within 2 s, banners and members within 1 s
     /// (plus a little for the UI test runner itself).
@@ -128,7 +128,7 @@ final class PartyFlowUITests: XCTestCase {
         tapStartPartyOnceSettled()
         XCTAssertTrue(partyScreen.waitForExistence(timeout: Self.screenTimeout))
         XCTAssertTrue(app.navigationBars["Split Party at Tony's"].exists)
-        XCTAssertEqual(element("joinCode").label, "Join code: pizza, beer, party popper")
+        XCTAssertEqual(element("joinCode").label, "Join code: pizza, beer")
         let countdown = element("partyCountdown").label
         XCTAssertTrue(countdown == "Expires in 5:00" || countdown == "Expires in 4:59", countdown)
         XCTAssertEqual(memberSeats.count, 1)
@@ -220,7 +220,7 @@ final class PartyFlowUITests: XCTestCase {
     private var confirmationScreen: XCUIElement { element("joinConfirmationScreen") }
     private var codeOptions: XCUIElementQuery { app.buttons.matching(identifier: "codeOption") }
     private var optionLabels: [String] { codeOptions.allElementsBoundByIndex.map(\.label) }
-    private static let fixtureCodeSpoken = "pizza, beer, party popper"
+    private static let fixtureCodeSpoken = "pizza, beer"
     private var correctOption: XCUIElement { codeOptions[Self.fixtureCodeSpoken] }
     private var wrongOption: XCUIElement {
         codeOptions.matching(NSPredicate(format: "label != %@", Self.fixtureCodeSpoken)).firstMatch

@@ -396,8 +396,8 @@ private struct ReconnectingIndicator: View {
 
 // MARK: Code
 
-/// The three emoji tiles. They pop in one by one, then bob gently out of step.
-/// VoiceOver reads "Join code: pizza, beer, party popper".
+/// The two emoji tiles. They pop in one by one, then bob gently out of step.
+/// VoiceOver reads "Join code: pizza, beer".
 struct JoinCodeTiles: View {
     let code: JoinCode
     var animatesIn = false

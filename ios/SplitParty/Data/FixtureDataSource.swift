@@ -52,7 +52,7 @@ final class FixtureDataSource: PaymentDataSource {
 
     /// Every party the fixture creates or hosts uses this code, so UI tests and
     /// captures know which option is the right one.
-    static let fixedJoinCode = JoinCode(["🍕", "🍺", "🎉"])!
+    static let fixedJoinCode = JoinCode(["🍕", "🍺"])!
 
     // MARK: PaymentDataSource
 

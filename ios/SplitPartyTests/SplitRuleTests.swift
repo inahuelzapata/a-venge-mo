@@ -73,7 +73,7 @@ final class TipChoiceTests: XCTestCase {
     func testPartyDocumentCarriesBillAndTip() throws {
         let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
         let data: [String: Any] = [
-            "hostId": "maxi", "merchantId": DemoMerchant.id, "joinCode": ["🍕", "🍺", "🎉"], "status": "open",
+            "hostId": "maxi", "merchantId": DemoMerchant.id, "joinCode": ["🍕", "🍺"], "status": "open",
             "createdAt": createdAt, "expiresAt": createdAt.addingTimeInterval(300),
             "memberIds": ["maxi", "annie", "christophe"], "billCents": 10_000,
             "tip": ["type": "percent", "percent": 18],

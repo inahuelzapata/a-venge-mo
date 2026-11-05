@@ -46,7 +46,7 @@ enum PartySchema {
     /// Rules cap `memberIds` at 8 (they cannot loop over a list).
     static let maxMembers = 8
 
-    /// `joinCodes/{merchantId}_{e1}{e2}{e3}`, e.g. "tonys-greenwich_🍕🍺🎉".
+    /// `joinCodes/{merchantId}_{e1}{e2}`, e.g. "tonys-greenwich_🍕🍺".
     static func joinCodeLockId(merchantId: String, code: JoinCode) -> String {
         "\(merchantId)_\(code.emojis.joined())"
     }
@@ -64,10 +64,11 @@ enum PartyStatus: String {
     case open, paid, expired
 }
 
-/// The three-emoji join code. Every emoji is one code point from the palette, so
+/// The two-emoji join code. Every emoji is one code point from the palette, so
 /// iOS, Android and the rules compare the same strings.
 struct JoinCode: Hashable {
-    static let length = 3
+    /// Two emojis from a 12-emoji palette give 144 codes per merchant.
+    static let length = 2
 
     /// The schema's 12-emoji palette with the names VoiceOver reads for each.
     static let palette: [(emoji: String, name: String)] = [
@@ -80,7 +81,8 @@ struct JoinCode: Hashable {
 
     let emojis: [String]
 
-    /// Nil unless exactly three palette emojis, so a malformed document is skipped.
+    /// Nil unless exactly `length` palette emojis, so a malformed document, or one
+    /// written by an older build with a different code length, is skipped rather than crashing.
     init?(_ emojis: [String]) {
         guard emojis.count == Self.length, emojis.allSatisfy(Self.paletteEmojis.contains) else { return nil }
         self.emojis = emojis
@@ -96,7 +98,7 @@ struct JoinCode: Hashable {
         return random(using: &generator)
     }
 
-    /// "pizza, beer, party popper": what VoiceOver says for the code.
+    /// "pizza, beer": what VoiceOver says for the code.
     var spokenNames: String {
         emojis.map { Self.namesByEmoji[$0] ?? $0 }.joined(separator: ", ")
     }
