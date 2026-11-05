@@ -170,12 +170,12 @@ private fun ShareFigures(total: TotalUi, modifier: Modifier = Modifier) = CardSt
         }
     }
     Column(Modifier.fillMaxWidth()) {
+        // The total rolls with the share (as on iOS) when the bill or the tip changes.
         FigureRow(
             stringResource(R.string.total_total),
-            Money.format(total.totalCents),
             stringResource(R.string.total_total_description, Money.spoken(total.totalCents)),
             Modifier.testTag(PartyTestTags.TOTAL_VALUE)
-        )
+        ) { RollingAmount(total.totalCents, style = Type.Amount) }
         val tipLabel = tipLabel(total.tip)
         FigureRow(
             stringResource(R.string.total_tip),
@@ -205,6 +205,11 @@ private fun tipLabel(tip: TipChoice): String = when (tip) {
 
 @Composable
 private fun FigureRow(label: String, value: String, spoken: String, modifier: Modifier = Modifier) {
+    FigureRow(label, spoken, modifier) { Text(value, style = Type.Amount, color = Brand.Ink) }
+}
+
+@Composable
+private fun FigureRow(label: String, spoken: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -213,7 +218,7 @@ private fun FigureRow(label: String, value: String, spoken: String, modifier: Mo
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = Type.Subtitle, color = Brand.InkSecondary, modifier = Modifier.weight(1f))
-        Text(value, style = Type.Amount, color = Brand.Ink)
+        value()
     }
 }
 

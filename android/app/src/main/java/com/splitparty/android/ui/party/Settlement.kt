@@ -2,7 +2,6 @@ package com.splitparty.android.ui.party
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -38,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -71,8 +71,6 @@ import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.LocalReduceMotion
 import com.splitparty.android.ui.theme.Type
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -130,9 +128,18 @@ fun PayButton(pay: PayState, collectCents: Long?, paying: Boolean, onPay: () -> 
     }
 }
 
+// The same sequence as iOS: 100 ms, the ticks 280 ms apart, 150 ms, then the
+// check and a 2.4 s confetti rain from the top of the screen.
 private const val TICK_STAGGER_MS = 280L
-private const val TICK_LEAD_MS = 150L
-private const val CONFETTI_MS = 1_400
+private const val TICK_LEAD_MS = 100L
+private const val SUCCESS_LEAD_MS = 150L
+private const val CONFETTI_MS = 2_400
+
+/** SwiftUI spring(response: 0.3) as a Compose stiffness: (2π / 0.3)². The tick badges. */
+private const val TICK_STIFFNESS = 439f
+
+/** SwiftUI spring(response: 0.4) as a Compose stiffness: (2π / 0.4)². */
+private const val CHECK_STIFFNESS = 247f
 private const val CHECK_SIZE_DP = 76
 
 /**
@@ -163,24 +170,30 @@ fun SettledParty(state: PartyUiState, onHome: () -> Unit, modifier: Modifier = M
         } else {
             delay(TICK_LEAD_MS)
             for (i in payers.indices) {
+                if (i > 0) delay(TICK_STAGGER_MS)
                 ticked = i + 1
                 view.shareTick()
-                delay(TICK_STAGGER_MS)
             }
+            delay(SUCCESS_LEAD_MS)
             launch { confetti.animateTo(1f, tween(CONFETTI_MS, easing = LinearEasing)) }
-            checkScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
+            checkScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = CHECK_STIFFNESS))
         }
         view.partyHaptic(success = true)
         played = 1
     }
-    Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag(PartyTestTags.SETTLED),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(Modifier.height(Dimens.ContentSpacing))
-        PaidSeats(state.members, payers.take(ticked).map { it.userId }.toSet())
-        Spacer(Modifier.height(Dimens.CardGap))
-        SuccessCard(settlement, state.hostName, checkScale.value, if (reduce) 1f else confetti.value, onHome)
+    Box(modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag(PartyTestTags.SETTLED),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(Dimens.ContentSpacing))
+            PaidSeats(state.members, payers.take(ticked).map { it.userId }.toSet())
+            Spacer(Modifier.height(Dimens.CardGap))
+            SuccessCard(settlement, state.hostName, checkScale.value, onHome)
+        }
+        // Over the whole screen, from the top, as on iOS. Never with motion removed.
+        val rain = confetti.value
+        if (!reduce && rain in 0.001f..0.999f) ConfettiRain(rain, Modifier.fillMaxSize())
     }
 }
 
@@ -230,7 +243,7 @@ private fun PaidTick(paid: Boolean, modifier: Modifier = Modifier) {
     val scale = remember { Animatable(if (paid) 1f else 0f) }
     LaunchedEffect(paid) {
         val target = if (paid) 1f else 0f
-        if (reduce) scale.snapTo(target) else scale.animateTo(target, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium))
+        if (reduce) scale.snapTo(target) else scale.animateTo(target, spring(dampingRatio = 0.55f, stiffness = TICK_STIFFNESS))
     }
     Box(modifier.size(22.dp)) {
         Box(Modifier.fillMaxSize().border(2.dp, Brand.Card, CircleShape).background(Brand.Chip, CircleShape))
@@ -248,7 +261,7 @@ private fun PaidTick(paid: Boolean, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SuccessCard(settlement: SettlementUi, hostName: String, checkScale: Float, confetti: Float, onHome: () -> Unit) {
+private fun SuccessCard(settlement: SettlementUi, hostName: String, checkScale: Float, onHome: () -> Unit) {
     val amount = settlement.amountCents
     Column(
         Modifier
@@ -260,7 +273,6 @@ private fun SuccessCard(settlement: SettlementUi, hostName: String, checkScale: 
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
-            if (confetti in 0.001f..0.999f) ConfettiBurst(confetti, Modifier.fillMaxSize())
             Box(
                 Modifier
                     .size(CHECK_SIZE_DP.dp)
@@ -328,39 +340,72 @@ private fun CheckMark(stroke: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-private val ConfettiColors = listOf(Brand.Blue, Brand.Success, Brand.Warning, Brand.Error, Brand.MarkNavy, Color(0xFFFFCC00))
-private const val CONFETTI_PIECES = 48
+private val ConfettiColors = listOf(
+    Brand.Blue,
+    Color(0xFFFFC83D),
+    Color(0xFFFF5C8A),
+    Color(0xFF2BC48A),
+    Color(0xFF6CC4FF)
+)
+private const val CONFETTI_PIECES = 90
 private const val CONFETTI_SEED = 7
-private const val GRAVITY = 0.9f
 
-private data class Piece(val angle: Float, val speed: Float, val spin: Float, val color: Color, val wide: Boolean)
+/** dp per second², as iOS's 900 pt/s². */
+private const val GRAVITY_DP = 900f
+private const val CONFETTI_SECONDS = CONFETTI_MS / 1_000f
 
-/** A one-shot burst from the check: pieces fly out, fall and fade as [progress] goes 0 → 1. */
+/** Fully visible for the first 60% of the rain, then fading out. */
+private const val CONFETTI_FADE_FROM = 0.6f
+
+private data class Piece(
+    val startX: Float,
+    val horizontalSpeed: Float,
+    val verticalSpeed: Float,
+    val spin: Float,
+    val width: Float,
+    val height: Float,
+    val color: Color
+)
+
+private fun Random.between(from: Float, to: Float) = from + nextFloat() * (to - from)
+
+/**
+ * The iOS confetti, piece for piece in kind: 90 pieces launched up from just
+ * above the top edge, spreading sideways, falling with gravity and spinning,
+ * fading over the last 40% of 2.4 s. [progress] goes 0 → 1 over that time.
+ */
 @Composable
-private fun ConfettiBurst(progress: Float, modifier: Modifier = Modifier) {
+private fun ConfettiRain(progress: Float, modifier: Modifier = Modifier) {
     val pieces = remember {
         val random = Random(CONFETTI_SEED)
         List(CONFETTI_PIECES) {
             Piece(
-                angle = random.nextFloat() * 2f * Math.PI.toFloat(),
-                speed = 0.5f + random.nextFloat() * 0.7f,
-                spin = random.nextFloat() * 720f - 360f,
-                color = ConfettiColors[it % ConfettiColors.size],
-                wide = random.nextBoolean()
+                startX = random.between(0.1f, 0.9f),
+                horizontalSpeed = random.between(-160f, 160f),
+                verticalSpeed = random.between(-420f, -120f),
+                spin = random.between(-540f, 540f),
+                width = random.between(6f, 10f),
+                height = random.between(10f, 16f),
+                color = ConfettiColors[it % ConfettiColors.size]
             )
         }
     }
     Canvas(modifier.clearAndSetSemantics { }) {
-        val reach = size.width / 2
-        val alpha = (1f - progress).coerceIn(0f, 1f)
+        val t = progress * CONFETTI_SECONDS
+        val alpha = if (progress < CONFETTI_FADE_FROM) 1f else (1f - progress) / (1f - CONFETTI_FADE_FROM)
+        val corner = CornerRadius(1.5.dp.toPx())
         pieces.forEach { piece ->
-            val distance = reach * piece.speed * progress
-            val x = center.x + cos(piece.angle) * distance
-            val y = center.y + sin(piece.angle) * distance * 0.6f + GRAVITY * reach * progress * progress
-            val w = if (piece.wide) 10.dp.toPx() else 5.dp.toPx()
-            val h = if (piece.wide) 5.dp.toPx() else 10.dp.toPx()
-            rotate(piece.spin * progress, Offset(x, y)) {
-                drawRect(piece.color.copy(alpha = alpha), topLeft = Offset(x - w / 2, y - h / 2), size = Size(w, h))
+            val x = piece.startX * size.width + (piece.horizontalSpeed * t).dp.toPx()
+            val y = (-20f + piece.verticalSpeed * t + GRAVITY_DP * t * t / 2).dp.toPx()
+            val w = piece.width.dp.toPx()
+            val h = piece.height.dp.toPx()
+            rotate(piece.spin * t, Offset(x, y)) {
+                drawRoundRect(
+                    piece.color.copy(alpha = alpha.coerceIn(0f, 1f)),
+                    topLeft = Offset(x - w / 2, y - h / 2),
+                    size = Size(w, h),
+                    cornerRadius = corner
+                )
             }
         }
     }

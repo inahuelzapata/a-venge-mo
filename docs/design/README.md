@@ -7,6 +7,7 @@ app is built to match them screen for screen.
 | ---- | ---- |
 | [`ios-captures/`](ios-captures/) | One iOS capture per screen and state, with device, scale and build recorded in its README |
 | [`visual-conventions.md`](visual-conventions.md) | Values measured from the captures (colours, spacing, type, tab bar, status bar, radii), the bundled Android font, and the **only** allowed platform differences |
+| [`animation-audit.md`](animation-audit.md) | The nine PoC animations checked on the running apps, before and after the animation-polish work order: present / partial / missing per platform, and what still needs the real demo phones |
 | [`comparisons/`](comparisons/) | Each screen as iOS (left) and Android (right) at the same width, plus `-overlay.png` with Android at 50% over iOS |
 | [`android-captures/`](android-captures/) | The Android side of each comparison |
 | [`capture/`](capture/) | Scripts that recreate all of the above |

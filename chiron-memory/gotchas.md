@@ -149,3 +149,11 @@ What: `homeScreen` stays in the accessibility tree while a party screen is pushe
 ## iOS expiry and 3-second UI tests fail when another simulator runs at the same time
 
 What: PartyFlowUITests' expiry tests (parties built to expire ~10 s after launch) and the receipt scan's 3 s bar failed in a full run while a second simulator ran tests, and passed on an idle machine · Learned: run the full iOS UI suite with nothing else on the simulators before calling a failure real
+
+## iOS: animating the party snapshot crossfades the open → paid swap and hides the first paid tick
+
+What: PartyRoomModel applied every party snapshot inside Motion.animate(spring 0.45/0.7), so when the party turned `paid` SwiftUI crossfaded OpenPartyContent into PaidPartyContent for ~0.45 s; the paid screen's 100 ms + 280 ms tick sequence ran under the fade and members saw both badges tick in the same frame. The snapshot that turns a party paid is now applied without animation · Why: the settlement plays its own motion from its first frame; any container transition on top of it eats the sequence · Where: ios/SplitParty/UI/PartyView.swift (PartyRoomModel.listen), SettlementViews.swift (PaidPartyContent.play) · Learned: only visible in a frame-by-frame recording on a member phone; the host looked fine because it shows pending badges first
+
+## Android unit tests crash in one JVM on this Mac; run the Paparazzi tests and the rest separately
+
+What: `./gradlew :app:testDebugUnitTest` (and so `check`) dies a few seconds in with `java.lang.NoSuchMethodError: android.view.Surface.nativeSetProducerThrottlingEnabled(long, boolean)` from layoutlib when Paparazzi and Robolectric tests share the test JVM — on untouched HEAD too, so the task fails without listing failing tests. Run `:app:verifyPaparazziDebug --tests 'com.splitparty.android.screenshots.*'` and `:app:testDebugUnitTest --tests 'com.splitparty.android.ui.*' --tests '...domain.*' --tests '...data.*' --tests '...di.*' --tests '...format.*'` instead, then count from the result XMLs · Where: android/app/src/test · Learned: seen 2026-11-05 with Android SDK 37 on the AVD host; `echo $?` after a redirected gradle run in a pipeline reports the echo, not Gradle — read the log for BUILD FAILED

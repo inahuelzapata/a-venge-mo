@@ -176,7 +176,8 @@ final class LiveDataStore {
         highlightedTransactionIds.formUnion(newIds)
         Task { [weak self] in
             try? await Task.sleep(for: Self.highlightDuration)
-            withAnimation(.easeOut(duration: 1)) {
+            // Reduce Motion: the highlight still shows, then goes without a fade.
+            Motion.animate(.easeOut(duration: 1)) {
                 self?.highlightedTransactionIds.subtract(newIds)
             }
         }

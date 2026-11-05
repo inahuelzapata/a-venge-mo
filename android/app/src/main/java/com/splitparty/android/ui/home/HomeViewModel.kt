@@ -78,7 +78,8 @@ class HomeViewModel(
     private val parties: PartyRepository,
     demoSettings: DemoSettingsRepository,
     private val connectivity: ConnectivityObserver,
-    private val clock: Clock
+    private val clock: Clock,
+    private val merchantEntrance: MerchantCardEntrance = MerchantCardEntrance()
 ) : ViewModel() {
     private val highlighted = MutableStateFlow(persistentSetOf<String>())
     private var knownIds: Set<String>? = null
@@ -182,6 +183,9 @@ class HomeViewModel(
     }
 
     private data class StartState(val busy: Boolean = false, val failed: Boolean = false)
+
+    /** True once per arrival of the merchant card: Home plays its slide and sheen. */
+    fun takeMerchantEntrance(): Boolean = merchantEntrance.take()
 
     /** Highlights ids that were not in the previous server snapshot. The first load highlights nothing. */
     private fun markNewRows(state: LiveState<List<Transaction>>) {

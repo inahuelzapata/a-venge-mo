@@ -16,6 +16,7 @@ import com.splitparty.android.domain.usecase.ObserveUserTransactionsUseCase
 import com.splitparty.android.domain.usecase.ObserveUserUseCase
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.domain.usecase.SignOutUseCase
+import com.splitparty.android.ui.home.MerchantCardEntrance
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentMapOf
@@ -74,7 +75,8 @@ class MeViewModel(
     observeUsers: ObserveUsersUseCase,
     private val signOut: SignOutUseCase,
     private val demoSettings: DemoSettingsRepository,
-    private val demoReset: DemoResetRepository
+    private val demoReset: DemoResetRepository,
+    private val merchantEntrance: MerchantCardEntrance = MerchantCardEntrance()
 ) : ViewModel() {
     private val resetState = MutableStateFlow<DemoResetUi>(DemoResetUi.Idle)
 
@@ -105,7 +107,11 @@ class MeViewModel(
             // Signing out flips the session; the app root then shows login.
             MeAction.LogOut -> viewModelScope.launch { signOut() }
 
-            is MeAction.SetDemoAtMerchant -> viewModelScope.launch { demoSettings.setAtMerchant(action.on) }
+            is MeAction.SetDemoAtMerchant -> {
+                // Switched off, the card's next arrival plays again, as on iOS.
+                if (!action.on) merchantEntrance.replay()
+                viewModelScope.launch { demoSettings.setAtMerchant(action.on) }
+            }
 
             MeAction.ResetDemo -> resetDemo()
         }
@@ -117,7 +123,12 @@ class MeViewModel(
         resetState.value = DemoResetUi.Running
         viewModelScope.launch {
             resetState.value = when (val result = demoReset.reset()) {
-                DemoResetResult.Done -> DemoResetUi.Done
+                DemoResetResult.Done -> {
+                    // The demo starts over: Home plays the merchant card's arrival again.
+                    merchantEntrance.replay()
+                    DemoResetUi.Done
+                }
+
                 is DemoResetResult.Failed -> DemoResetUi.Failed(result.reason, result.message)
             }
         }

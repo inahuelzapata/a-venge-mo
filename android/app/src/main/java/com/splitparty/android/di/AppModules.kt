@@ -28,6 +28,7 @@ import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.domain.usecase.SignInUseCase
 import com.splitparty.android.domain.usecase.SignOutUseCase
 import com.splitparty.android.ui.home.HomeViewModel
+import com.splitparty.android.ui.home.MerchantCardEntrance
 import com.splitparty.android.ui.join.JoinViewModel
 import com.splitparty.android.ui.login.LoginViewModel
 import com.splitparty.android.ui.me.MeViewModel
@@ -82,6 +83,8 @@ val domainModule = module {
 
 /** ViewModels that need the signed-in user get it as a parameter: `koinViewModel { parametersOf(userId) }`. */
 val viewModelModule = module {
+    // App-wide UI state: the merchant card's arrival plays once per session (Home and Me share it).
+    single { MerchantCardEntrance() }
     viewModelOf(::SessionViewModel)
     viewModelOf(::LoginViewModel)
     viewModelOf(::HomeViewModel)

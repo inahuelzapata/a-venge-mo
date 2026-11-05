@@ -149,6 +149,13 @@ final class PartyHub {
         }
     }
 
+    /// After a Demo reset the demo starts over: the card leaves without motion
+    /// and slides in (with its shimmer) the next time Home is on screen.
+    func replayMerchantCardEntrance() {
+        isMerchantCardRevealed = false
+        merchantCardRevealedAt = nil
+    }
+
     /// Snapshot tests: the card is already there, with no slide or shimmer.
     func revealMerchantCardWithoutAnimation() {
         isMerchantCardRevealed = isDemoAtMerchant

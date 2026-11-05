@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -71,6 +72,7 @@ import com.splitparty.android.ui.theme.topInset
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -98,6 +100,7 @@ fun HomeRoute(
         onStartParty = viewModel::startParty,
         onJoin = onJoin,
         onOpenParty = onOpenParty,
+        takeMerchantEntrance = viewModel::takeMerchantEntrance,
         modifier = modifier
     )
 }
@@ -109,9 +112,15 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onStartParty: () -> Unit = {},
     onJoin: (partyId: String) -> Unit = {},
-    onOpenParty: (partyId: String) -> Unit = {}
+    onOpenParty: (partyId: String) -> Unit = {},
+    takeMerchantEntrance: () -> Boolean = { false }
 ) {
     val now = rememberNow()
+    // A Pay's payments drop onto the top of the feed one by one (motion on only).
+    val rows = rememberStaggeredFeed(
+        (state.feed as? LiveState.Ready)?.value.orEmpty(),
+        animate = !LocalReduceMotion.current
+    )
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag(HomeTestTags.FEED),
         contentPadding = PaddingValues(
@@ -133,7 +142,7 @@ fun HomeScreen(
         // The banner slot (PoC-7/8): a feed item that scrolls with the rows, in
         // every feed state. Absent when empty, so the feed moves up with no gap.
         // Each kind has its own key: a change swaps the item with its entrance.
-        bannerSlot(state, onStartParty, onJoin, onOpenParty)
+        bannerSlot(state, onStartParty, onJoin, onOpenParty, takeMerchantEntrance)
         when (val feed = state.feed) {
             LiveState.Loading -> item(key = "loading") { LoadingCard() }
 
@@ -145,7 +154,7 @@ fun HomeScreen(
                         EmptyCard("No payments yet", "When friends pay each other, it shows up here.")
                     }
                 } else {
-                    items(feed.value, key = { it.id }) { transaction ->
+                    items(rows, key = { it.id }) { transaction ->
                         FeedRow(
                             transaction = transaction,
                             users = state.users,
@@ -163,15 +172,19 @@ private fun LazyListScope.bannerSlot(
     state: HomeUiState,
     onStartParty: () -> Unit,
     onJoin: (String) -> Unit,
-    onOpenParty: (String) -> Unit
+    onOpenParty: (String) -> Unit,
+    takeMerchantEntrance: () -> Boolean
 ) {
     when (val slot = state.bannerSlot) {
         BannerSlot.None -> Unit
 
         BannerSlot.Merchant -> {
             item(key = "split_party_card") {
-                Entrance(BannerEntrance.SlideUp, Modifier.animateItem()) {
-                    val sheen = rememberShimmerProgress()
+                // The arrival (slide + one sheen) once per session and after a
+                // Demo reset; any other return of the card just fades in.
+                val arrives = remember { takeMerchantEntrance() }
+                Entrance(if (arrives) BannerEntrance.Slide else BannerEntrance.Fade, Modifier.animateItem()) {
+                    val sheen = rememberShimmerProgress(enabled = arrives)
                     SplitPartyCard(
                         onStartParty = onStartParty,
                         busy = state.startingParty,
@@ -198,19 +211,26 @@ private fun LazyListScope.bannerSlot(
     }
 }
 
-private enum class BannerEntrance { SlideUp, Drop, Fade }
+private enum class BannerEntrance { Slide, Drop, Fade }
 
 /** Plays [entrance] once when the item first appears; without motion it is simply there. */
 @Composable
 private fun Entrance(entrance: BannerEntrance, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val reduce = LocalReduceMotion.current
     // Without motion it starts visible, so there is nothing to animate.
-    val visible = remember { MutableTransitionState(reduce) }.apply { targetState = true }
+    val visible = remember { MutableTransitionState(reduce) }
+    LaunchedEffect(Unit) {
+        // iOS waits a beat before the merchant card arrives (the geofence stand-in).
+        if (entrance == BannerEntrance.Slide && !reduce) delay(MERCHANT_ARRIVAL_DELAY_MS)
+        visible.targetState = true
+    }
     val enter = if (reduce) {
         EnterTransition.None
     } else {
         when (entrance) {
-            BannerEntrance.SlideUp -> slideInVertically(tween(450)) { it / 3 } + fadeIn(tween(450))
+            // From the trailing edge, spring response 0.5 / damping 0.85 as on iOS.
+            BannerEntrance.Slide -> slideInHorizontally(spring(dampingRatio = 0.85f, stiffness = MERCHANT_SPRING_STIFFNESS)) { it } +
+                fadeIn(spring(dampingRatio = 0.85f, stiffness = MERCHANT_SPRING_STIFFNESS))
 
             BannerEntrance.Drop -> slideInVertically(spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) { -it } +
                 fadeIn(tween(200))
@@ -220,6 +240,12 @@ private fun Entrance(entrance: BannerEntrance, modifier: Modifier = Modifier, co
     }
     AnimatedVisibility(visibleState = visible, enter = enter, modifier = modifier) { content() }
 }
+
+/** iOS: 0.35 s after Home's parties have answered. */
+private const val MERCHANT_ARRIVAL_DELAY_MS = 350L
+
+/** SwiftUI spring(response: 0.5) as a Compose stiffness: (2π / 0.5)². */
+private const val MERCHANT_SPRING_STIFFNESS = 158f
 
 @Composable
 private fun StartPartyError(modifier: Modifier = Modifier) {
