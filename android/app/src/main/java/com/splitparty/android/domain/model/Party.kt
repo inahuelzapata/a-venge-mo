@@ -59,6 +59,18 @@ data class Party(
 
     fun shareOf(userId: String): Long? = split?.shares?.getOrNull(memberIds.indexOf(userId))
 
+    /** Everyone but the host, in join order: the members Pay settles. */
+    val joinees: List<PartyMember> get() = members.drop(1)
+
+    /** What blocks Pay right now, or null when the host can settle. */
+    fun payBlockerAt(nowMillis: Long): PayBlocker? = when {
+        status == PartyStatus.Paid -> PayBlocker.AlreadyPaid
+        !isActiveAt(nowMillis) -> PayBlocker.Expired
+        billCents == null -> PayBlocker.NoTotal
+        joinees.isEmpty() -> PayBlocker.NoMembers
+        else -> null
+    }
+
     fun millisLeftAt(nowMillis: Long): Long = (expiresAtMillis - nowMillis).coerceAtLeast(0L)
 
     companion object {
@@ -69,6 +81,9 @@ data class Party(
         const val MAX_MEMBERS = 8
     }
 }
+
+/** Why the host cannot tap Pay yet. */
+enum class PayBlocker { AlreadyPaid, Expired, NoTotal, NoMembers }
 
 /** The one seeded merchant (backend/lib/seedData.js). The demo switch stands in for its geofence. */
 object DemoMerchant {

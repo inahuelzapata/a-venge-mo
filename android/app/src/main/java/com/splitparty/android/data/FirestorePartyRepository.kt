@@ -10,10 +10,12 @@ import com.google.firebase.firestore.Transaction
 import com.splitparty.android.data.firebase.FirestoreSchema
 import com.splitparty.android.data.firebase.toFirestore
 import com.splitparty.android.data.firebase.toParty
+import com.splitparty.android.domain.model.DemoMerchant
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
 import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.party.JoinCodes
+import com.splitparty.android.domain.party.PartySettlement
 import com.splitparty.android.domain.repository.CreatePartyResult
 import com.splitparty.android.domain.repository.JoinPartyResult
 import com.splitparty.android.domain.repository.PartyRepository
@@ -33,6 +35,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Transactions need the server, so offline they fail instead of queueing: a
  * failed create leaves nothing behind.
  */
+@Suppress("TooManyFunctions") // one function per write in docs/firestore-schema.md's party contract
 class FirestorePartyRepository(private val db: FirebaseFirestore, private val clock: () -> Long = System::currentTimeMillis) :
     PartyRepository {
     private val parties get() = db.collection(FirestoreSchema.PARTIES)
@@ -177,6 +180,87 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
             }
         }.await()
     } ?: PartyWriteResult.Failed
+
+    override suspend fun settle(partyId: String, hostId: String): PartyWriteResult =
+        runSettlement(partyId, hostId) ?: if (paidOnServer(partyId)) PartyWriteResult.Done else PartyWriteResult.Failed
+
+    /**
+     * A commit that lost to another Pay of the same party is rejected by the
+     * rules (`paid` is terminal) with PERMISSION_DENIED, which the SDK does not
+     * retry. So after any failure, a party the server already shows paid means
+     * the settlement this Pay wanted happened: report it done.
+     */
+    private suspend fun paidOnServer(partyId: String): Boolean =
+        attempt { parties.document(partyId).get(Source.SERVER).await().toParty()?.status == PartyStatus.Paid } == true
+
+    private suspend fun runSettlement(partyId: String, hostId: String): PartyWriteResult? = attempt {
+        val partyRef = parties.document(partyId)
+        db.runTransaction { tx ->
+            // Reads first (a Firestore transaction rule), then every write in one commit.
+            val party = tx.get(partyRef).toParty()
+            when {
+                party == null || party.hostId != hostId -> PartyWriteResult.NotAllowed
+
+                // Already settled (a doubled tap, or a retry whose commit landed): nothing to do.
+                party.status == PartyStatus.Paid -> PartyWriteResult.Done
+
+                party.payBlockerAt(clock()) != null -> PartyWriteResult.NotAllowed
+
+                else -> {
+                    val merchantName = tx.get(db.collection(FirestoreSchema.MERCHANTS).document(party.merchantId))
+                        .getString("name")?.takeIf { it.isNotBlank() } ?: DemoMerchant.NAME
+                    val lockRef = locks.document(JoinCodes.lockId(party.merchantId, party.joinCode))
+                    val ownLock = tx.get(lockRef).let { it.exists() && it.getString("partyId") == partyId }
+                    writeSettlement(tx, party, merchantName)
+                    if (ownLock) tx.delete(lockRef)
+                    PartyWriteResult.Done
+                }
+            }
+        }.await()
+    }
+
+    /** The shares, balances and party update of docs/firestore-schema.md "Paying a party". */
+    private fun writeSettlement(tx: Transaction, party: Party, merchantName: String) {
+        val shares = checkNotNull(party.split).shares
+        val memo = PartySettlement.memo(merchantName)
+        var collected = 0L
+        party.joinees.forEach { member ->
+            val share = shares[party.memberIds.indexOf(member.userId)]
+            if (share <= 0L) return@forEach // the rules demand amountCents > 0; a $0 share moves nothing
+            collected += share
+            tx.set(
+                db.collection(FirestoreSchema.TRANSACTIONS).document(PartySettlement.transactionId(party.id, member.userId)),
+                mapOf(
+                    "payerId" to member.userId,
+                    "payeeId" to party.hostId,
+                    "participantIds" to listOf(member.userId, party.hostId),
+                    "amountCents" to share,
+                    "memo" to memo,
+                    "merchantId" to party.merchantId,
+                    "merchantName" to merchantName,
+                    "partyId" to party.id,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "likesCount" to 0L,
+                    "commentsCount" to 0L,
+                    "source" to "party"
+                )
+            )
+            // No balance check: a balance may go negative (the PoC never blocks a payment).
+            tx.update(db.collection(FirestoreSchema.USERS).document(member.userId), "balanceCents", FieldValue.increment(-share))
+        }
+        if (collected > 0L) {
+            tx.update(db.collection(FirestoreSchema.USERS).document(party.hostId), "balanceCents", FieldValue.increment(collected))
+        }
+        val fields = buildMap<FieldPath, Any?> {
+            put(FieldPath.of("status"), PartyStatus.Paid.wire)
+            put(FieldPath.of("paidAt"), FieldValue.serverTimestamp())
+            // The rules require a tip on a paid party and only accept the percent presets: 0% is custom 0.
+            if (party.tip == null) put(FieldPath.of("tip"), Tip.ZERO.toFirestore())
+            party.memberIds.forEach { put(FieldPath.of("members", it, "paid"), true) }
+        }
+        val (first, rest) = fields.entries.first() to fields.entries.drop(1)
+        tx.update(parties.document(party.id), first.key, first.value, *rest.flatMap { listOf(it.key, it.value) }.toTypedArray())
+    }
 
     override suspend fun recordWrongAttempt(partyId: String, userId: String) {
         // Not awaited past the timeout: offline the increment is queued and lands on reconnect.

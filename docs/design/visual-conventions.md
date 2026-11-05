@@ -310,6 +310,22 @@ Pushed from the Join banner, inline title "Join Split Party".
 | Accessibility | Each option is read by emoji names ("pizza, beer, party popper") |
 | Reduce Motion | No shake or reshuffle animation; the outline, message and haptic stay |
 
+## Pay and settlement (PoC-11), Demo reset (PoC-12) — provisional
+
+Built on Android before the iOS captures exist; reconcile with iOS once its
+slice records these states. Android goldens: `PayScreenshotTest`
+(`pay-enabled`, `pay-disabled-total`, `pay-disabled-members`, `settled-host`,
+`settled-member`, `me-demo-section`, `settled-host-dark`).
+
+| Element | Android (dp), provisional |
+| ------- | ------------------------- |
+| Pay button | Host only, last item of the total card, 4 below the controls. Full-width capsule 52 tall, brand blue `#0087E0`, "Pay · $78.66" (button role, white). No ripple or elevation: a press dims to 80%. While the write runs: white spinner |
+| Pay disabled | Same capsule in `#ACACAD`, label is the reason: "Add the total", "Waiting for friends to join", "This party has expired" (expired: shown under the frozen total) |
+| Settled screen | Replaces the cards. Seat card: avatars 56, first name 14 below; every non-host seat gets a 22 green `#34C759` check badge with a 2 white ring, offset 4 right and down. Success card 12 below: 140-tall stage with a 76 green circle and white check (stroke 6), then "You collected" / "You paid" (body, secondary), the amount (balance role, 36 bold), "Everyone's share is in your balance." / "Paid to {Host} for Tony's." (subtitle, secondary), then the black "Back to Home" pill |
+| Settlement motion | Plays once, only on a phone that saw the party open: 150 ms, then each payer's badge pops in (spring 0.45) 280 ms apart with a light tick haptic; then the check springs in (0.5) while a 48-piece confetti burst flies out and fades over 1.4 s; success haptic. Reduce Motion / animations off: final state at once, success haptic kept |
+| Balance (Me) | Rolls old → new over 600 ms (ease out), integer cents, negative values as "-$12.34"; instant with animations off |
+| Demo section (Me) | Last item of the Me list: "Demo" section heading, then a white card: hint (14 secondary), black "Demo reset" pill, red error line under it on failure. Confirmation is the app's own dialog card ("Reset the demo?", black "Reset", grey "Cancel") |
+
 ## Type
 
 iOS uses SF Pro, which may not be bundled on Android. Android bundles **Inter**

@@ -40,10 +40,11 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     busy: Boolean = false,
-    error: WriteError? = null
+    error: WriteError? = null,
+    errorText: String? = null
 ) {
     Dialog(onDismissRequest = { if (!busy) onDismiss() }) {
-        ConfirmCard(title, body, confirmLabel, cancelLabel, onConfirm, onDismiss, modifier, busy, error)
+        ConfirmCard(title, body, confirmLabel, cancelLabel, onConfirm, onDismiss, modifier, busy, error, errorText)
     }
 }
 
@@ -58,7 +59,9 @@ fun ConfirmCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     busy: Boolean = false,
-    error: WriteError? = null
+    error: WriteError? = null,
+    /** Shown instead of [error]'s text, for failures that are not party writes. */
+    errorText: String? = null
 ) {
     Column(
         modifier = modifier
@@ -72,9 +75,12 @@ fun ConfirmCard(
     ) {
         Text(title, style = Type.SectionTitle, color = Brand.Ink, textAlign = TextAlign.Center)
         Text(body, style = Type.Body, color = Brand.InkSecondary, textAlign = TextAlign.Center)
-        if (error != null) {
+        val errorMessage = errorText ?: error?.let {
+            stringResource(if (it == WriteError.Failed) R.string.write_failed else R.string.write_not_allowed)
+        }
+        if (errorMessage != null) {
             Text(
-                stringResource(if (error == WriteError.Failed) R.string.write_failed else R.string.write_not_allowed),
+                errorMessage,
                 style = Type.Body,
                 color = Brand.Error,
                 textAlign = TextAlign.Center,

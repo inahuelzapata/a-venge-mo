@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.splitparty.android.R
 import com.splitparty.android.format.Money
 import com.splitparty.android.ui.components.PillButton
+import com.splitparty.android.ui.components.RollingAmount
 import com.splitparty.android.ui.components.SoftPillButton
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
@@ -73,6 +74,17 @@ fun TotalArea(state: PartyUiState, actions: TotalActions, modifier: Modifier = M
             controls -> AddTheTotal(enabled = !state.saving, actions)
 
             else -> Waiting()
+        }
+        // The host's Pay, also shown (disabled) once the party expired; members never see it.
+        state.pay?.let { pay ->
+            val collect = total?.let { t -> t.shareCents?.let { t.totalCents - it } }
+            PayButton(
+                pay = if (frozen) PayState.Expired else pay,
+                collectCents = collect,
+                paying = state.paying,
+                onPay = actions::pay,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
         if (controls) state.writeError?.let { WriteErrorLine(it) }
     }
@@ -204,37 +216,6 @@ private fun FigureRow(label: String, value: String, spoken: String, modifier: Mo
         Text(value, style = Type.Amount, color = Brand.Ink)
     }
 }
-
-private const val ROLL_MS = 600
-private const val ROLL_STEPS = 1_000L
-
-/**
- * The share in cents, rolling from the previous value to [cents] (0.6 s,
- * ease out). Interpolation is integer cents over a progress fraction, so the
- * shown amount is always a whole number of cents. Instant with reduced motion.
- */
-@Composable
-fun RollingAmount(cents: Long, modifier: Modifier = Modifier) {
-    val reduce = LocalReduceMotion.current
-    var from by remember { mutableLongStateOf(cents) }
-    var target by remember { mutableLongStateOf(cents) }
-    val progress = remember { Animatable(1f) }
-    LaunchedEffect(cents, reduce) {
-        if (cents == target) return@LaunchedEffect
-        // Restart from whatever is on screen right now.
-        from = shown(from, target, progress.value)
-        target = cents
-        if (reduce) {
-            progress.snapTo(1f)
-        } else {
-            progress.snapTo(0f)
-            progress.animateTo(1f, tween(ROLL_MS, easing = FastOutSlowInEasing))
-        }
-    }
-    Text(Money.format(shown(from, target, progress.value)), style = Type.Balance, color = Brand.Ink, modifier = modifier)
-}
-
-private fun shown(from: Long, to: Long, progress: Float): Long = from + (to - from) * (progress * ROLL_STEPS).toLong() / ROLL_STEPS
 
 /** 0%, 15%, 18%, 20%, Custom: one selectable group; black when chosen. No Material chip styling or ripple. */
 @Composable

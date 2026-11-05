@@ -1,9 +1,11 @@
 package com.splitparty.android.di
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import com.splitparty.android.data.AndroidConnectivityObserver
 import com.splitparty.android.data.DataStoreDemoSettingsRepository
 import com.splitparty.android.data.DataStoreSessionRepository
+import com.splitparty.android.data.FirebaseDemoResetRepository
 import com.splitparty.android.data.FirestorePartyRepository
 import com.splitparty.android.data.FirestoreSplitPartyRepository
 import com.splitparty.android.data.MlKitReceiptRecognizer
@@ -12,6 +14,7 @@ import com.splitparty.android.data.firebase.FirebaseSetup
 import com.splitparty.android.data.firebase.FirestoreTarget
 import com.splitparty.android.domain.Clock
 import com.splitparty.android.domain.repository.ConnectivityObserver
+import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoSettingsRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
@@ -52,11 +55,13 @@ val firebaseModule = module {
             is FirebaseConnection.SetupRequired -> error("Firestore requested while setup is required: ${connection.problems}")
         }
     }
+    single<FirebaseFunctions> { FirebaseSetup.functions(get(), get()) }
 }
 
 val dataModule = module {
     singleOf(::FirestoreSplitPartyRepository) { bind<SplitPartyRepository>() }
     single<PartyRepository> { FirestorePartyRepository(get()) }
+    singleOf(::FirebaseDemoResetRepository) { bind<DemoResetRepository>() }
     singleOf(::DataStoreSessionRepository) { bind<SessionRepository>() }
     singleOf(::DataStoreDemoSettingsRepository) { bind<DemoSettingsRepository>() }
     singleOf(::AndroidConnectivityObserver) { bind<ConnectivityObserver>() }

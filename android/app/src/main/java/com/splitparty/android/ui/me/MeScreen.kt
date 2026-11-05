@@ -14,18 +14,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,8 +50,10 @@ import com.splitparty.android.ui.components.LoadingCard
 import com.splitparty.android.ui.components.MessageCard
 import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.components.PreviewData
+import com.splitparty.android.ui.components.RollingAmount
 import com.splitparty.android.ui.components.UnreachableCard
 import com.splitparty.android.ui.components.rememberNow
+import com.splitparty.android.ui.party.ConfirmDialog
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.SplitPartyTheme
@@ -67,7 +79,13 @@ fun MeRoute(
  * nothing else in this slice (no friends list).
  */
 @Composable
-fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeAction) -> Unit, modifier: Modifier = Modifier) {
+fun MeScreen(
+    state: MeUiState,
+    contentPadding: PaddingValues,
+    onAction: (MeAction) -> Unit,
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState()
+) {
     val now = rememberNow()
     val transactions = state.transactions
     // The list spacing is 12; iOS has 16 between the title, card and heading, hence the extra 4s.
@@ -75,6 +93,7 @@ fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeActio
 
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag(MeTestTags.LIST),
+        state = listState,
         contentPadding = PaddingValues(top = topInset(), bottom = contentPadding.calculateBottomPadding() + Dimens.ListBottomPadding),
         verticalArrangement = Arrangement.spacedBy(Dimens.CardGap)
     ) {
@@ -135,12 +154,19 @@ fun MeScreen(state: MeUiState, contentPadding: PaddingValues, onAction: (MeActio
                     }
                 }
         }
+        // Last on the tab, so a presenter finds it but a joinee scrolling their payments does not stumble on it.
+        item(key = "demo-reset") {
+            DemoResetSection(state.reset, onReset = { onAction(MeAction.ResetDemo) }, modifier = Modifier.padding(top = extra))
+        }
     }
 }
 
 object MeTestTags {
     const val LIST = "me_list"
     const val DEMO_SWITCH = "me_demo_switch"
+    const val BALANCE = "me_balance"
+    const val DEMO_RESET = "me_demo_reset"
+    const val DEMO_RESET_ERROR = "me_demo_reset_error"
 }
 
 /**
@@ -174,6 +200,62 @@ private fun DemoSwitchCard(on: Boolean, onChange: (Boolean) -> Unit, modifier: M
     }
 }
 
+/**
+ * "Demo" heading, then a card with what the reset does and the "Demo reset"
+ * button (PoC-12). It asks first; while `resetDemo` runs the button shows a
+ * spinner; a failure reads inline and the button works again.
+ */
+@Composable
+private fun DemoResetSection(reset: DemoResetUi, onReset: () -> Unit, modifier: Modifier = Modifier) {
+    var confirming by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dimens.CardGap)) {
+        Text(
+            stringResource(R.string.demo_section),
+            style = Type.SectionTitle,
+            color = Brand.Ink,
+            modifier = Modifier.padding(start = 20.dp, top = 8.dp).semantics { heading() }
+        )
+        Column(
+            Modifier
+                .padding(horizontal = Dimens.Gutter)
+                .fillMaxWidth()
+                .background(Brand.Card, RoundedCornerShape(Dimens.CardRadius))
+                .padding(Dimens.CardPadding),
+            verticalArrangement = Arrangement.spacedBy(Dimens.CardInnerSpacing)
+        ) {
+            Text(stringResource(R.string.demo_reset_hint), style = Type.Body, color = Brand.InkSecondary)
+            PillButton(
+                text = stringResource(R.string.demo_reset_action),
+                onClick = { confirming = true },
+                enabled = reset != DemoResetUi.Running,
+                busy = reset == DemoResetUi.Running,
+                modifier = Modifier.testTag(MeTestTags.DEMO_RESET)
+            )
+            if (reset == DemoResetUi.Failed) {
+                Text(
+                    stringResource(R.string.demo_reset_failed),
+                    style = Type.Body,
+                    color = Brand.Error,
+                    modifier = Modifier.testTag(MeTestTags.DEMO_RESET_ERROR).semantics { liveRegion = LiveRegionMode.Assertive }
+                )
+            }
+        }
+    }
+    if (confirming) {
+        ConfirmDialog(
+            title = stringResource(R.string.demo_reset_confirm_title),
+            body = stringResource(R.string.demo_reset_confirm_body),
+            confirmLabel = stringResource(R.string.demo_reset_confirm),
+            cancelLabel = stringResource(R.string.dialog_cancel),
+            onConfirm = {
+                confirming = false
+                onReset()
+            },
+            onDismiss = { confirming = false }
+        )
+    }
+}
+
 /** Placeholder dash until the user document has loaded (or while it can't be read), as on iOS. */
 @Composable
 private fun ProfileCard(
@@ -203,7 +285,19 @@ private fun ProfileCard(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text("Balance", style = Type.Body, color = Brand.InkSecondary)
-            Text(balanceCents?.let(Money::format) ?: "—", style = Type.Balance, color = Brand.Ink)
+            if (balanceCents == null) {
+                Text("—", style = Type.Balance, color = Brand.Ink)
+            } else {
+                // Rolls old → new when a Pay or a reset moves it (instant with animations removed).
+                val spoken = stringResource(R.string.me_balance_description, Money.spoken(balanceCents))
+                RollingAmount(
+                    balanceCents,
+                    Modifier.testTag(MeTestTags.BALANCE).clearAndSetSemantics {
+                        contentDescription = spoken
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                )
+            }
         }
         PillButton(text = "Log out", onClick = onLogOut)
     }

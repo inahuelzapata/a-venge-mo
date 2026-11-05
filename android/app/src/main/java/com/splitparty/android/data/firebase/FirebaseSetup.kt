@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestoreSettings
 import com.google.firebase.firestore.memoryCacheSettings
+import com.google.firebase.functions.FirebaseFunctions
 
 /** Result of connecting to the configured Firestore (docs/firestore-target.md). */
 sealed interface FirebaseConnection {
@@ -76,6 +77,18 @@ object FirebaseSetup {
     }
 
     /**
+     * Cloud Functions (the callable `resetDemo`) in the same app and project as
+     * [db], region us-central1 (backend/functions/index.js). On the emulator
+     * target it talks to the Functions emulator on the Firestore emulator's host.
+     */
+    fun functions(db: FirebaseFirestore, target: FirestoreTarget): FirebaseFunctions =
+        FirebaseFunctions.getInstance(db.app, FUNCTIONS_REGION).apply {
+            if (target is FirestoreTarget.Emulator) {
+                parseHostPort(target.host)?.let { (host, _) -> useEmulator(host, FUNCTIONS_EMULATOR_PORT) }
+            }
+        }
+
+    /**
      * Memory cache only: a relaunch never shows stale data from disk, and the
      * feed reflects what the server has.
      */
@@ -90,4 +103,8 @@ object FirebaseSetup {
     }
 
     private val VALID_PORTS = 1..65_535
+    private const val FUNCTIONS_REGION = "us-central1"
+
+    /** backend/firebase.json `emulators.functions.port`. */
+    private const val FUNCTIONS_EMULATOR_PORT = 5001
 }

@@ -2,11 +2,13 @@ package com.splitparty.android.ui.me
 
 import app.cash.turbine.test
 import com.splitparty.android.domain.live.LiveState
+import com.splitparty.android.domain.repository.DemoResetResult
 import com.splitparty.android.domain.usecase.ObserveUserTransactionsUseCase
 import com.splitparty.android.domain.usecase.ObserveUserUseCase
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.domain.usecase.SignOutUseCase
 import com.splitparty.android.testing.FakeConnectivityObserver
+import com.splitparty.android.testing.FakeDemoResetRepository
 import com.splitparty.android.testing.FakeDemoSettingsRepository
 import com.splitparty.android.testing.FakeSessionRepository
 import com.splitparty.android.testing.FakeSplitPartyRepository
@@ -14,6 +16,8 @@ import com.splitparty.android.testing.MainDispatcherRule
 import com.splitparty.android.testing.TestData
 import com.splitparty.android.testing.TestData.server
 import com.splitparty.android.testing.TestData.tx
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -28,6 +32,7 @@ class MeViewModelTest {
     private val connectivity = FakeConnectivityObserver()
     private val session = FakeSessionRepository(initial = "maxi")
     private val demoSettings = FakeDemoSettingsRepository(initial = true)
+    private val demoReset = FakeDemoResetRepository()
 
     // Lazy: built inside the test, after MainDispatcherRule has replaced Dispatchers.Main.
     private val viewModel by lazy {
@@ -37,7 +42,8 @@ class MeViewModelTest {
             observeUserTransactions = ObserveUserTransactionsUseCase(repository, connectivity),
             observeUsers = ObserveUsersUseCase(repository),
             signOut = SignOutUseCase(session),
-            demoSettings = demoSettings
+            demoSettings = demoSettings,
+            demoReset = demoReset
         )
     }
 
@@ -80,5 +86,37 @@ class MeViewModelTest {
             assertEquals(false, awaitItem().demoAtMerchant)
             assertEquals(false, demoSettings.atMerchant.value)
         }
+    }
+
+    @Test
+    fun `demo reset shows progress, then success, and ignores a second tap while running`() = runTest {
+        val gate = CompletableDeferred<Unit>().also { demoReset.gate = it }
+        viewModel.state.test {
+            viewModel.onAction(MeAction.ResetDemo)
+            viewModel.onAction(MeAction.ResetDemo)
+            runCurrent()
+            assertEquals(DemoResetUi.Running, expectMostRecentItem().reset)
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(DemoResetUi.Done, expectMostRecentItem().reset)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(1, demoReset.calls)
+    }
+
+    @Test
+    fun `a failed demo reset is an error and can be tried again`() = runTest {
+        demoReset.result = DemoResetResult.Failed
+        viewModel.state.test {
+            viewModel.onAction(MeAction.ResetDemo)
+            runCurrent()
+            assertEquals(DemoResetUi.Failed, expectMostRecentItem().reset)
+            demoReset.result = DemoResetResult.Done
+            viewModel.onAction(MeAction.ResetDemo)
+            runCurrent()
+            assertEquals(DemoResetUi.Done, expectMostRecentItem().reset)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(2, demoReset.calls)
     }
 }

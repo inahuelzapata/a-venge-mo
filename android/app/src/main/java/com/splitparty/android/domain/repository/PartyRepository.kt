@@ -34,6 +34,7 @@ sealed interface PartyWriteResult {
 }
 
 /** Split Party reads and writes (docs/firestore-schema.md, `parties` and `joinCodes`). */
+@Suppress("TooManyFunctions") // the party contract: one function per documented read or write
 interface PartyRepository {
     /**
      * Parties at [merchantId] stored as `open` whose `expiresAt` was still
@@ -64,6 +65,16 @@ interface PartyRepository {
 
     /** A non-host member leaves: drops [userId] from `memberIds` and `members`; wrong attempts untouched. */
     suspend fun leave(partyId: String, userId: String): PartyWriteResult
+
+    /**
+     * Host only, the Pay tap (docs/firestore-schema.md, "Paying a party"): one
+     * transaction that creates `transactions/{partyId}_{member}` for every
+     * joinee's share, moves the balances, marks everyone paid, sets `paid` and
+     * frees the join-code lock. A party that is already `paid` returns [PartyWriteResult.Done]
+     * and writes nothing, so a retried or doubled Pay never charges twice.
+     * Not active, no bill or no joinee: [PartyWriteResult.NotAllowed].
+     */
+    suspend fun settle(partyId: String, hostId: String): PartyWriteResult
 
     /** `wrongCodeAttempts.{userId}` += 1. */
     suspend fun recordWrongAttempt(partyId: String, userId: String)

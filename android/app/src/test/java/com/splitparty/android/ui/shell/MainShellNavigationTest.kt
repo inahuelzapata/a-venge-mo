@@ -18,11 +18,13 @@ import com.splitparty.android.di.domainModule
 import com.splitparty.android.di.viewModelModule
 import com.splitparty.android.domain.Clock
 import com.splitparty.android.domain.repository.ConnectivityObserver
+import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoSettingsRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
 import com.splitparty.android.testing.FakeConnectivityObserver
+import com.splitparty.android.testing.FakeDemoResetRepository
 import com.splitparty.android.testing.FakeDemoSettingsRepository
 import com.splitparty.android.testing.FakePartyRepository
 import com.splitparty.android.testing.FakeSessionRepository
@@ -73,6 +75,7 @@ class MainShellNavigationTest {
             single<ConnectivityObserver> { FakeConnectivityObserver() }
             single<PartyRepository> { parties }
             single<DemoSettingsRepository> { FakeDemoSettingsRepository() }
+            single<DemoResetRepository> { FakeDemoResetRepository() }
             single<Clock> { Clock { NOW } }
         }
         startKoin { modules(fakeData, domainModule, viewModelModule) }
@@ -97,7 +100,7 @@ class MainShellNavigationTest {
         launch()
         compose.onNodeWithTag(ShellTestTags.tab(Tab.Me)).performClick()
         compose.onNodeWithText("@maxi").assertIsDisplayed()
-        compose.onNodeWithText("$250.00").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Balance, 250 dollars").assertIsDisplayed()
         // The profile card fills the small test screen; the user's rows are below it.
         compose.onNodeWithTag(MeTestTags.LIST).performScrollToNode(hasText("My row", substring = true))
         compose.onNodeWithText("My row", substring = true).assertIsDisplayed()

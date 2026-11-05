@@ -15,12 +15,14 @@ import com.splitparty.android.di.viewModelModule
 import com.splitparty.android.domain.Clock
 import com.splitparty.android.domain.model.Party
 import com.splitparty.android.domain.repository.ConnectivityObserver
+import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoSettingsRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
 import com.splitparty.android.domain.split.Tip
 import com.splitparty.android.testing.FakeConnectivityObserver
+import com.splitparty.android.testing.FakeDemoResetRepository
 import com.splitparty.android.testing.FakeDemoSettingsRepository
 import com.splitparty.android.testing.FakePartyRepository
 import com.splitparty.android.testing.FakeSessionRepository
@@ -56,6 +58,7 @@ class ScriptedRecognizer(var outcome: ScanOutcome = ScanOutcome.NoTotal) : Recei
  */
 class PartyHarness(private val userId: String) : ExternalResource() {
     val parties = FakePartyRepository()
+    val demoReset = FakeDemoResetRepository()
     val recognizer = ScriptedRecognizer()
     val data = FakeSplitPartyRepository().apply {
         users.value = server(TestData.everyone.associateBy { it.id })
@@ -74,6 +77,7 @@ class PartyHarness(private val userId: String) : ExternalResource() {
                     single<ConnectivityObserver> { FakeConnectivityObserver() }
                     single<PartyRepository> { parties }
                     single<DemoSettingsRepository> { FakeDemoSettingsRepository() }
+                    single<DemoResetRepository> { demoReset }
                     single<Clock> { Clock { System.currentTimeMillis() } }
                     single<ReceiptRecognizer> { recognizer }
                 },
