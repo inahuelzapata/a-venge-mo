@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { FieldValue, Timestamp, GeoPoint } from 'firebase-admin/firestore';
 import { BACKEND_DIR, openFirestore, readConfig } from '../../lib/env.js';
 import { seed, reset } from '../../lib/ops.js';
-import { buildSeed, MERCHANT_ID } from '../../lib/seedData.js';
+import { buildSeed, MERCHANT_ID, SEED_USERS } from '../../lib/seedData.js';
 import { computeSplit } from '../../lib/split.js';
 import { joinCodeLockId, partyTransactionId, PARTY_TTL_MS } from '../../lib/schema.js';
 import { validateParty, validateTransaction, validateUser } from '../../lib/validate.js';
@@ -59,7 +59,9 @@ test('seed on an empty DB: 3 mutual-friend users with name, avatar, non-zero bal
     const u = d.data();
     assert.deepEqual(validateUser(d.id, u), []);
     assert.deepEqual([...u.friendIds].sort(), ids.filter((i) => i !== d.id));
-    assert.ok(u.displayName && u.avatar);
+    assert.ok(u.displayName);
+    assert.equal(u.avatar, SEED_USERS[d.id].avatar); // the person's photo URL
+    assert.match(u.avatar, /^https:\/\/taller\.ai\//);
     assert.ok(Number.isInteger(u.balanceCents) && u.balanceCents !== 0);
   }
   afterFirstSeed = await snapshot();

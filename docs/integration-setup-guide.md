@@ -116,6 +116,12 @@ Both speak the same Firebase callable protocol and run the same `reset()` as
 
 After changing `RESET_DEMO_URL`, rebuild and reinstall the app.
 
+**Any seed change needs a redeploy.** The deployed reset bundles its own copy of
+`lib/seedData.js` at deploy time, so after editing the seed (for example a
+user's `avatar` photo URL) run `npm run seed` *and* redeploy the reset you use:
+`npm run deploy:functions` (A) or `npm run deploy:reset-endpoint` (B). Otherwise
+the first in-app Demo reset puts the old seed values back.
+
 **Check it is live without resetting anything**: a plain GET on the address
 answers **400** when deployed and **404** when it is missing (a POST *does*
 reset, so never POST it by hand during a demo):

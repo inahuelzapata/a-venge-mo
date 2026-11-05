@@ -87,3 +87,12 @@ test('rejects a 0 percent tip and a removal that leaves members out of sync', as
   await assertFails(updateDoc(ref, { memberIds: ['maxi'] }));
   await assertFails(updateDoc(ref, { memberIds: ['annie'], 'members.maxi': deleteField() }));
 });
+
+test('a user document whose avatar is a photo URL: phone may move the balance, not the avatar', async () => {
+  const avatar = 'https://taller.ai/_next/image?url=%2Fleadership%2Fmaximiliano-armesto.jpg&w=1080&q=75';
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'users/maxi'), {
+    username: 'maxi', displayName: 'Maxi', avatar, balanceCents: 25000, friendIds: ['annie', 'christophe'],
+  }));
+  await assertSucceeds(updateDoc(doc(db, 'users/maxi'), { balanceCents: 20000 }));
+  await assertFails(updateDoc(doc(db, 'users/maxi'), { avatar: 'avatar_maxi' }));
+});

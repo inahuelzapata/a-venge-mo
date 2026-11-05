@@ -4,10 +4,15 @@
 
 export const MERCHANT_ID = 'tonys-greenwich';
 
+// `avatar` is the person's photo URL, stored verbatim (the taller.ai Next.js
+// image-optimizer link, w=1080). The apps fetch and cache it at runtime and show
+// initials when it is missing, empty or not a URL; the backend stores URLs only.
+const photo = (file) => `https://taller.ai/_next/image?url=%2Fleadership%2F${file}.jpg&w=1080&q=75`;
+
 export const SEED_USERS = Object.freeze({
-  maxi: { displayName: 'Maxi', avatar: 'avatar_maxi', balanceCents: 25000 },
-  annie: { displayName: 'Annie', avatar: 'avatar_annie', balanceCents: 18050 },
-  christophe: { displayName: 'Christophe', avatar: 'avatar_christophe', balanceCents: 32075 },
+  maxi: { displayName: 'Maxi', avatar: photo('maximiliano-armesto'), balanceCents: 25000 },
+  annie: { displayName: 'Annie', avatar: photo('annie-rodriguez'), balanceCents: 18050 },
+  christophe: { displayName: 'Christophe', avatar: photo('christophe-kolb'), balanceCents: 32075 },
 });
 
 // [id, payer, payee, amountCents, memo, fromTonys, ISO time, likes, comments]

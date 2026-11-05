@@ -42,7 +42,7 @@ Usernames are therefore immutable.
 | -------------- | ---------------- | ----------- |
 | `username`     | string           | Login key. Lower-case, matches `^[a-z0-9_]{3,20}$`. Always equal to the document id. |
 | `displayName`  | string           | Name shown in the UI, e.g. `"Maxi"`. 1–40 chars. |
-| `avatar`       | string           | Avatar asset key bundled in both apps, e.g. `"avatar_maxi"`. Apps map the key to an image; unknown keys fall back to initials. |
+| `avatar`       | string           | URL of the user's photo, e.g. `"https://taller.ai/_next/image?url=%2Fleadership%2Fmaximiliano-armesto.jpg&w=1080&q=75"`. The apps fetch and cache the image at runtime; a missing, empty or non-URL value means "show initials". Written only by the seed (Admin SDK); the backend stores the URL only and never fetches, proxies or copies the image. |
 | `balanceCents` | int              | Mock wallet balance in cents. Changed only by a party payment (see *Paying a party*). May go negative; the PoC does not block payments. |
 | `friendIds`    | array\<string\>  | User ids of this user's friends. Friendship is mutual: if `a` lists `b`, `b` lists `a`. Never contains the user's own id. |
 
@@ -51,11 +51,15 @@ and the account exists if that document exists.
 
 Seeded accounts (see `backend/lib/seedData.js` for the exact values):
 
-| id           | displayName | avatar              | balanceCents | friendIds                |
-| ------------ | ----------- | ------------------- | ------------ | ------------------------ |
-| `maxi`       | Maxi        | `avatar_maxi`       | 25000        | `annie`, `christophe`    |
-| `annie`      | Annie       | `avatar_annie`      | 18050        | `maxi`, `christophe`     |
-| `christophe` | Christophe  | `avatar_christophe` | 32075        | `maxi`, `annie`          |
+| id           | displayName | avatar (photo URL)                                                                    | balanceCents | friendIds             |
+| ------------ | ----------- | ------------------------------------------------------------------------------------- | ------------ | --------------------- |
+| `maxi`       | Maxi        | `https://taller.ai/_next/image?url=%2Fleadership%2Fmaximiliano-armesto.jpg&w=1080&q=75` | 25000        | `annie`, `christophe` |
+| `annie`      | Annie       | `https://taller.ai/_next/image?url=%2Fleadership%2Fannie-rodriguez.jpg&w=1080&q=75`     | 18050        | `maxi`, `christophe`  |
+| `christophe` | Christophe  | `https://taller.ai/_next/image?url=%2Fleadership%2Fchristophe-kolb.jpg&w=1080&q=75`     | 32075        | `maxi`, `annie`       |
+
+The URLs are the taller.ai Next.js image-optimizer links (`w=1080`), stored
+verbatim. Changing them is a seed change, which also needs the Demo reset
+redeployed ([setup guide, section 3b](integration-setup-guide.md)).
 
 ---
 
