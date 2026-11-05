@@ -37,6 +37,8 @@ struct JoinConfirmationView: View {
         .onDisappear { room?.stop(); room = nil }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("joinConfirmationScreen")
+        // Lets UI tests tell parties apart, as on the party screen.
+        .accessibilityValue(partyId)
     }
 
     @ViewBuilder
