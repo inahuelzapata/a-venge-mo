@@ -45,13 +45,17 @@ struct MainTabView: View {
 
 /// Screens pushed on top of Home.
 enum HomeDestination: Hashable {
-    case splitParty
+    /// The party screen, for host and members alike.
+    case party(id: String)
+    /// Picking the host's code before joining their party.
+    case confirmJoin(partyId: String)
 }
 
 /// Home with standard push navigation. Home keeps no navigation bar of its own;
 /// pushed screens get the system bar and Back. Home stays alive underneath, so
 /// Back returns to the same scroll position.
 private struct HomeNavigationStack: View {
+    @Environment(LiveDataStore.self) private var liveData
     @State private var path: [HomeDestination]
 
     init(initialPath: [HomeDestination]) {
@@ -60,17 +64,43 @@ private struct HomeNavigationStack: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            HomeView(onStartParty: { path.append(.splitParty) })
+            HomeView(onStartParty: startParty,
+                     onOpenParty: { open(.party(id: $0)) },
+                     onJoin: { open(.confirmJoin(partyId: $0)) })
                 .background(Theme.background.ignoresSafeArea())
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: HomeDestination.self) { destination in
                     switch destination {
-                    // The single navigation target for "Start a party": the real
-                    // party screen replaces the placeholder here.
-                    case .splitParty: SplitPartyPlaceholderView()
+                    case let .party(id):
+                        PartyView(partyId: id, onBackToHome: { path = [] })
+                    case let .confirmJoin(partyId):
+                        JoinConfirmationView(partyId: partyId,
+                                             onJoined: { path = [.party(id: partyId)] },
+                                             onBackToHome: { path = [] })
                     }
                 }
         }
+        // Relaunch (or sign-in) while in an open party: straight back to it.
+        .onChange(of: liveData.parties.partyToOpenOnLaunch, initial: true) { _, partyId in
+            guard let partyId else { return }
+            liveData.parties.partyToOpenOnLaunch = nil
+            path = [.party(id: partyId)]
+        }
+    }
+
+    /// "Start a party" on the merchant card: opens the new party, or the one the
+    /// user is already in. On failure Home shows the inline error and stays put.
+    private func startParty() {
+        Task {
+            if let partyId = await liveData.parties.startParty() {
+                open(.party(id: partyId))
+            }
+        }
+    }
+
+    private func open(_ destination: HomeDestination) {
+        guard path.last != destination else { return }
+        path = [destination]
     }
 }
 

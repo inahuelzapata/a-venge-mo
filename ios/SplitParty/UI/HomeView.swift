@@ -3,8 +3,10 @@ import SwiftUI
 /// Home: header, the banner slot, then the live feed of everyone's payments,
 /// newest first.
 struct HomeView: View {
-    /// Opens Split Party; called from the banner card.
+    /// Called from the banner slot (merchant card, Join banner, back-to-party).
     var onStartParty: () -> Void = {}
+    var onOpenParty: (String) -> Void = { _ in }
+    var onJoin: (String) -> Void = { _ in }
 
     @Environment(LiveDataStore.self) private var liveData
 
@@ -12,7 +14,7 @@ struct HomeView: View {
         ScrollView {
             VStack(spacing: 16) {
                 HomeHeader(user: liveData.signedInUser, fallbackName: liveData.userId)
-                HomeBannerSlot(onStartParty: onStartParty)
+                HomeBannerSlot(onStartParty: onStartParty, onOpenParty: onOpenParty, onJoin: onJoin)
                 TransactionList(state: liveData.feed,
                                 emptyTitle: "No payments yet",
                                 emptyMessage: "When friends pay each other, it shows up here.")
@@ -20,18 +22,12 @@ struct HomeView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        // The geofence stand-in: while Home is on screen and the demo switch is
+        // on, the merchant card arrives (once per session, or after switching on).
+        .task(id: liveData.parties.isDemoAtMerchant) {
+            await liveData.parties.revealMerchantCardWhenReady()
+        }
         .accessibilityIdentifier("homeScreen")
-    }
-}
-
-/// Space above the feed for banners. Holds the "Split the check" card (PoC-7),
-/// shown to everyone in every feed state; the Join banner (PoC-8) goes here later
-/// so the feed layout around it does not change.
-struct HomeBannerSlot: View {
-    let onStartParty: () -> Void
-
-    var body: some View {
-        SplitPartyBannerCard(onStartParty: onStartParty)
     }
 }
 

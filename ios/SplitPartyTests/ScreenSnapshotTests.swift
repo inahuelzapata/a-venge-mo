@@ -84,10 +84,6 @@ final class ScreenSnapshotTests: XCTestCase {
         try assertSignedInScreen(scenario: .seeded, tab: .payRequest)
     }
 
-    func testSplitPartyPlaceholder() throws {
-        try assertSignedInScreen(scenario: .seeded, tab: .home, homePath: [.splitParty])
-    }
-
     // MARK: Helpers
 
     private func assertSignedInScreen(scenario: FixtureDataSource.Scenario, tab: AppTab,
@@ -98,6 +94,8 @@ final class ScreenSnapshotTests: XCTestCase {
         let appModel = makeAppModel(scenario: scenario, signedInUserId: "maxi")
         let liveData = try XCTUnwrap(appModel.liveData, "Saved session should open as maxi")
         defer { liveData.stop() }
+        // The merchant card normally slides in a moment after Home opens.
+        liveData.parties.revealMerchantCardWithoutAnimation()
         assertScreen(MainTabView(initialTab: tab, initialHomePath: homePath).environment(liveData), appModel: appModel,
                      pixelPrecision: pixelPrecision, file: file, testName: testName, line: line)
     }
@@ -123,16 +121,20 @@ final class ScreenSnapshotTests: XCTestCase {
 
     private func makeAppModel(scenario: FixtureDataSource.Scenario, signedInUserId: String?) -> AppModel {
         AppModel(dataSource: FixtureDataSource(scenario: scenario), targetSummary: Self.emulatorSummary,
-                 sessionStore: makeSessionStore(signedInUserId: signedInUserId))
+                 sessionStore: makeSessionStore(signedInUserId: signedInUserId),
+                 demoModeStore: DemoModeStore(defaults: throwawayDefaults(suiteName: "ScreenSnapshotTests.demoMode")))
     }
 
     /// A throwaway defaults suite, so tests never touch the app's real saved session.
     private func makeSessionStore(signedInUserId: String?) -> SessionStore {
-        let suiteName = "ScreenSnapshotTests"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let store = SessionStore(defaults: defaults)
+        let store = SessionStore(defaults: throwawayDefaults(suiteName: "ScreenSnapshotTests"))
         if let signedInUserId { store.save(userId: signedInUserId) }
         return store
+    }
+
+    private func throwawayDefaults(suiteName: String) -> UserDefaults {
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 }

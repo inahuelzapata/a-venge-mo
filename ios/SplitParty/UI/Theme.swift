@@ -52,6 +52,48 @@ enum Theme {
     static let bannerButtonBottomInset: CGFloat = 16
     static let bannerButtonHeight: CGFloat = 38
     static let bannerButtonFontSize: CGFloat = 15
+
+    // Merchant card arrival (geofence stand-in): slides in, then one light sweep.
+    // docs/design/visual-conventions.md ("Home banner slot").
+
+    static let shimmerDelay: Double = 0.25
+    static let shimmerDuration: Double = 0.9
+    /// Band width as a share of the card width.
+    static let shimmerBandWidthFraction: CGFloat = 0.35
+    static let shimmerPeakOpacity: Double = 0.55
+    static let shimmerAngleDegrees: Double = 20
+
+    // Join banner and "Back to your party" card in Home's banner slot.
+
+    static let joinBannerHorizontalPadding: CGFloat = 18
+    static let joinBannerVerticalPadding: CGFloat = 16
+    static let joinBannerSpacing: CGFloat = 12
+    static let joinBannerFontSize: CGFloat = 16
+    static let joinButtonHorizontalPadding: CGFloat = 20
+    static let pulsingDotSize: CGFloat = 10
+    static let backToPartyCodeFontSize: CGFloat = 26
+
+    // Party screen and code confirmation.
+
+    static let codeTileSize: CGFloat = 76
+    static let codeTileSpacing: CGFloat = 12
+    static let codeTileCornerRadius: CGFloat = 20
+    static let codeEmojiFontSize: CGFloat = 44
+    static let memberAvatarSize: CGFloat = 56
+    /// Wide enough for "Christophe" at 14 medium; 3 seats + 2 gaps = 280.
+    static let memberSeatWidth: CGFloat = 84
+    static let memberSeatSpacing: CGFloat = 14
+    static let hostBadgeFontSize: CGFloat = 11
+    static let partySectionSpacing: CGFloat = 16
+    /// Code options on the confirmation screen.
+    static let optionHeight: CGFloat = 72
+    static let optionEmojiFontSize: CGFloat = 34
+    static let optionSpacing: CGFloat = 12
+    /// Wrong pick: the option shakes this far, this many times.
+    static let shakeDistance: CGFloat = 10
+    static let shakeCount: CGFloat = 3
+    /// Light grey of an empty seat; a selected option's border.
+    static let emptySeat = Color(hex: 0xE4E4E8)
 }
 
 extension Color {

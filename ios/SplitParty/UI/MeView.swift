@@ -15,6 +15,7 @@ struct MeView: View {
                     .frame(height: 44)
                 ProfileCard(user: liveData.signedInUser, userId: liveData.userId,
                             onLogOut: appModel.logOut)
+                DemoModeCard(isAtMerchant: Bindable(appModel).isDemoAtMerchant)
                 Text("Your payments")
                     .font(.system(size: 20, weight: .semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -66,5 +67,32 @@ private struct ProfileCard: View {
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.cardCornerRadius).fill(Theme.card))
         .padding(.horizontal, Theme.screenGutter)
+    }
+}
+
+/// The geofence stand-in (PoC-7): while on, Home shows the merchant card as if
+/// the phone had just arrived at Tony's. Remembered across restarts.
+private struct DemoModeCard: View {
+    @Binding var isAtMerchant: Bool
+
+    static let title = "Demo mode: at Tony's"
+
+    var body: some View {
+        Toggle(isOn: $isAtMerchant) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.primaryText)
+                Text("Pretend this phone is at the merchant")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .tint(Theme.brandBlue)
+        .padding(.horizontal, Theme.cardPadding)
+        .padding(.vertical, 14)
+        .background(RoundedRectangle(cornerRadius: Theme.cardCornerRadius).fill(Theme.card))
+        .padding(.horizontal, Theme.screenGutter)
+        .accessibilityIdentifier("demoModeToggle")
     }
 }

@@ -13,6 +13,7 @@ enum Schema {
         static let displayName = "displayName"
         static let avatar = "avatar"
         static let balanceCents = "balanceCents"
+        static let friendIds = "friendIds"
     }
 
     enum TransactionField {
@@ -32,12 +33,14 @@ enum Schema {
     static let listLimit = 50
 }
 
-/// `users/{id}`. `friendIds` is deliberately not read: no screen in this app shows it.
+/// `users/{id}`. `friendIds` decides whose parties raise a Join banner; no
+/// screen lists friends.
 struct UserAccount: Equatable, Identifiable {
     let id: String
     let displayName: String
     let avatarKey: String
     let balanceCents: Int
+    let friendIds: [String]
 
     /// Returns nil when a required field is missing or has the wrong type, so a
     /// malformed document is skipped instead of crashing the app.
@@ -50,13 +53,20 @@ struct UserAccount: Equatable, Identifiable {
         self.displayName = displayName
         self.avatarKey = data[Schema.UserField.avatar] as? String ?? ""
         self.balanceCents = balanceCents
+        self.friendIds = data[Schema.UserField.friendIds] as? [String] ?? []
     }
 
-    init(id: String, displayName: String, avatarKey: String, balanceCents: Int) {
+    init(id: String, displayName: String, avatarKey: String, balanceCents: Int, friendIds: [String] = []) {
         self.id = id
         self.displayName = displayName
         self.avatarKey = avatarKey
         self.balanceCents = balanceCents
+        self.friendIds = friendIds
+    }
+
+    /// "Christophe Dupont" → "Christophe": the member row shows first names.
+    var firstName: String {
+        displayName.split(separator: " ").first.map(String.init) ?? displayName
     }
 }
 

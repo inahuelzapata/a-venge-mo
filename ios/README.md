@@ -10,6 +10,15 @@ any case), a live Home feed of everyone's payments, a Me tab with the live
 mock balance and the user's own payments, and a bottom bar with Home,
 Pay/Request (placeholder) and Me. The phone stays signed in until Log out.
 
+Split Party (PoC-7 to PoC-9): a "Demo mode: at Tony's" switch on Me (on by
+default, remembered) stands in for the geofence and makes the "Split the check"
+card slide in on Home. "Start a party" creates a party at Tony's with a
+three-emoji code and a 5-minute expiry (or reopens the one you are in). Friends'
+phones get a Join banner, pick the host's code out of four (three wrong picks
+lock that party for them) and appear live in everyone's member row. Every phone
+expires the party by the clock; the host's phone writes `expired` and releases
+the code lock. No bill, tip, share or Pay yet.
+
 ## Layout
 
 | Path | What |
@@ -17,8 +26,8 @@ Pay/Request (placeholder) and Me. The phone stays signed in until Log out.
 | `SplitParty.xcodeproj` | The project. Open this. |
 | `SplitParty/` | App sources and assets. This folder is **synchronized** with Xcode: files added here are part of the app with no project edit. |
 | `SplitParty/Data/` | Data access behind `PaymentDataSource`: Firestore (`PaymentRepository`) and, in Debug builds only, the in-memory `FixtureDataSource` used by tests; models, money formatting, session storage |
-| `SplitParty/App/` | `AppModel` (target + who is signed in) and `LiveDataStore` (live listeners, error state) |
-| `SplitParty/UI/` | Login, Home, Me, bottom bar, theme |
+| `SplitParty/App/` | `AppModel` (target, who is signed in, demo switch), `LiveDataStore` (live listeners, error state) and `PartyHub` (open parties, Home banner, shared expiry clock) |
+| `SplitParty/UI/` | Login, Home and its banner slot, party screen, code confirmation, Me, bottom bar, theme |
 | `SplitPartyTests/` | Unit tests (money, usernames, document mapping) and snapshot tests (`ScreenSnapshotTests`) |
 | `SplitPartyTests/__Snapshots__/` | Snapshot reference PNGs, stored with **Git LFS** |
 | `SplitPartyUITests/` | UI tests of the shell flows (`AppShellUITests`) |
@@ -123,14 +132,17 @@ xcodebuild test -project SplitParty.xcodeproj -scheme SplitParty \
 
 | Suite | What it covers | Needs |
 | ----- | -------------- | ----- |
-| `SplitPartyTests` (unit) | Money formatting from cents, username rules, Firestore document mapping | Nothing |
+| `SplitPartyTests` (unit) | Money formatting from cents, username rules, Firestore document mapping, join codes (palette, four distinct options, reshuffle), clock-based expiry, three-strike lockout | Nothing |
 | `ScreenSnapshotTests` | Pixel snapshots of login (empty, unknown user, not configured), Home (feed, empty, unreachable), Me and Pay/Request | **iOS 26.5 simulator** (references are recorded there; other iOS versions skip these tests) |
-| `SplitPartyUITests` | Sign in as maxi, "thor" error, empty field, stay signed in across relaunch, Log out, tab bar, a new payment appearing on top, empty and error states | Nothing |
+| `SplitPartyUITests` | Sign in as maxi, "thor" error, empty field, stay signed in across relaunch, Log out, tab bar, a new payment appearing on top, empty and error states. `PartyFlowUITests`: demo switch, start a party (and again), inline error, Join banner in and out, code confirmation and lock, live members, Back to your party, relaunch into the party, expiry | Nothing |
 
 Snapshot and UI tests never touch Firestore. In Debug builds the app accepts
 launch arguments that switch it to built-in seeded data (`FixtureDataSource`):
 `-UITestFixture seeded|empty|unreachable`, `-UITestResetSession YES`,
-`-UITestInsertIncomingPaymentAfter <seconds>`. Release builds ignore them.
+`-UITestInsertIncomingPaymentAfter <seconds>`, and for parties
+`-UITestFriendParty <hostId>` (with `-UITestFriendPartyMembers`, `-UITestFriendPartyAge`,
+`-UITestFriendPartyAfter`) and `-UITestFriendsJoinEvery <seconds>`; see
+`UITestLaunch` in `SplitParty/App/AppModel.swift`. Release builds ignore them.
 
 **After an intended visual change**, re-record the snapshots, look at every
 changed PNG, then commit them (Git LFS stores them automatically):

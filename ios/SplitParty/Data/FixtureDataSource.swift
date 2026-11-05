@@ -25,11 +25,26 @@ final class FixtureDataSource: PaymentDataSource {
 
     private struct FixtureUnreachableError: Error {}
 
+    // Split Party state (see the "Parties" extension below).
+    private var parties: [String: SplitParty] = [:]
+    private var openPartyListeners: [UUID: (merchantId: String,
+                                            onChange: (Result<LiveList<SplitParty>, Error>) -> Void)] = [:]
+    private var partyListeners: [UUID: (partyId: String,
+                                        onChange: (Result<LiveDocument<SplitParty>, Error>) -> Void)] = [:]
+    private var nextPartyNumber = 1
+    /// When set, the other seeded users join a party the signed-in user starts,
+    /// one after another at this interval (UI tests and captures).
+    var friendsJoinInterval: Double?
+
     init(scenario: Scenario, now: Date = .now) {
         self.scenario = scenario
         usersById = Self.seededUsers
         transactions = scenario == .seeded ? Self.seededTransactions(now: now) : []
     }
+
+    /// Every party the fixture creates or hosts uses this code, so UI tests and
+    /// captures know which option is the right one.
+    static let fixedJoinCode = JoinCode(["🍕", "🍺", "🎉"])!
 
     // MARK: PaymentDataSource
 
@@ -98,10 +113,12 @@ final class FixtureDataSource: PaymentDataSource {
 
     /// Same values as SEED_USERS in backend/lib/seedData.js.
     private static let seededUsers: [String: UserAccount] = [
-        "maxi": UserAccount(id: "maxi", displayName: "Maxi", avatarKey: "avatar_maxi", balanceCents: 25000),
-        "annie": UserAccount(id: "annie", displayName: "Annie", avatarKey: "avatar_annie", balanceCents: 18050),
+        "maxi": UserAccount(id: "maxi", displayName: "Maxi", avatarKey: "avatar_maxi", balanceCents: 25000,
+                            friendIds: ["annie", "christophe"]),
+        "annie": UserAccount(id: "annie", displayName: "Annie", avatarKey: "avatar_annie", balanceCents: 18050,
+                             friendIds: ["maxi", "christophe"]),
         "christophe": UserAccount(id: "christophe", displayName: "Christophe", avatarKey: "avatar_christophe",
-                                  balanceCents: 32075),
+                                  balanceCents: 32075, friendIds: ["maxi", "annie"]),
     ]
 
     /// Same payments as SEED_FEED in backend/lib/seedData.js, newest first, with
@@ -121,6 +138,114 @@ final class FixtureDataSource: PaymentDataSource {
                                merchantName: merchant, createdAt: now.addingTimeInterval(-age),
                                likesCount: likes, commentsCount: comments)
         }
+    }
+}
+
+// MARK: Parties
+
+extension FixtureDataSource {
+    func listenToOpenParties(merchantId: String,
+                             _ onChange: @escaping (Result<LiveList<SplitParty>, Error>) -> Void)
+        -> LiveSubscription {
+        let id = UUID()
+        openPartyListeners[id] = (merchantId, onChange)
+        onChange(openPartiesResult(merchantId: merchantId))
+        return FixtureSubscription { [weak self] in self?.openPartyListeners[id] = nil }
+    }
+
+    func listenToParty(id partyId: String,
+                       _ onChange: @escaping (Result<LiveDocument<SplitParty>, Error>) -> Void)
+        -> LiveSubscription {
+        let id = UUID()
+        partyListeners[id] = (partyId, onChange)
+        onChange(.success(LiveDocument(item: parties[partyId], isFromCache: false)))
+        return FixtureSubscription { [weak self] in self?.partyListeners[id] = nil }
+    }
+
+    func listenToMerchantName(merchantId: String, _ onChange: @escaping (String) -> Void) -> LiveSubscription {
+        onChange(DemoMerchant.fallbackName)
+        return FixtureSubscription {}
+    }
+
+    func startParty(hostId: String, merchantId: String) async throws -> SplitParty {
+        guard scenario != .unreachable else { throw PartyActionError.unreachable }
+        let now = Date()
+        if let existing = parties.values.first(where: { $0.isActive(at: now) && $0.isMember(hostId) }) {
+            return existing
+        }
+        let party = addParty(hostId: hostId, memberIds: [hostId], createdAt: now)
+        if let friendsJoinInterval {
+            scheduleJoins(of: Self.seededUsers.keys.sorted().filter { $0 != hostId },
+                          into: party.id, every: friendsJoinInterval)
+        }
+        return party
+    }
+
+    func joinParty(id: String, userId: String) async throws {
+        guard let party = parties[id] else { throw PartyActionError.partyNoLongerOpen }
+        guard !party.isLockedOut(userId) else { throw PartyActionError.lockedOut }
+        guard party.isActive(at: Date()) else { throw PartyActionError.partyNoLongerOpen }
+        guard !party.isMember(userId) else { return }
+        replace(party, memberIds: party.memberIds + [userId], wrongCodeAttempts: party.wrongCodeAttempts)
+    }
+
+    func recordWrongCode(partyId: String, userId: String) async throws {
+        guard let party = parties[partyId] else { return }
+        var attempts = party.wrongCodeAttempts
+        attempts[userId, default: 0] += 1
+        replace(party, memberIds: party.memberIds, wrongCodeAttempts: attempts)
+    }
+
+    func expireParty(id: String) async {
+        guard let party = parties[id], party.status == .open, Date() >= party.expiresAt else { return }
+        replace(party, status: .expired, memberIds: party.memberIds, wrongCodeAttempts: party.wrongCodeAttempts)
+    }
+
+    // MARK: Test controls
+
+    /// A party at Tony's that another phone has just started (or started
+    /// `ageSeconds` ago), as if read from the database.
+    @discardableResult
+    func addParty(hostId: String, memberIds: [String], createdAt: Date = .now) -> SplitParty {
+        let party = SplitParty(id: "fixture_party_\(nextPartyNumber)", hostId: hostId, merchantId: DemoMerchant.id,
+                               joinCode: Self.fixedJoinCode, status: .open, createdAt: createdAt,
+                               expiresAt: createdAt.addingTimeInterval(TimeInterval(PartySchema.partyLifetimeSeconds)),
+                               memberIds: memberIds, wrongCodeAttempts: [:])
+        nextPartyNumber += 1
+        store(party)
+        return party
+    }
+
+    func scheduleJoins(of userIds: [String], into partyId: String, every interval: Double) {
+        Task { @MainActor [weak self] in
+            for userId in userIds {
+                try? await Task.sleep(for: .seconds(interval))
+                try? await self?.joinParty(id: partyId, userId: userId)
+            }
+        }
+    }
+
+    // MARK: Helpers
+
+    private func replace(_ party: SplitParty, status: PartyStatus? = nil, memberIds: [String],
+                         wrongCodeAttempts: [String: Int]) {
+        store(SplitParty(id: party.id, hostId: party.hostId, merchantId: party.merchantId, joinCode: party.joinCode,
+                         status: status ?? party.status, createdAt: party.createdAt, expiresAt: party.expiresAt,
+                         memberIds: memberIds, wrongCodeAttempts: wrongCodeAttempts))
+    }
+
+    private func store(_ party: SplitParty) {
+        parties[party.id] = party
+        openPartyListeners.values.forEach { $0.onChange(openPartiesResult(merchantId: $0.merchantId)) }
+        partyListeners.values.filter { $0.partyId == party.id }
+            .forEach { $0.onChange(.success(LiveDocument(item: party, isFromCache: false))) }
+    }
+
+    private func openPartiesResult(merchantId: String) -> Result<LiveList<SplitParty>, Error> {
+        guard scenario != .unreachable else { return .failure(FixtureUnreachableError()) }
+        let open = parties.values.filter { $0.merchantId == merchantId && $0.status == .open }
+            .sorted { $0.createdAt < $1.createdAt }
+        return .success(LiveList(items: open, isFromCache: false))
     }
 }
 
