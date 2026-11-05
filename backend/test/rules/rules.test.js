@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { deleteField, doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
 let env;
 let db;
@@ -60,4 +60,30 @@ test('accepts a valid paid update, rejects reopening a paid party', async () => 
     status: 'paid', paidAt: Timestamp.now(), 'members.maxi.paid': true, 'members.annie.paid': true,
   }));
   await assertFails(updateDoc(doc(db, 'parties/ok'), { status: 'open' }));
+});
+
+// The writes the apps' total slice makes (Android data/FirestorePartyRepository.kt):
+// bill (+ the 0% tip as custom 0 while none is stored), tip changes, host
+// removal and leaving, each one update of only those fields.
+test('accepts the total slice writes: bill, tips, removal and leave', async () => {
+  const ref = doc(db, 'parties/total');
+  await assertSucceeds(setDoc(ref, party({
+    billCents: null, tip: null, memberIds: ['maxi', 'annie', 'christophe'],
+    members: { maxi: { joinedAt: created, paid: false }, annie: { joinedAt: created, paid: false },
+      christophe: { joinedAt: created, paid: false } },
+  })));
+  await assertSucceeds(updateDoc(ref, { billCents: 4850, tip: { type: 'custom', amountCents: 0 } }));
+  await assertSucceeds(updateDoc(ref, { billCents: 10000 }));
+  await assertSucceeds(updateDoc(ref, { tip: { type: 'percent', percent: 18 } }));
+  await assertSucceeds(updateDoc(ref, { tip: { type: 'custom', amountCents: 700 } }));
+  await assertSucceeds(updateDoc(ref, { memberIds: ['maxi', 'annie'], 'members.christophe': deleteField() }));
+  await assertSucceeds(updateDoc(ref, { memberIds: ['maxi'], 'members.annie': deleteField() }));
+});
+
+test('rejects a 0 percent tip and a removal that leaves members out of sync', async () => {
+  const ref = doc(db, 'parties/total-bad');
+  await assertSucceeds(setDoc(ref, party()));
+  await assertFails(updateDoc(ref, { tip: { type: 'percent', percent: 0 } }));
+  await assertFails(updateDoc(ref, { memberIds: ['maxi'] }));
+  await assertFails(updateDoc(ref, { memberIds: ['annie'], 'members.maxi': deleteField() }));
 });

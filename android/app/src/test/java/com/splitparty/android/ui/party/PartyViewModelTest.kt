@@ -3,6 +3,9 @@ package com.splitparty.android.ui.party
 import app.cash.turbine.test
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyStatus
+import com.splitparty.android.domain.repository.PartyWriteResult
+import com.splitparty.android.domain.split.Tip
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import com.splitparty.android.testing.FakeConnectivityObserver
 import com.splitparty.android.testing.FakePartyRepository
@@ -16,6 +19,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -127,6 +131,162 @@ class PartyViewModelTest {
             assertEquals(PartyPhase.NotFound, expectMostRecentItem().phase)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `no bill reads as waiting, host and member alike`() = runTest {
+        val host = viewModel("annie")
+        val member = viewModel("maxi")
+        push(party(host = "annie", members = listOf("annie", "maxi")))
+        host.state.test {
+            val s = expectMostRecentItem()
+            assertTrue(s.isHost)
+            assertNull(s.total)
+            cancelAndIgnoreRemainingEvents()
+        }
+        member.state.test {
+            val s = expectMostRecentItem()
+            assertEquals(false, s.isHost)
+            assertEquals("Annie", s.hostName)
+            assertNull(s.total)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `100 plus 18 percent for three gives host 39_34 and others 39_33, and a removal recomputes`() = runTest {
+        val three = listOf("maxi", "annie", "christophe")
+        val host = viewModel("maxi")
+        val member = viewModel("christophe")
+        push(party(host = "maxi", members = three, billCents = 10_000, tip = Tip.Percent(18)))
+        host.state.test {
+            val t = expectMostRecentItem().total!!
+            assertEquals(11_800L, t.totalCents)
+            assertEquals(3, t.headcount)
+            assertEquals(3_934L, t.shareCents)
+            assertEquals(TipChoice.Percent(18), t.tip)
+            cancelAndIgnoreRemainingEvents()
+        }
+        member.events.test {
+            member.state.test {
+                assertEquals(3_933L, expectMostRecentItem().total!!.shareCents)
+                push(party(host = "maxi", members = three.take(2), billCents = 10_000, tip = Tip.Percent(18)))
+                val after = expectMostRecentItem()
+                // Christophe is gone from the list: no share for him any more.
+                assertNull(after.total!!.shareCents)
+                assertEquals(2, after.total!!.headcount)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(PartyEvent.Removed("Maxi"), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a share change is a haptic event`() = runTest {
+        val vm = viewModel("annie")
+        vm.events.test {
+            vm.state.test {
+                push(party(host = "maxi", members = listOf("maxi", "annie"), billCents = 10_000, tip = Tip.ZERO))
+                push(party(host = "maxi", members = listOf("maxi", "annie", "christophe"), billCents = 10_000, tip = Tip.ZERO))
+                assertEquals(3_333L, expectMostRecentItem().total!!.shareCents)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(PartyEvent.MemberJoined, awaitItem())
+            assertEquals(PartyEvent.ShareChanged, awaitItem())
+        }
+    }
+
+    @Test
+    fun `host confirms a bill with the 0 percent tip, then picks custom 7`() = runTest {
+        val vm = viewModel("maxi")
+        push(party(host = "maxi", members = listOf("maxi", "annie", "christophe")))
+        vm.events.test {
+            vm.state.test {
+                expectMostRecentItem()
+                vm.confirmBill(10_000)
+                runCurrent()
+                assertEquals(TipChoice.Zero, expectMostRecentItem().total!!.tip)
+                vm.selectTip(TipChoice.Custom(700))
+                runCurrent()
+                val t = expectMostRecentItem().total!!
+                assertEquals(10_700L, t.totalCents)
+                assertEquals(3_568L, t.shareCents)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(PartyEvent.Saved, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(listOf("bill:10000", "tip:${Tip.Custom(700)}"), parties.writes)
+    }
+
+    @Test
+    fun `members cannot write the bill or tip, and a rejected write shows inline`() = runTest {
+        val member = viewModel("annie")
+        push(party(host = "maxi", members = listOf("maxi", "annie")))
+        member.state.test {
+            expectMostRecentItem()
+            member.confirmBill(4_850)
+            member.selectTip(TipChoice.Percent(18))
+            runCurrent()
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertTrue(parties.writes.isEmpty())
+
+        val host = viewModel("maxi")
+        parties.writeResult = PartyWriteResult.Failed
+        host.state.test {
+            expectMostRecentItem()
+            host.confirmBill(4_850)
+            runCurrent()
+            val s = expectMostRecentItem()
+            assertEquals(WriteError.Failed, s.writeError)
+            assertNull(s.total)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `leaving is not a removal, and the host cannot leave`() = runTest {
+        val vm = viewModel("annie")
+        push(party(host = "maxi", members = listOf("maxi", "annie")))
+        vm.events.test {
+            vm.state.test {
+                expectMostRecentItem()
+                vm.leave()
+                runCurrent()
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(PartyEvent.Left, awaitItem())
+            expectNoEvents()
+        }
+        val host = viewModel("maxi")
+        host.state.test {
+            expectMostRecentItem()
+            host.leave()
+            runCurrent()
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(listOf("leave:annie"), parties.writes)
+    }
+
+    @Test
+    fun `after expiry the total stays frozen and nothing is written`() = runTest {
+        val vm = viewModel("maxi")
+        push(
+            party(host = "maxi", members = listOf("maxi", "annie"), billCents = 10_000, tip = Tip.Percent(20), status = PartyStatus.Expired)
+        )
+        vm.state.test {
+            val s = expectMostRecentItem()
+            assertEquals(PartyPhase.Expired, s.phase)
+            assertEquals(12_000L, s.total!!.totalCents)
+            vm.confirmBill(20_000)
+            vm.selectTip(TipChoice.Zero)
+            vm.removeMember("annie")
+            runCurrent()
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertTrue(parties.writes.isEmpty())
     }
 
     @Test

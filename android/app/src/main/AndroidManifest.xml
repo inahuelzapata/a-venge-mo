@@ -7,6 +7,10 @@
     <!-- Android 17+ (targetSdk 37) blocks LAN traffic without it; the emulator
          target reaches the laptop over the LAN. Requested at runtime only then. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- Receipt scan (host only). Requested at runtime when "Scan receipt" is tapped.
+         Not required: without a camera the total is still typed in. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:name=".SplitPartyApplication"

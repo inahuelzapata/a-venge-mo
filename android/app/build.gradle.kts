@@ -38,6 +38,10 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Each on-device test runs in its own process with app data and permissions
+        // cleared (Orchestrator), so the camera-permission tests always start fresh.
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
 
         buildConfigField("String", "FIREBASE_TARGET", firestoreSetting("FIREBASE_TARGET"))
         buildConfigField("String", "FIREBASE_PROJECT_ID", firestoreSetting("FIREBASE_PROJECT_ID"))
@@ -59,7 +63,16 @@ android {
         compose = true
         buildConfig = true
     }
+    // Fakes and test data used by both the JVM tests and the on-device (Espresso) tests.
+    sourceSets {
+        getByName("test").kotlin.srcDir("src/sharedTest/java")
+        getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+    }
     testOptions {
+        // On-device tests run with system animations off (connectedAndroidTest),
+        // which is also the app's reduced-motion path.
+        animationsDisabled = true
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
         // Robolectric (Compose UI tests on the JVM) needs the merged resources and manifest.
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
@@ -130,6 +143,11 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.collections.immutable)
     implementation(platform(libs.koin.bom))
@@ -150,6 +168,20 @@ dependencies {
     testImplementation(libs.androidx.test.runner)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+
+    // On-device tests (src/androidTest): connectedDebugAndroidTest on an emulator or phone.
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(platform(libs.koin.bom))
+    androidTestImplementation(libs.koin.test)
+    androidTestImplementation(libs.junit)
+    androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestUtil(libs.androidx.test.services)
 
     ktlintRuleset(libs.compose.rules.ktlint)
     detektPlugins(libs.compose.rules.detekt)

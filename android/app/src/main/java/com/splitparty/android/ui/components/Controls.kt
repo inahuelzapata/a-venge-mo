@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -63,6 +65,42 @@ fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
         contentAlignment = Alignment.Center
     ) {
         if (busy) ActivitySpinner(color = Color.White) else Text(text, style = Type.Button, color = Color.White)
+    }
+}
+
+/**
+ * The secondary capsule: chip grey with black text, same size and press
+ * behaviour as [PillButton] (dims, no ripple). [height] lets small inline
+ * actions use the same look.
+ */
+@Composable
+fun SoftPillButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    height: Dp = Dimens.PillHeight,
+    style: TextStyle = Type.Button
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Box(
+        modifier = modifier
+            .height(height)
+            .alpha(
+                if (pressed) {
+                    PRESSED_ALPHA
+                } else if (enabled) {
+                    1f
+                } else {
+                    DISABLED_ALPHA
+                }
+            )
+            .background(Brand.Chip, CircleShape)
+            .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, style = style, color = Brand.Ink, modifier = Modifier.padding(horizontal = 16.dp))
     }
 }
 
