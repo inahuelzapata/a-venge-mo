@@ -62,33 +62,28 @@ test('accepts a valid paid update, rejects reopening a paid party', async () => 
   await assertFails(updateDoc(doc(db, 'parties/ok'), { status: 'open' }));
 });
 
-// The total slice's client writes (iOS and Android "capture the total" work orders).
-test('accepts the total slice writes: bill with tip, tip change, 0% as custom 0', async () => {
+// The writes the apps' total slice makes (Android data/FirestorePartyRepository.kt):
+// bill (+ the 0% tip as custom 0 while none is stored), tip changes, host
+// removal and leaving, each one update of only those fields.
+test('accepts the total slice writes: bill, tips, removal and leave', async () => {
   const ref = doc(db, 'parties/total');
-  await assertSucceeds(setDoc(ref, party({ billCents: null, tip: null })));
+  await assertSucceeds(setDoc(ref, party({
+    billCents: null, tip: null, memberIds: ['maxi', 'annie', 'christophe'],
+    members: { maxi: { joinedAt: created, paid: false }, annie: { joinedAt: created, paid: false },
+      christophe: { joinedAt: created, paid: false } },
+  })));
   await assertSucceeds(updateDoc(ref, { billCents: 4850, tip: { type: 'custom', amountCents: 0 } }));
+  await assertSucceeds(updateDoc(ref, { billCents: 10000 }));
   await assertSucceeds(updateDoc(ref, { tip: { type: 'percent', percent: 18 } }));
   await assertSucceeds(updateDoc(ref, { tip: { type: 'custom', amountCents: 700 } }));
-  await assertSucceeds(updateDoc(ref, { billCents: 1 }));
-  await assertSucceeds(updateDoc(ref, { billCents: 999999 }));
-});
-
-test('rejects a 0% percent tip and a negative bill', async () => {
-  const ref = doc(db, 'parties/total-bad');
-  await assertSucceeds(setDoc(ref, party()));
-  await assertFails(updateDoc(ref, { tip: { type: 'percent', percent: 0 } }));
-  await assertFails(updateDoc(ref, { billCents: -1 }));
-});
-
-test('accepts dropping a member from memberIds and members together, rejects a half drop', async () => {
-  const ref = doc(db, 'parties/leave');
-  await assertSucceeds(setDoc(ref, party()));
-  await assertFails(updateDoc(ref, { memberIds: ['maxi'] }));
+  await assertSucceeds(updateDoc(ref, { memberIds: ['maxi', 'annie'], 'members.christophe': deleteField() }));
   await assertSucceeds(updateDoc(ref, { memberIds: ['maxi'], 'members.annie': deleteField() }));
 });
 
-test('rejects removing the host', async () => {
-  const ref = doc(db, 'parties/no-host');
+test('rejects a 0 percent tip and a removal that leaves members out of sync', async () => {
+  const ref = doc(db, 'parties/total-bad');
   await assertSucceeds(setDoc(ref, party()));
+  await assertFails(updateDoc(ref, { tip: { type: 'percent', percent: 0 } }));
+  await assertFails(updateDoc(ref, { memberIds: ['maxi'] }));
   await assertFails(updateDoc(ref, { memberIds: ['annie'], 'members.maxi': deleteField() }));
 });

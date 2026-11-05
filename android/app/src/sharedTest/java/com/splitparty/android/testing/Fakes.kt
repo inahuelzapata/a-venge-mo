@@ -13,8 +13,10 @@ import com.splitparty.android.domain.repository.CreatePartyResult
 import com.splitparty.android.domain.repository.DemoSettingsRepository
 import com.splitparty.android.domain.repository.JoinPartyResult
 import com.splitparty.android.domain.repository.PartyRepository
+import com.splitparty.android.domain.repository.PartyWriteResult
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
+import com.splitparty.android.domain.split.Tip
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -104,6 +106,33 @@ class FakePartyRepository : PartyRepository {
         wrongAttempts += partyId to userId
     }
 
+    var writeResult: PartyWriteResult = PartyWriteResult.Done
+    var writeGate: CompletableDeferred<Unit>? = null
+    val writes = mutableListOf<String>()
+
+    /** Like the real writes: on Done the change reaches this party's listeners. */
+    private suspend fun write(partyId: String, label: String, change: (Party) -> Party): PartyWriteResult {
+        writes += label
+        writeGate?.await()
+        if (writeResult == PartyWriteResult.Done) {
+            val flow = parties[partyId]
+            val current = flow?.value as? LiveEvent.Data
+            current?.value?.let { flow.value = LiveEvent.Data(change(it), fromCache = false) }
+        }
+        return writeResult
+    }
+
+    override suspend fun setBill(partyId: String, hostId: String, billCents: Long) =
+        write(partyId, "bill:$billCents") { it.copy(billCents = billCents, tip = it.tip ?: Tip.ZERO) }
+
+    override suspend fun setTip(partyId: String, hostId: String, tip: Tip) = write(partyId, "tip:$tip") { it.copy(tip = tip) }
+
+    override suspend fun removeMember(partyId: String, hostId: String, memberId: String) =
+        write(partyId, "remove:$memberId") { p -> p.copy(members = p.members.filterNot { it.userId == memberId }) }
+
+    override suspend fun leave(partyId: String, userId: String) =
+        write(partyId, "leave:$userId") { p -> p.copy(members = p.members.filterNot { it.userId == userId }) }
+
     /** Like the real write: a stored-open party becomes expired, and its listeners see it. */
     override suspend fun expire(partyId: String) {
         expired += partyId
@@ -139,10 +168,12 @@ object TestData {
         members: List<String> = listOf(host),
         createdAt: Long = 0L,
         status: PartyStatus = PartyStatus.Open,
-        wrongAttempts: Map<String, Long> = emptyMap()
+        wrongAttempts: Map<String, Long> = emptyMap(),
+        billCents: Long? = null,
+        tip: Tip? = null
     ) = Party(
         id, host, DemoMerchant.ID, CODE, status, createdAt, createdAt + Party.TTL_MILLIS,
-        members.mapIndexed { i, uid -> PartyMember(uid, createdAt + i, false) }, wrongAttempts
+        members.mapIndexed { i, uid -> PartyMember(uid, createdAt + i, false) }, wrongAttempts, billCents, tip
     )
 
     fun tx(id: String, payer: String = "annie", payee: String = "maxi", cents: Long = 3_115, memo: String = "Tony's Split Party") =

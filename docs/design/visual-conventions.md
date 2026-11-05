@@ -120,9 +120,34 @@ Android change:
 | Expired | "Nothing was charged. Start a new party from Home." | "Nothing was charged." |
 | Confirmation | Title "Join Annie's party", options are cards of three 60 tiles, shake ±14 decaying in 360 ms, "That's not the code. Try again." | Bar title "Join Split Party", host avatar and "Join Maxi's party at Tony's", 72-tall option buttons with emoji 34, shake ±10 three times in 0.4 s, message counts the tries left |
 | Demo switch row (Me) | Green `#34C759` switch | System switch tinted brand blue `#0087E0`, 20 × 14 padding |
+| Total area | Filled in by the total slice ("Total, tip and share" below): "Add the total" for the host, the live share for everyone, so `party-one-member` (host view) and `party-three-members` (member view) differ here | Reserved: `hourglass`, "Waiting for the total", until the iOS total slice lands |
 
 Both platforms agree on the behaviour: slot priority, clock-based expiry, the
 three-strike lock, haptics kept with reduced motion, and the Firestore writes.
+
+## Total, tip and share (PoC-10)
+
+**Android values, provisional.** No iOS captures of these screens existed when
+they were built. When the iOS total slice records its values here, replace these
+and reconcile Android, then commit the comparisons (`total-add`, `total-keypad`,
+`total-scanning`, `total-confirm`, `total-no-total-found`, `total-tip-chosen`,
+`total-share-1/2/3`, `removed-message`, `leave-confirm`; the Android renders are
+in `TotalScreenshotTest`).
+
+| Element | Value |
+| ------- | ----- |
+| Add the total (host, no bill) | Total card: "Add the total" (section heading), "Scan the receipt or type the amount. Everyone's share updates as you go." (body, secondary), then a black 52 pill "Scan receipt" and a chip-grey 52 pill "Enter total", 10 apart |
+| Share figures (everyone, bill set) | "Your share" (body, secondary) over the amount (balance role, 36 bold). Then three rows, 6 vertical padding: label (subtitle, secondary) left, value (amount role) right: Total, Tip ("18% · $18.00"), People. The share rolls old → new over 600 ms (ease out), integer cents; instant with animations off. A light tick haptic whenever this member's share changes |
+| Tip chips (host only) | "Tip" (amount role), then one row 6 apart: 0%, 15%, 18%, 20% (equal widths) and Custom (1.6 ×), each 44 tall, capsule. Chip grey with black text (chip-count role); the chosen one black with white text. Custom shows its amount once chosen ("$7.00"). No ripple, elevation or Material chip styling |
+| Change total (host) | Below the chips: two chip-grey 44 capsules, "Scan receipt" and "Change total", 8 apart |
+| Write error | 16 red exclamation, 6 gap, "Couldn't save. Check your connection and try again." (body, error red) at the bottom of the card |
+| Keypad screen | Party-style header ("Enter total" / "Custom tip"), the amount centred (balance role; "$0.00" in placeholder grey when empty), a 40-tall line for the inline error (body, error red), then a 3 × 4 keypad (white keys, radius 16, 56 tall, 8 gaps, digits in screen-title role; "." and ⌫), 16 margins, then the black "Confirm" pill. No system keyboard |
+| Scan screen | Header "Scan receipt", the camera in a black rounded (28) frame, 16 margins; status line (body, secondary): "Hold the receipt flat so the total line is in the frame, then tap Scan." / "Reading the receipt…"; black "Scan" pill (spinner while reading). Reading: the photo freezes and a 3-wide brand-blue line with a 28 glow sweeps down and up (1.1 s each way, linear); none with animations off |
+| Confirmation | Header "Confirm the total", "Found on the receipt" (body, secondary), the amount (balance role), 'From the line "Total"' (body, secondary), then "Confirm" (black pill) and "Edit amount" (grey pill) |
+| No total / no camera | The keypad screen with a centred explanation above the amount (body, secondary) |
+| Remove / leave confirmation | Custom dialog card (not Material): white, radius 28, 20 padding: title (section heading), body (body, secondary), black action pill and grey cancel pill, 10 apart. Remove: tap a non-host seat (host only). Leave: grey "Leave party" capsule under the total card (members only) |
+| Removed message | White capsule with 12% shadow, 52 below the header's top, "You were removed from Maxi's party" (amount role); gone after 4 s |
+| Dark mode | Identical to light: the app is light-only (`total-tip-chosen-dark` is byte-identical to `total-tip-chosen`) |
 
 ## Bottom (tab) bar
 

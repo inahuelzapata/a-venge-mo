@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.Transaction
 import com.splitparty.android.data.firebase.FirestoreSchema
+import com.splitparty.android.data.firebase.toFirestore
 import com.splitparty.android.data.firebase.toParty
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
@@ -16,6 +17,8 @@ import com.splitparty.android.domain.party.JoinCodes
 import com.splitparty.android.domain.repository.CreatePartyResult
 import com.splitparty.android.domain.repository.JoinPartyResult
 import com.splitparty.android.domain.repository.PartyRepository
+import com.splitparty.android.domain.repository.PartyWriteResult
+import com.splitparty.android.domain.split.Tip
 import java.util.Date
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
@@ -114,6 +117,66 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
             }
         }.await()
     } ?: JoinPartyResult.Failed
+
+    override suspend fun setBill(partyId: String, hostId: String, billCents: Long): PartyWriteResult = hostWrite(partyId, hostId) { party ->
+        if (party.tip == null) {
+            mapOf(FieldPath.of("billCents") to billCents, FieldPath.of("tip") to Tip.ZERO.toFirestore())
+        } else {
+            mapOf(FieldPath.of("billCents") to billCents)
+        }
+    }
+
+    override suspend fun setTip(partyId: String, hostId: String, tip: Tip): PartyWriteResult = hostWrite(partyId, hostId) { party ->
+        if (party.billCents == null) null else mapOf(FieldPath.of("tip") to tip.toFirestore())
+    }
+
+    override suspend fun removeMember(partyId: String, hostId: String, memberId: String): PartyWriteResult =
+        hostWrite(partyId, hostId) { party ->
+            if (memberId == party.hostId) null else memberRemoval(party, memberId)
+        }
+
+    override suspend fun leave(partyId: String, userId: String): PartyWriteResult = partyWrite(partyId) { party ->
+        if (userId == party.hostId) null else memberRemoval(party, userId)
+    }
+
+    /** Both member fields in one update, so the rules' memberIds == members keys always holds. */
+    private fun memberRemoval(party: Party, userId: String): Map<FieldPath, Any>? = if (!party.hasMember(userId)) {
+        emptyMap()
+    } else {
+        mapOf(
+            FieldPath.of("memberIds") to party.memberIds - userId,
+            FieldPath.of("members", userId) to FieldValue.delete()
+        )
+    }
+
+    private suspend fun hostWrite(partyId: String, hostId: String, fields: (Party) -> Map<FieldPath, Any>?): PartyWriteResult =
+        partyWrite(partyId) { party -> if (party.hostId != hostId) null else fields(party) }
+
+    /**
+     * One transaction: re-reads the party, refuses (writes nothing) unless it is
+     * active by the clock and [fields] returns the change, then updates only
+     * those fields. A join racing this write is retried by the SDK on top of
+     * it (or vice versa), so neither is lost. Null from [fields] = not allowed;
+     * empty = already in that state.
+     */
+    private suspend fun partyWrite(partyId: String, fields: (Party) -> Map<FieldPath, Any>?): PartyWriteResult = attempt {
+        val ref = parties.document(partyId)
+        db.runTransaction { tx ->
+            val party = tx.get(ref).toParty()
+            val change = party?.takeIf { it.isActiveAt(clock()) }?.let(fields)
+            when {
+                change == null -> PartyWriteResult.NotAllowed
+
+                change.isEmpty() -> PartyWriteResult.Done
+
+                else -> {
+                    val (first, rest) = change.entries.first() to change.entries.drop(1)
+                    tx.update(ref, first.key, first.value, *rest.flatMap { listOf(it.key, it.value) }.toTypedArray())
+                    PartyWriteResult.Done
+                }
+            }
+        }.await()
+    } ?: PartyWriteResult.Failed
 
     override suspend fun recordWrongAttempt(partyId: String, userId: String) {
         // Not awaited past the timeout: offline the increment is queued and lands on reconnect.

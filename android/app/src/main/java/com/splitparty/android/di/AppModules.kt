@@ -6,6 +6,7 @@ import com.splitparty.android.data.DataStoreDemoSettingsRepository
 import com.splitparty.android.data.DataStoreSessionRepository
 import com.splitparty.android.data.FirestorePartyRepository
 import com.splitparty.android.data.FirestoreSplitPartyRepository
+import com.splitparty.android.data.MlKitReceiptRecognizer
 import com.splitparty.android.data.firebase.FirebaseConnection
 import com.splitparty.android.data.firebase.FirebaseSetup
 import com.splitparty.android.data.firebase.FirestoreTarget
@@ -28,6 +29,7 @@ import com.splitparty.android.ui.login.LoginViewModel
 import com.splitparty.android.ui.me.MeViewModel
 import com.splitparty.android.ui.party.PartyViewModel
 import com.splitparty.android.ui.root.SessionViewModel
+import com.splitparty.android.ui.scan.ReceiptRecognizer
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.factoryOf
@@ -59,6 +61,7 @@ val dataModule = module {
     singleOf(::DataStoreDemoSettingsRepository) { bind<DemoSettingsRepository>() }
     singleOf(::AndroidConnectivityObserver) { bind<ConnectivityObserver>() }
     single<Clock> { Clock.System }
+    single<ReceiptRecognizer> { MlKitReceiptRecognizer() }
 }
 
 val domainModule = module {

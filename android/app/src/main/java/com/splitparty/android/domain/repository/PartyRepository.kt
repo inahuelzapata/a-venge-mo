@@ -2,6 +2,7 @@ package com.splitparty.android.domain.repository
 
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.split.Tip
 import kotlinx.coroutines.flow.Flow
 
 /** Outcome of a create attempt. A failure has written nothing (one Firestore transaction). */
@@ -21,6 +22,17 @@ sealed interface JoinPartyResult {
     data object Failed : JoinPartyResult
 }
 
+/** Outcome of a bill, tip, removal or leave write. Anything but [Done] has written nothing. */
+sealed interface PartyWriteResult {
+    data object Done : PartyWriteResult
+
+    /** Expired or settled by the time the write ran, or the caller may not make this change. */
+    data object NotAllowed : PartyWriteResult
+
+    /** No connection or the write was rejected (rules). */
+    data object Failed : PartyWriteResult
+}
+
 /** Split Party reads and writes (docs/firestore-schema.md, `parties` and `joinCodes`). */
 interface PartyRepository {
     /**
@@ -37,6 +49,21 @@ interface PartyRepository {
 
     /** Appends [userId] to the member list inside a transaction, so simultaneous joins both land. */
     suspend fun join(partyId: String, userId: String): JoinPartyResult
+
+    /**
+     * Host only: `billCents` = [billCents]. While no tip is stored the same
+     * update writes the 0% tip, so no phone ever sees a bill without a tip.
+     */
+    suspend fun setBill(partyId: String, hostId: String, billCents: Long): PartyWriteResult
+
+    /** Host only, once a bill exists: `tip` = [tip]. */
+    suspend fun setTip(partyId: String, hostId: String, tip: Tip): PartyWriteResult
+
+    /** Host only: drops [memberId] (never the host) from `memberIds` and `members` in one write. */
+    suspend fun removeMember(partyId: String, hostId: String, memberId: String): PartyWriteResult
+
+    /** A non-host member leaves: drops [userId] from `memberIds` and `members`; wrong attempts untouched. */
+    suspend fun leave(partyId: String, userId: String): PartyWriteResult
 
     /** `wrongCodeAttempts.{userId}` += 1. */
     suspend fun recordWrongAttempt(partyId: String, userId: String)

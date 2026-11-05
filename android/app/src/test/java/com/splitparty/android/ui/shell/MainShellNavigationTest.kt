@@ -189,6 +189,40 @@ class MainShellNavigationTest {
     }
 
     @Test
+    fun removedByTheHostReturnsHomeWithTheMessageAndTheJoinBanner() {
+        val joined = party(id = "annies", host = "annie", members = listOf("annie", "maxi", "christophe"))
+        parties.partyFlow("annies").value = server(joined)
+        parties.open.value = server(listOf(joined))
+        launch()
+        compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
+
+        val without = party(id = "annies", host = "annie", members = listOf("annie", "christophe"))
+        parties.open.value = server(listOf(without))
+        parties.partyFlow("annies").value = server(without)
+        compose.onNodeWithTag(ShellTestTags.NOTICE).assertIsDisplayed()
+        compose.onNodeWithText("You were removed from Annie's party").assertIsDisplayed()
+        compose.onNodeWithText("Split Party at Tony's").assertDoesNotExist()
+        // Not locked out: the Join banner is back, exactly as for a first-time joiner.
+        compose.onNodeWithTag(PartyBannerTestTags.JOIN).assertIsDisplayed()
+    }
+
+    @Test
+    fun leavingReturnsHomeWithTheJoinBannerAndNoRemovedMessage() {
+        val joined = party(id = "annies", host = "annie", members = listOf("annie", "maxi"))
+        parties.partyFlow("annies").value = server(joined)
+        parties.open.value = server(listOf(joined))
+        launch()
+        compose.onNodeWithTag(PartyTestTags.LEAVE).performScrollTo().performClick()
+        compose.onNodeWithText("Leave Annie's party?").assertIsDisplayed()
+        parties.open.value = server(listOf(party(id = "annies", host = "annie")))
+        compose.onNodeWithTag(PartyTestTags.DIALOG_CONFIRM).performClick()
+
+        assertEquals(listOf("leave:maxi"), parties.writes)
+        compose.onNodeWithTag(PartyBannerTestTags.JOIN).assertIsDisplayed()
+        compose.onNodeWithTag(ShellTestTags.NOTICE).assertDoesNotExist()
+    }
+
+    @Test
     fun homeTabFromThePartyReturnsHome() {
         launch()
         parties.partyFlow("new-party").value = server(maxisParty)

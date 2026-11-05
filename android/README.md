@@ -173,7 +173,7 @@ di/      Koin modules wiring the three layers
 2. Write `XRoute` (koinViewModel) and a stateless `XScreen` with previews.
 3. Bind the ViewModel in `viewModelModule` (and any new use case in `domainModule`).
 4. Add a `@Serializable` destination and a `composable<…>` entry if it's a tab.
-5. Add a ViewModel test with the fakes in `app/src/test/.../testing/`, and a
+5. Add a ViewModel test with the fakes in `app/src/sharedTest/.../testing/`, and a
    screenshot test per state, then run `recordPaparazziDebug`.
 
 ## Tests and code quality
@@ -184,10 +184,12 @@ di/      Koin modules wiring the three layers
 ./gradlew ktlintFormat     # auto-fix formatting
 ./gradlew recordPaparazziDebug   # re-record screenshot goldens after an intended UI change
 ./gradlew verifyPaparazziDebug   # compare against the goldens (also part of check)
+./gradlew connectedDebugAndroidTest   # on-device (Espresso) tests: needs an emulator or phone (adb)
 ```
 
 - **Unit tests (JVM)**: use cases, `LiveState`, ViewModels and the Koin graph
-  (`KoinModulesTest`). They use hand-written fakes (`testing/Fakes.kt`), Turbine and
+  (`KoinModulesTest`). They use hand-written fakes (`app/src/sharedTest/.../testing/Fakes.kt`,
+  shared with the on-device tests), Turbine and
   `kotlinx-coroutines-test` with `MainDispatcherRule`.
 - **Compose UI tests (Robolectric, JVM)**: Login, Home and shell navigation (with the
   real ViewModels and fake data sources). No device needed.
@@ -201,6 +203,20 @@ di/      Koin modules wiring the three layers
   commit them with the change. Snapshot names come from the test class and method,
   so renaming a test means re-recording. New screens: add a test that calls
   `paparazzi.screen { XScreen(state, …) }` for each state.
+- **On-device tests (Espresso + Compose, `app/src/androidTest/.../e2e/`)**: the Split
+  Party total slice on a real emulator or phone. Each test hosts the real signed-in
+  shell (`MainShell`, real ViewModels) over the shared fakes, so no Firebase is needed:
+  keypad entry and its limits, tip chips, system back writing nothing, a member's
+  live share, the receipt scan (real runtime permission, CameraX on the device's
+  camera, scripted recognition), privacy (no gallery image or app file after a scan),
+  the bundled ML Kit model reading a rendered receipt's Total within the 2.5 s budget,
+  and removing and leaving. They run under the Android Test Orchestrator with
+  `clearPackageData`, so every test starts without the camera permission, and with
+  system animations off. "Denied in settings" is set with `pm set-permission-flags …
+  user-fixed` (revoking would kill the app process). Run one class with
+  `-Pandroid.testInstrumentationRunnerArguments.class=com.splitparty.android.e2e.ReceiptScanE2ETest`;
+  with several devices attached, pick one with `ANDROID_SERIAL`. Not covered: live
+  Firestore, several phones at once, a printed receipt (these stay manual checks).
 - **ktlint** (Android Studio style plus Compose rules, `.editorconfig`) and **detekt 2**
   (`config/detekt/detekt.yml`, Compose rules). detekt is a 2.0 alpha because 1.23 can't
   run on the Java 25 Gradle JVM.

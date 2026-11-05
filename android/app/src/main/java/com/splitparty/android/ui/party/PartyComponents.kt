@@ -155,6 +155,18 @@ fun View.partyHaptic(success: Boolean) {
     performHapticFeedback(constant)
 }
 
+/** A light tick when this member's share moves; kept with animations removed. */
+fun View.shareTick() {
+    val constant = if (Build.VERSION.SDK_INT >=
+        Build.VERSION_CODES.R
+    ) {
+        HapticFeedbackConstants.SEGMENT_TICK
+    } else {
+        HapticFeedbackConstants.CLOCK_TICK
+    }
+    performHapticFeedback(constant)
+}
+
 /** "4:59", never negative. */
 fun formatCountdown(millisLeft: Long): String {
     // Rounded up, so it reads 5:00 at creation and 0:00 only once expired.
@@ -171,4 +183,19 @@ object PartyTestTags {
     const val RECONNECTING = "party_reconnecting"
     const val EXPIRED = "party_expired"
     const val TOTAL = "party_total"
+    const val SCAN = "party_scan"
+    const val ENTER = "party_enter_total"
+    const val SHARE = "party_share"
+    const val TOTAL_VALUE = "party_total_value"
+    const val HEADCOUNT = "party_headcount"
+    const val TIP_CHIPS = "party_tip_chips"
+    const val WRITE_ERROR = "party_write_error"
+    const val LEAVE = "party_leave"
+
+    const val DIALOG = "party_dialog"
+    const val DIALOG_CONFIRM = "party_dialog_confirm"
+
+    fun tipChip(label: String) = "party_tip_$label"
+
+    fun seat(userId: String) = "party_seat_$userId"
 }

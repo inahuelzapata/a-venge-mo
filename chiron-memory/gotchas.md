@@ -92,6 +92,17 @@ What: A while(true){ delay() } ticker in viewModelScope (Dispatchers.Main = the 
 
 What: In a modifier chain, a testTag placed after clearAndSetSemantics is cleared with the rest, so onNodeWithTag finds nothing; put testTag before clearAndSetSemantics · Where: android ui/home/PartyBanners.kt, ui/party/PartyScreen.kt
 
+## A tap-swallowing clickable on an overlay merges its children for TalkBack
+
+What: Adding `.clickable(indication = null) {}` to a full-screen overlay to keep taps from reaching the screen below merges every child into one semantics node, so TalkBack reads the whole screen as one button and tests can't find tagged children. Use `.pointerInput(Unit) { detectTapGestures { } }` instead, which adds no semantics · Where: android ui/party/TotalEntry.kt TotalEntryOverlay
+
+## Robolectric's default screen is too short for the keypad screens
+
+What: With no qualifiers, Robolectric lays out on a 320×470 dp screen, which leaves the keypad screen's amount and message area about 0 dp tall, so "is displayed" checks fail. Entry-flow tests use `@Config(qualifiers = "w393dp-h851dp")` (Pixel 5, as Paparazzi) · Where: android test ui/party/PartyRouteTest.kt, ConfirmScanTest.kt
+
+## Android on-device tests: permission dialog, process kills and CameraX threads
+
+What: In the on-device tests on the API 37 Play Store emulator, UiAutomator can't see the system camera-permission dialog (it lives in com.google.android.permissioncontroller, and a dump shows only systemui plus the paused app). Revoking a runtime permission kills the app and the test process with it. So "denied in settings" is set with `pm set-permission-flags <pkg> android.permission.CAMERA user-set user-fixed`, which makes the request answer denied at once, and the Orchestrator's `clearPackageData` gives every test a fresh, ungranted start. CameraX's PreviewView.getSurfaceProvider and bindToLifecycle must run on the main thread, but a LaunchedEffect can resume on another thread after `ProcessCameraProvider.awaitInstance`, so binding is wrapped in `withContext(Dispatchers.Main)`. Only the device tests caught this; Robolectric never binds a camera · Where: android app/src/androidTest/.../e2e/ReceiptScanE2ETest.kt, ui/scan/ReceiptScanScreen.kt bindCamera, app/build.gradle.kts testOptions
 ## Firestore transaction blocks on iOS must not inherit the main actor
 
 What: The party transactions live in PartyWriter, a nonisolated struct, instead of the @MainActor PaymentRepository · Why: Firestore calls the transaction block on its own queue; a closure written inside a main-actor method inherits main-actor isolation and is then called off the main thread · Where: ios/SplitParty/Data/PartyRepository.swift · Learned: keep any SDK callback that runs on a background queue out of @MainActor types
