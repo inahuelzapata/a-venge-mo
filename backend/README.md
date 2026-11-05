@@ -99,6 +99,10 @@ Deploy (after `npm run deploy:firestore`):
 npm run deploy:functions
 ```
 
+The function bundles its own copy of the seed, so redeploy after **any** seed
+change (or `npm run deploy:reset-endpoint` for the Vercel endpoint); otherwise
+the in-app Demo reset restores the old values.
+
 It needs the project on the **Blaze** plan (Cloud Functions requires it) and,
 besides the deploy roles above, *Service Account User* on the credential so it
 can deploy as the runtime service account. The deploy makes the function

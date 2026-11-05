@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateParty } from '../../lib/validate.js';
+import { validateParty, validateUser } from '../../lib/validate.js';
+import { SEED_USERS } from '../../lib/seedData.js';
 
 const t0 = new Date('2026-11-03T20:00:00Z');
 const t5 = new Date(t0.getTime() + 5 * 60 * 1000);
@@ -32,3 +33,17 @@ for (const [name, over] of [
 ]) {
   test(`invalid: ${name}`, () => assert.notDeepEqual(validateParty(goodParty(over)), []));
 }
+
+test('seeded users carry their photo URL as avatar and pass the validator', () => {
+  const base = 'https://taller.ai/_next/image?url=%2Fleadership%2F';
+  assert.deepEqual(Object.fromEntries(Object.entries(SEED_USERS).map(([id, u]) => [id, u.avatar])), {
+    maxi: `${base}maximiliano-armesto.jpg&w=1080&q=75`,
+    annie: `${base}annie-rodriguez.jpg&w=1080&q=75`,
+    christophe: `${base}christophe-kolb.jpg&w=1080&q=75`,
+  });
+  for (const [id, u] of Object.entries(SEED_USERS)) {
+    const doc = { username: id, displayName: u.displayName, avatar: u.avatar, balanceCents: u.balanceCents,
+      friendIds: Object.keys(SEED_USERS).filter((f) => f !== id) };
+    assert.deepEqual(validateUser(id, doc), []);
+  }
+});
