@@ -326,6 +326,38 @@ final class ReferenceCaptureUITests: XCTestCase {
         try capture("home-paid-highlight", settling: false)
     }
 
+    func test15DemoReset() throws {
+        launch(resettingSession: true, extra: ["-UITestWriteDelay", "4"])
+        signIn(as: "maxi")
+        XCTAssertTrue(element("splitPartyBanner").waitForExistence(timeout: Self.timeout))
+        tapTab("Me")
+        let reset = element("demoResetButton")
+        XCTAssertTrue(reset.waitForExistence(timeout: Self.timeout))
+        // All the way down: "hittable" is already true behind the floating tab bar.
+        for _ in 0..<4 { element("meScreen").swipeUp() }
+        measure("demo section", element("demoSection"))
+        try capture("me-demo-section")
+        reset.tap()
+        XCTAssertTrue(app.buttons["confirmDemoReset"].firstMatch.waitForExistence(timeout: Self.timeout))
+        try capture("demo-reset-confirm")
+        app.buttons["confirmDemoReset"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 0.6)
+        try capture("demo-reset-progress", settling: false)
+
+        app.terminate()
+        launch(resettingSession: true, extra: ["-UITestDemoReset", "fail", "-UITestWriteDelay", "0.3"])
+        signIn(as: "maxi")
+        XCTAssertTrue(element("splitPartyBanner").waitForExistence(timeout: Self.timeout))
+        tapTab("Me")
+        XCTAssertTrue(reset.waitForExistence(timeout: Self.timeout))
+        // All the way down: "hittable" is already true behind the floating tab bar.
+        for _ in 0..<4 { element("meScreen").swipeUp() }
+        reset.tap()
+        app.buttons["confirmDemoReset"].firstMatch.tap()
+        XCTAssertTrue(element("demoResetError").waitForExistence(timeout: Self.timeout))
+        try capture("demo-reset-error")
+    }
+
     // MARK: Helpers
 
     private func scrollToBottom() {

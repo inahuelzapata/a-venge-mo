@@ -11,7 +11,7 @@ styled to match them. Measured values are in
 | Appearance | Light. The app forces light mode (`preferredColorScheme(.light)`) |
 | Status bar | Pinned to 9:41, full signal and Wi-Fi, charged battery (`simctl status_bar override`) |
 | Data | The app's Debug fixture (`-UITestFixture`), which serves the same users and payments as `backend/lib/seedData.js`, with ages relative to now ("3 hours ago" and so on) |
-| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, Pay/Request button seated in the tab bar). The Home captures (feed, new-row highlight, empty, error) were re-taken again the same day, iPhone 17 Pro / iOS 26.5, when the "Split the check" card filled the banner slot. The Split Party captures (join, confirmation, party, expired, back-to-party, demo off) and `me.png` (demo switch) were added the same day, iPhone 17 Pro / iOS 26.5, with the fixture's party code 🍕🍺🎉; their names match the Android parity renders so `compare.py` pairs them. The placeholder capture was removed with the placeholder screen. The total-slice captures (`total-*`, `removed-message`, `leave-confirm`) were added on 2026-11-05, iPhone 17 Pro / iOS 26.5, by `ReferenceCaptureUITests` tests 10–13 |
+| Taken | 2026-11-04, by [`../capture/capture-ios.sh`](../capture/capture-ios.sh) running `ios/SplitPartyUITests/ReferenceCaptureUITests.swift`. Re-taken the same day after the brand mark landed (login mark, header mark, Pay/Request button seated in the tab bar). The Home captures (feed, new-row highlight, empty, error) were re-taken again the same day, iPhone 17 Pro / iOS 26.5, when the "Split the check" card filled the banner slot. The Split Party captures (join, confirmation, party, expired, back-to-party, demo off) and `me.png` (demo switch) were added the same day, iPhone 17 Pro / iOS 26.5, with the fixture's party code 🍕🍺🎉; their names match the Android parity renders so `compare.py` pairs them. The placeholder capture was removed with the placeholder screen. The total-slice captures (`total-*`, `removed-message`, `leave-confirm`) were added on 2026-11-05, iPhone 17 Pro / iOS 26.5, by `ReferenceCaptureUITests` tests 10–13. The Pay and Demo reset captures (`pay-*`, `home-paid-highlight`, `me-demo-section`, `demo-reset-*`) were added on 2026-11-05, iPhone 17 Pro / iOS 26.5, by tests 14–15 |
 
 The work order asked for a physical iPhone. These come from the simulator at the
 same pt size and scale as an iPhone 17/18 Pro, because the project owner chose
@@ -52,6 +52,17 @@ run `docs/design/capture/capture-ios.sh`. Android then follows the new images.
 | [`total-share-1.png`](total-share-1.png) / [`-2`](total-share-2.png) / [`-3`](total-share-3.png) | The share row with 1, 2 and 3 members ($118.00 total) |
 | [`removed-message.png`](removed-message.png) | Christophe's Home right after Maxi removed him: the notice and the Join banner |
 | [`leave-confirm.png`](leave-confirm.png) | Annie's "Leave Maxi's party?" confirmation |
+| [`pay-add-total.png`](pay-add-total.png) | Annie (host) with two friends and no bill: Pay disabled, "Add the total" |
+| [`pay-ready.png`](pay-ready.png) | Annie (host), $100.00 at 18% for three: "Pay $78.66" |
+| [`pay-pending.png`](pay-pending.png) | Right after tapping Pay: "Paying…" and the pending badges on Maxi and Christophe |
+| [`pay-confetti.png`](pay-confetti.png) | Mid-burst: both seats ticked paid, the success card and confetti |
+| [`pay-success-host.png`](pay-success-host.png) | Annie's paid screen once the confetti is gone: "You collected $78.66" |
+| [`pay-success-member.png`](pay-success-member.png) | Christophe's paid screen: "You paid $39.33" |
+| [`home-paid-highlight.png`](home-paid-highlight.png) | Maxi's Home just after Annie settled with Christophe: the new payment on top, highlighted |
+| [`me-demo-section.png`](me-demo-section.png) | Me scrolled to the bottom: the Demo section with "Demo reset" |
+| [`demo-reset-confirm.png`](demo-reset-confirm.png) | The "Reset the demo?" confirmation |
+| [`demo-reset-progress.png`](demo-reset-progress.png) | While the reset runs: "Resetting…" |
+| [`demo-reset-error.png`](demo-reset-error.png) | The reset function failed: the red error under the button |
 
 The login field focuses itself when the screen opens, so the login captures show
 the system keyboard. The simulator must have its hardware keyboard disconnected
