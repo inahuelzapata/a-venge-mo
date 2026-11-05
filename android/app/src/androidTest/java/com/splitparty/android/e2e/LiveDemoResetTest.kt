@@ -59,7 +59,12 @@ class LiveDemoResetTest {
         compose.waitUntil(TIMEOUT_MS) { compose.has(PartyTestTags.DIALOG_CONFIRM) }
         compose.onNodeWithTag(PartyTestTags.DIALOG_CONFIRM).performClick()
 
-        compose.waitUntil(RESET_TIMEOUT_MS) { compose.has(MeTestTags.DEMO_RESET_DONE) || compose.has(MeTestTags.DEMO_RESET_ERROR) }
+        // The reset re-seeds "Your payments" above this section, so the list jumps
+        // back up and the (lazy) section is no longer composed: scroll to the outcome.
+        val outcome = hasTestTag(MeTestTags.DEMO_RESET_DONE) or hasTestTag(MeTestTags.DEMO_RESET_ERROR)
+        compose.waitUntil(RESET_TIMEOUT_MS) {
+            runCatching { compose.onNodeWithTag(MeTestTags.LIST).performScrollToNode(outcome) }.isSuccess
+        }
         if (!compose.has(MeTestTags.DEMO_RESET_DONE)) {
             fail("Demo reset failed (RESET_DEMO_URL='${BuildConfig.RESET_DEMO_URL}'): ${compose.textOf(MeTestTags.DEMO_RESET_ERROR)}")
         }
