@@ -42,6 +42,8 @@ npm install
 cp .env.example .env                     # set FIREBASE_PROJECT_ID
 # save the service-account key as backend/service-account.json (or use gcloud ADC)
 npm run deploy:firestore                 # rules + indexes to the hosted project
+npm run deploy:functions                 # in-app Demo reset, Blaze projects (or, without Blaze:)
+npm run deploy:reset-endpoint            # in-app Demo reset on free Vercel; set RESET_DEMO_URL (setup guide 3b)
 npm run seed                             # 3 friends, Tony's, seeded feed, no parties
 npm run reset -- --yes                   # back to the seeded state
 npm run test:hosted -- --wipe-demo-db    # acceptance suite on the demo database (resets after)

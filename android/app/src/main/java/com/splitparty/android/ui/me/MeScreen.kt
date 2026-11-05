@@ -36,11 +36,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.splitparty.android.R
 import com.splitparty.android.domain.live.LiveState
+import com.splitparty.android.domain.repository.DemoResetFailure
 import com.splitparty.android.format.Money
 import com.splitparty.android.ui.components.Avatar
 import com.splitparty.android.ui.components.EmptyCard
@@ -167,6 +169,7 @@ object MeTestTags {
     const val BALANCE = "me_balance"
     const val DEMO_RESET = "me_demo_reset"
     const val DEMO_RESET_ERROR = "me_demo_reset_error"
+    const val DEMO_RESET_DONE = "me_demo_reset_done"
 }
 
 /**
@@ -224,20 +227,34 @@ private fun DemoResetSection(reset: DemoResetUi, onReset: () -> Unit, modifier: 
             verticalArrangement = Arrangement.spacedBy(Dimens.CardInnerSpacing)
         ) {
             Text(stringResource(R.string.demo_reset_hint), style = Type.Body, color = Brand.InkSecondary)
+            val running = reset == DemoResetUi.Running
+            val runningLabel = stringResource(R.string.demo_reset_running)
             PillButton(
                 text = stringResource(R.string.demo_reset_action),
                 onClick = { confirming = true },
-                enabled = reset != DemoResetUi.Running,
-                busy = reset == DemoResetUi.Running,
-                modifier = Modifier.testTag(MeTestTags.DEMO_RESET)
+                enabled = !running,
+                busy = running,
+                // While busy the button only shows a spinner: give TalkBack the words.
+                modifier = Modifier
+                    .testTag(MeTestTags.DEMO_RESET)
+                    .semantics { if (running) stateDescription = runningLabel }
             )
-            if (reset == DemoResetUi.Failed) {
-                Text(
-                    stringResource(R.string.demo_reset_failed),
+            when (reset) {
+                is DemoResetUi.Failed -> Text(
+                    demoResetErrorText(reset),
                     style = Type.Body,
                     color = Brand.Error,
                     modifier = Modifier.testTag(MeTestTags.DEMO_RESET_ERROR).semantics { liveRegion = LiveRegionMode.Assertive }
                 )
+
+                DemoResetUi.Done -> Text(
+                    stringResource(R.string.demo_reset_done),
+                    style = Type.Body,
+                    color = Brand.Ink,
+                    modifier = Modifier.testTag(MeTestTags.DEMO_RESET_DONE).semantics { liveRegion = LiveRegionMode.Polite }
+                )
+
+                DemoResetUi.Idle, DemoResetUi.Running -> Unit
             }
         }
     }
@@ -254,6 +271,14 @@ private fun DemoResetSection(reset: DemoResetUi, onReset: () -> Unit, modifier: 
             onDismiss = { confirming = false }
         )
     }
+}
+
+/** The function's own message when it sent one (a partial reset says to tap again), else a readable fallback. */
+@Composable
+private fun demoResetErrorText(failed: DemoResetUi.Failed): String = when (failed.reason) {
+    DemoResetFailure.Unreachable -> stringResource(R.string.demo_reset_failed_offline)
+    DemoResetFailure.NotDeployed -> stringResource(R.string.demo_reset_failed_not_deployed)
+    DemoResetFailure.Server -> failed.message ?: stringResource(R.string.demo_reset_failed_server)
 }
 
 /** Placeholder dash until the user document has loaded (or while it can't be read), as on iOS. */

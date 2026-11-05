@@ -126,6 +126,9 @@
     <string name="demo_reset_confirm_title">Reset the demo?</string>
     <string name="demo_reset_confirm_body">All parties and party payments are removed and every balance goes back to its seeded value, on every phone.</string>
     <string name="demo_reset_confirm">Reset</string>
-    <string name="demo_reset_failed">Couldn\'t reset the demo. Check your connection and try again.</string>
-    <string name="demo_reset_done">Demo reset</string>
+    <string name="demo_reset_running">Resetting the demo</string>
+    <string name="demo_reset_failed_offline">Couldn\'t reach the server, so nothing was reset. Check your connection and try again.</string>
+    <string name="demo_reset_failed_not_deployed">Demo reset isn\'t set up on the server (the resetDemo function is not deployed). Nothing was reset.</string>
+    <string name="demo_reset_failed_server">The server couldn\'t finish the reset. Tap Demo reset again.</string>
+    <string name="demo_reset_done">Demo reset. Every phone is back to the seeded state.</string>
 </resources>

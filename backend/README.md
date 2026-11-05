@@ -18,6 +18,7 @@ configured and started. Full walkthrough:
 | `functions/index.js` | The `resetDemo` callable: runs the same reset as `npm run reset` with admin rights |
 | `scripts/build-functions.js` | Copies `lib/{ops,schema,seedData}.js` into `functions/shared/` (generated, git-ignored) before deploy and tests |
 | `scripts/deploy-firestore.js`, `scripts/deploy-functions.js` | Deploy rules + indexes / the `resetDemo` function to `FIREBASE_PROJECT_ID` |
+| `reset-endpoint/`, `scripts/deploy-reset-endpoint.js`, `lib/callableReset.js` | The same reset as a callable-protocol endpoint on Vercel, for projects without Blaze |
 | `scripts/test-hosted.js` | Hosted acceptance run: deploy, reset, test, reset |
 | `lib/` | Target and credential checks (`env.js`), deploy, seed data, split rule, validators |
 | `test/unit/` | Unit tests (no database) |
@@ -105,6 +106,15 @@ publicly invokable; an organisation policy that forbids `allUsers` will block
 that. Reset is idempotent, so two taps at once both succeed. A cold start
 adds a few seconds to the first call after the function has been idle.
 
+### Without Blaze: the reset endpoint on Vercel
+
+`reset-endpoint/api/resetDemo.js` serves the same reset over the same callable
+protocol (`lib/callableReset.js`: POST `{data:null}` → `{result:{ok,…}}`, errors
+as `{error:{status,message}}`, GET → 400), so the apps call it by URL with the
+Firebase Functions SDK (`RESET_DEMO_URL` in `android/firestore.properties`).
+Deploy with `npm run deploy:reset-endpoint`; setup, trade-offs and the key's
+handling are in [setup guide step 3b](../docs/integration-setup-guide.md#3b-deploy-the-demo-reset-backend-required-for-the-in-app-demo-reset).
+
 `functions/shared/` is generated from `lib/` by `npm run build:functions`
 (also run automatically by the deploy and by `test:functions`). Edit `lib/`,
 never the copy.
@@ -116,6 +126,7 @@ npm test                                 # unit tests: split rule, validators, t
 npm run test:hosted -- --wipe-demo-db    # acceptance suite on the HOSTED demo database
 npm run test:rules                       # security-rules suite on a throwaway emulator
 npm run test:functions                   # resetDemo callable on throwaway Firestore + Functions emulators
+npm run test:reset-endpoint              # the Vercel reset endpoint on a throwaway Firestore emulator
 ```
 
 `test:hosted` runs against **the demo database** and deletes every live party

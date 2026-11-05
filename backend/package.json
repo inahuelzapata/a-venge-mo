@@ -10,11 +10,13 @@
     "reset": "node --env-file-if-exists=.env scripts/reset.js",
     "deploy:firestore": "node --env-file-if-exists=.env scripts/deploy-firestore.js",
     "deploy:functions": "node --env-file-if-exists=.env scripts/deploy-functions.js",
+    "deploy:reset-endpoint": "node --env-file-if-exists=.env scripts/deploy-reset-endpoint.js",
     "build:functions": "node scripts/build-functions.js",
     "test": "node --test test/unit/",
     "test:hosted": "node --env-file-if-exists=.env scripts/test-hosted.js",
     "test:rules": "firebase emulators:exec --only firestore --project demo-split-party-rules \"node --test test/rules/\"",
     "test:functions": "node scripts/build-functions.js && firebase emulators:exec --only firestore,functions --project demo-split-party-functions \"node --test --test-concurrency=1 test/functions/\"",
+    "test:reset-endpoint": "node scripts/build-functions.js && firebase emulators:exec --only firestore --project demo-split-party-endpoint \"node --test --test-concurrency=1 test/reset-endpoint/*.test.js\"",
     "emulators": "firebase emulators:start --only firestore --project demo-split-party"
   },
   "dependencies": {

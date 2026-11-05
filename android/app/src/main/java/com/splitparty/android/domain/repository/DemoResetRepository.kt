@@ -4,8 +4,22 @@ package com.splitparty.android.domain.repository
 sealed interface DemoResetResult {
     data object Done : DemoResetResult
 
-    /** Offline, the function is missing (not deployed) or it returned an error. */
-    data object Failed : DemoResetResult
+    /**
+     * The call failed. [message] is the function's own text when it sent one
+     * (e.g. its "may be partially reset; tap Reset again"), else null.
+     */
+    data class Failed(val reason: DemoResetFailure, val message: String? = null) : DemoResetResult
+}
+
+enum class DemoResetFailure {
+    /** Offline, the server could not be reached, or no answer in time. */
+    Unreachable,
+
+    /** The project has no `resetDemo` (`npm run deploy:functions` was not run). */
+    NotDeployed,
+
+    /** The function answered with an error (a partial reset among them); tapping again is safe. */
+    Server
 }
 
 /**

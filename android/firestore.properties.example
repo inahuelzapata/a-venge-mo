@@ -7,6 +7,10 @@
 FIREBASE_TARGET=hosted
 FIREBASE_PROJECT_ID=your-firebase-project-id
 FIRESTORE_EMULATOR_HOST=
+# Demo reset (Me tab). Empty: the resetDemo Cloud Function (needs Blaze and
+# `npm run deploy:functions`). Projects without Blaze: the URL that
+# `npm run deploy:reset-endpoint` prints, e.g. https://<project>-demo-reset.vercel.app/api/resetDemo
+RESET_DEMO_URL=
 
 # --- Local emulator started from backend/ (opt-in, offline) ------------------
 # Comment out the hosted block above and use:

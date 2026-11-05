@@ -1,7 +1,12 @@
 package com.splitparty.android.ui.me
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -10,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.splitparty.android.domain.live.LiveState
+import com.splitparty.android.domain.repository.DemoResetFailure
 import com.splitparty.android.ui.party.PartyTestTags
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import kotlinx.collections.immutable.persistentListOf
@@ -62,16 +68,44 @@ class DemoResetScreenTest {
     fun runningShowsProgressAndCannotBeTappedAgain() {
         show(DemoResetUi.Running)
         scrollToReset()
-        compose.onNodeWithTag(MeTestTags.DEMO_RESET).assertIsNotEnabled()
+        compose.onNodeWithTag(MeTestTags.DEMO_RESET)
+            .assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Resetting the demo"))
     }
 
     @Test
-    fun failureReadsInlineAndTheButtonWorksAgain() {
-        show(DemoResetUi.Failed)
+    fun offlineFailureReadsInlineAndTheButtonWorksAgain() {
+        show(DemoResetUi.Failed(DemoResetFailure.Unreachable))
         scrollToReset()
-        compose.onNodeWithTag(MeTestTags.DEMO_RESET_ERROR, useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("Couldn't reset the demo. Check your connection and try again.").assertExists()
+        compose.onNodeWithTag(MeTestTags.DEMO_RESET_ERROR, useUnmergedTree = true)
+            .assertTextEquals("Couldn't reach the server, so nothing was reset. Check your connection and try again.")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
         compose.onNodeWithTag(MeTestTags.DEMO_RESET).performClick()
         compose.onNodeWithText("Reset the demo?").assertExists()
+    }
+
+    @Test
+    fun missingFunctionIsNamed() {
+        show(DemoResetUi.Failed(DemoResetFailure.NotDeployed))
+        scrollToReset()
+        compose.onNodeWithTag(MeTestTags.DEMO_RESET_ERROR, useUnmergedTree = true)
+            .assertTextEquals("Demo reset isn't set up on the server (the resetDemo function is not deployed). Nothing was reset.")
+    }
+
+    @Test
+    fun theFunctionsOwnMessageIsShown() {
+        val partial = "Demo reset did not complete (boom). The database may be partially reset; tap Reset again."
+        show(DemoResetUi.Failed(DemoResetFailure.Server, partial))
+        scrollToReset()
+        compose.onNodeWithTag(MeTestTags.DEMO_RESET_ERROR, useUnmergedTree = true).assertTextEquals(partial)
+    }
+
+    @Test
+    fun successIsAnnounced() {
+        show(DemoResetUi.Done)
+        scrollToReset()
+        compose.onNodeWithTag(MeTestTags.DEMO_RESET_DONE, useUnmergedTree = true)
+            .assertTextEquals("Demo reset. Every phone is back to the seeded state.")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
     }
 }

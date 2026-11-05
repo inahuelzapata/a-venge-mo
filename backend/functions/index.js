@@ -10,6 +10,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { reset } from './shared/ops.js';
+import { partialResetMessage } from './shared/callableReset.js';
 
 /** The apps call this name in this region (the Firebase SDKs' default region). */
 const RESET_DEMO_REGION = 'us-central1';
@@ -26,9 +27,6 @@ export const resetDemo = onCall({ region: RESET_DEMO_REGION, timeoutSeconds: 60 
     // reset commits in several batches, so a failure can leave it half done.
     // Say so: calling again is safe (reset is idempotent) and finishes the job.
     logger.error('Demo reset failed', err);
-    throw new HttpsError(
-      'internal',
-      `Demo reset did not complete (${err?.message ?? err}). The database may be partially reset; tap Reset again.`,
-    );
+    throw new HttpsError('internal', partialResetMessage(err));
   }
 });
