@@ -74,7 +74,7 @@ final class TotalFlowUITests: XCTestCase {
     ].joined(separator: "|")
 
     func testScanFindsTheTotalLineAndTheHostConfirmsItWithinThreeSeconds() {
-        openParty(as: "maxi", hostedBy: "maxi", members: ["annie"], extra: ["-UITestReceipt", Self.tonysReceipt])
+        openParty(as: "maxi", hostedBy: "maxi", members: ["annie"], extra: ["-UITestReceiptEnv", Self.tonysReceipt])
         let scan = app.buttons["scanReceiptButton"]
         XCTAssertTrue(scan.waitForExistence(timeout: Self.screenTimeout))
         scan.tap()
@@ -91,7 +91,7 @@ final class TotalFlowUITests: XCTestCase {
     }
 
     func testBlankPageShowsTheNoTotalMessageOnTheKeypadAndWritesNothing() {
-        openParty(as: "maxi", hostedBy: "maxi", members: [], extra: ["-UITestReceipt", "blank"])
+        openParty(as: "maxi", hostedBy: "maxi", members: [], extra: ["-UITestReceiptEnv", "blank"])
         app.buttons["scanReceiptButton"].tap()
         XCTAssertTrue(element("entryNotice").waitForExistence(timeout: 3))
         XCTAssertTrue(amountField.exists, "Lands on the keypad")
@@ -101,7 +101,7 @@ final class TotalFlowUITests: XCTestCase {
 
     func testUnreadableTotalLineShowsTheNoTotalMessage() {
         openParty(as: "maxi", hostedBy: "maxi", members: [],
-                  extra: ["-UITestReceipt", "TONY'S|Subtotal\t$48.50|Tax\t$3.08"])
+                  extra: ["-UITestReceiptEnv", "TONY'S|Subtotal\t$48.50|Tax\t$3.08"])
         app.buttons["scanReceiptButton"].tap()
         XCTAssertTrue(element("entryNotice").waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["We couldn't find a total on that receipt. Type it instead."].exists)
@@ -291,7 +291,7 @@ final class TotalFlowUITests: XCTestCase {
     private func openParty(as user: String, hostedBy hostId: String, members: [String], extra: [String] = []) {
         var arguments = ["-UITestFixture", "seeded", "-UITestResetSession", "YES", "-UITestFriendParty", hostId]
         if !members.isEmpty { arguments += ["-UITestFriendPartyMembers", members.joined(separator: ",")] }
-        app.launchArguments = arguments + extra
+        app.launchArguments = applyReceiptEnvironment(arguments + extra, to: app)
         app.launch()
         let usernameField = app.textFields["usernameField"]
         XCTAssertTrue(usernameField.waitForExistence(timeout: Self.screenTimeout))
@@ -300,4 +300,18 @@ final class TotalFlowUITests: XCTestCase {
         app.buttons["Sign in"].tap()
         XCTAssertTrue(element("partyScreen").waitForExistence(timeout: Self.screenTimeout))
     }
+}
+
+/// Moves a `"-UITestReceiptEnv", text` pair out of the launch arguments into the
+/// `UITestReceipt` environment variable (argument values are parsed as property
+/// lists, which mangles a receipt's spaces and apostrophes).
+func applyReceiptEnvironment(_ arguments: [String], to app: XCUIApplication) -> [String] {
+    guard let index = arguments.firstIndex(of: "-UITestReceiptEnv"), index + 1 < arguments.count else {
+        app.launchEnvironment["UITestReceipt"] = nil
+        return arguments
+    }
+    app.launchEnvironment["UITestReceipt"] = arguments[index + 1]
+    var remaining = arguments
+    remaining.removeSubrange(index...index + 1)
+    return remaining
 }

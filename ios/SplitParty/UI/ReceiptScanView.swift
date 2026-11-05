@@ -129,7 +129,14 @@ struct ReceiptScanView: View {
         Task {
             let started = ContinuousClock.now
             let pieces = await ReceiptTextRecognizer.recognize(image)
-            let remaining = Self.minimumScanDuration - (ContinuousClock.now - started)
+            var minimum = Self.minimumScanDuration
+            #if DEBUG
+            // Captures hold the laser on screen long enough to photograph it.
+            if let hold = UserDefaults.standard.object(forKey: "UITestScanHold") as? String, let seconds = Double(hold) {
+                minimum = .seconds(seconds)
+            }
+            #endif
+            let remaining = minimum - (ContinuousClock.now - started)
             if remaining > .zero { try? await Task.sleep(for: remaining) }
             // Drop the photo before anything else happens with the result.
             stage = .checkingCamera
@@ -329,11 +336,12 @@ private struct CameraCapture: UIViewControllerRepresentable {
 }
 
 #if DEBUG
-/// UI tests and captures run on simulators without a camera:
-/// `-UITestReceipt "TOTAL|$51.58"` renders those lines (one per "|", label and
+/// UI tests and captures run on simulators without a camera: the launch
+/// environment variable `UITestReceipt="TOTAL\t$51.58|..."` renders those lines (one per "|", label and
 /// amount split by a tab) as a receipt image in code and reads it with the real
 /// Vision pipeline; `-UITestReceipt blank` is a blank page; `-UITestCameraDenied YES`
-/// behaves as if camera permission were off. Debug builds only; no receipt
+/// behaves as if camera permission were off; `-UITestScanHold <seconds>` keeps
+/// the laser sweeping that long (captures). Debug builds only; no receipt
 /// photo is ever bundled.
 enum ReceiptScanTestLaunch {
     case receipt(lines: [String])
@@ -341,7 +349,9 @@ enum ReceiptScanTestLaunch {
 
     static func fromProcessArguments(_ defaults: UserDefaults = .standard) -> ReceiptScanTestLaunch? {
         if defaults.bool(forKey: "UITestCameraDenied") { return .cameraDenied }
-        guard let raw = defaults.string(forKey: "UITestReceipt") else { return nil }
+        // An environment variable, not a "-key value" argument: argument values are
+        // parsed as property lists, which mangles spaces and apostrophes.
+        guard let raw = ProcessInfo.processInfo.environment["UITestReceipt"] else { return nil }
         return .receipt(lines: raw == "blank" ? [] : raw.components(separatedBy: "|"))
     }
 }
