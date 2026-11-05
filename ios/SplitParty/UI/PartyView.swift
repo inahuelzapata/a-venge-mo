@@ -120,8 +120,14 @@ final class PartyRoomModel {
             case let .success(document):
                 // One state change per delivery: total, headcount and share all
                 // come from this value, so they always change in the same frame.
-                Motion.animate(.spring(response: 0.45, dampingFraction: 0.7)) {
+                // Turning paid swaps the screen at once: the paid screen plays its
+                // own ticks from the first frame, and a crossfade would hide them.
+                if document.item?.status == .paid && self.party?.status != .paid {
                     self.party = document.item
+                } else {
+                    Motion.animate(.spring(response: 0.45, dampingFraction: 0.7)) {
+                        self.party = document.item
+                    }
                 }
                 self.noticeRemoval(in: document.item)
                 if document.item == nil, self.hasLoaded, !document.isFromCache { self.wasDeleted = true }

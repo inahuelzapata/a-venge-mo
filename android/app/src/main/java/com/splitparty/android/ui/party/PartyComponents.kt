@@ -4,11 +4,9 @@ import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -28,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,12 +45,17 @@ import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.LocalReduceMotion
 import com.splitparty.android.ui.theme.Type
-import kotlin.math.PI
-import kotlin.math.sin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-private const val POP_STAGGER_MS = 120L
-private const val BOB_MS = 1_800
+private const val POP_STAGGER_MS = 140L
+private const val POP_FROM = 0.2f
+private const val POP_DAMPING = 0.55f
+
+/** SwiftUI spring(response: 0.35) as a Compose stiffness: (2π / 0.35)². */
+private const val POP_STIFFNESS = 322f
+private const val BOB_MS = 1_400
+private val BOB_DISTANCE = 3.dp
 private const val MILLIS_PER_SECOND = 1_000L
 private const val SECONDS_PER_MINUTE = 60L
 
@@ -67,31 +69,33 @@ fun EmojiCodeTiles(code: List<String>, modifier: Modifier = Modifier, tileSize: 
     val motion = animated && !LocalReduceMotion.current
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(tileSize * 0.16f)) {
         code.forEachIndexed { index, emoji ->
-            if (motion) AnimatedTile(emoji, index, tileSize) else Tile(emoji, tileSize)
+            if (motion) AnimatedTile(emoji, index, code.size, tileSize) else Tile(emoji, tileSize)
         }
     }
 }
 
 @Composable
-private fun AnimatedTile(emoji: String, index: Int, size: Dp) {
-    val scale = remember { Animatable(0f) }
+private fun AnimatedTile(emoji: String, index: Int, count: Int, size: Dp) {
+    val pop = remember { Animatable(0f) }
+    val bob = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
+        // One by one, 140 ms apart, from 20% and transparent (spring 0.35 / 0.55, as on iOS).
         delay(index * POP_STAGGER_MS)
-        scale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
+        launch { pop.animateTo(1f, spring(dampingRatio = POP_DAMPING, stiffness = POP_STIFFNESS)) }
+        // Once the last tile has popped, all bob together, alternate tiles out of step.
+        delay((count - index) * POP_STAGGER_MS)
+        bob.animateTo(1f, infiniteRepeatable(tween(BOB_MS, easing = EaseInOut), RepeatMode.Reverse))
     }
-    val bob by rememberInfiniteTransition(label = "bob").animateFloat(
-        0f,
-        1f,
-        infiniteRepeatable(tween(BOB_MS), RepeatMode.Restart),
-        label = "bobT"
-    )
+    val direction = if (index % 2 == 0) -1f else 1f
     Tile(
         emoji,
         size,
         Modifier.graphicsLayer {
-            scaleX = scale.value
-            scaleY = scale.value
-            translationY = sin((bob + index / 3f) * 2 * PI).toFloat() * 3.dp.toPx()
+            val p = pop.value
+            scaleX = POP_FROM + (1f - POP_FROM) * p
+            scaleY = scaleX
+            alpha = p.coerceIn(0f, 1f)
+            translationY = direction * bob.value * BOB_DISTANCE.toPx()
         }
     )
 }

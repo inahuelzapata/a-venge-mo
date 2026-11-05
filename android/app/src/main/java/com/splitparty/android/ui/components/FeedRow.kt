@@ -2,6 +2,7 @@ package com.splitparty.android.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,7 @@ import com.splitparty.android.format.RelativeTime
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.Type
+import com.splitparty.android.ui.theme.motionSpec
 import kotlinx.coroutines.delay
 
 /** Wall-clock time that ticks every 30 s, so "x minutes ago" stays current. */
@@ -66,8 +68,8 @@ fun rememberNow(): Long {
     return now
 }
 
-/** Fade from the highlight back to white, once the 1.5 s hold ends. */
-private const val HIGHLIGHT_FADE_MS = 350
+/** Fade from the highlight back to white once the 1.5 s hold ends: 1 s ease-out, as on iOS. */
+private const val HIGHLIGHT_FADE_MS = 1_000
 
 /** The inline avatar sits 4 below the text's centre line, on the baseline as on iOS. */
 private const val INLINE_AVATAR_SP = 22
@@ -86,7 +88,7 @@ fun FeedRow(transaction: Transaction, users: Map<String, User>, nowMillis: Long,
     val payeeName = payee?.displayName ?: Username.fallbackName(transaction.payeeId)
     val background by animateColorAsState(
         targetValue = if (highlighted) Brand.Highlight else Brand.Card,
-        animationSpec = tween(durationMillis = HIGHLIGHT_FADE_MS),
+        animationSpec = motionSpec(tween(durationMillis = HIGHLIGHT_FADE_MS, easing = EaseOut)),
         label = "rowHighlight"
     )
 

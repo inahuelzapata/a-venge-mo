@@ -89,8 +89,14 @@ class JoinViewModel(
         val attempts = maxOf(party?.wrongAttemptsOf(userId) ?: 0L, local.wrongPicks.toLong())
         val phase = when {
             party == null -> if (event.fromCache) JoinPhase.Loading else JoinPhase.Unavailable
-            attempts >= Party.MAX_WRONG_CODE_ATTEMPTS -> JoinPhase.Locked
+
+            // The last wrong pick shakes first; the locked state follows the shake.
+            attempts >= Party.MAX_WRONG_CODE_ATTEMPTS && !local.lockAfterShake -> JoinPhase.Locked
+
+            local.lockAfterShake -> JoinPhase.Choosing
+
             !party.isActiveAt(clock.now()) || local.unavailable -> JoinPhase.Unavailable
+
             else -> JoinPhase.Choosing
         }
         JoinUiState(
@@ -124,19 +130,21 @@ class JoinViewModel(
         } else {
             _events.trySend(JoinEvent.WrongCode)
             local.update {
+                val picks = maxOf(it.wrongPicks, party.wrongAttemptsOf(userId).toInt()) + 1
                 it.copy(
-                    wrongPicks = maxOf(it.wrongPicks, party.wrongAttemptsOf(userId).toInt()) + 1,
+                    wrongPicks = picks,
                     wrongPick = index,
                     showWrongCode = true,
                     joinFailed = false,
-                    busy = true
+                    busy = true,
+                    lockAfterShake = picks >= Party.MAX_WRONG_CODE_ATTEMPTS
                 )
             }
             viewModelScope.launch { parties.recordWrongAttempt(partyId, userId) }
             viewModelScope.launch {
                 // Let the picked option shake in place, then deal a new order.
                 delay(SHAKE_MS)
-                local.update { it.copy(options = shuffled(party), wrongPick = null, busy = false) }
+                local.update { it.copy(options = shuffled(party), wrongPick = null, busy = false, lockAfterShake = false) }
             }
         }
     }
@@ -151,7 +159,9 @@ class JoinViewModel(
         val busy: Boolean = false,
         val joinFailed: Boolean = false,
         val showWrongCode: Boolean = false,
-        val unavailable: Boolean = false
+        val unavailable: Boolean = false,
+        /** The third wrong pick is still shaking: Locked shows once it has played. */
+        val lockAfterShake: Boolean = false
     )
 
     companion object {

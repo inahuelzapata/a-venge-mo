@@ -63,7 +63,7 @@ class JoinViewModelTest {
     }
 
     @Test
-    fun `wrong picks count, reshuffle, and the third locks the party`() = runTest {
+    fun `wrong picks count, reshuffle, and the third shakes and then locks the party`() = runTest {
         val vm = viewModel()
         vm.events.test {
             vm.state.test {
@@ -87,6 +87,13 @@ class JoinViewModelTest {
                         assertTrue(state.showWrongCode)
                         assertTrue(state.options.contains(TestData.CODE))
                         assertNotEquals("order changes after a wrong pick", before, state.options)
+                    } else {
+                        // The third pick still shakes before the locked state shows.
+                        assertEquals(JoinPhase.Choosing, state.phase)
+                        assertEquals(picked, state.wrongPick)
+                        advanceTimeBy(JoinViewModel.SHAKE_MS)
+                        runCurrent()
+                        state = expectMostRecentItem()
                     }
                 }
                 assertEquals(JoinPhase.Locked, state.phase)

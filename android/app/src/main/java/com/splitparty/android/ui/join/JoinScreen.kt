@@ -1,7 +1,8 @@
 package com.splitparty.android.ui.join
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +58,8 @@ import com.splitparty.android.ui.theme.LocalReduceMotion
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import com.splitparty.android.ui.theme.Type
 import com.splitparty.android.ui.theme.topInset
+import kotlin.math.PI
+import kotlin.math.sin
 import kotlinx.collections.immutable.persistentListOf
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -171,6 +174,10 @@ private fun Choosing(state: JoinUiState, onPick: (Int) -> Unit, modifier: Modifi
     }
 }
 
+private const val SHAKE_DURATION_MS = 400
+private const val SHAKE_SWINGS = 3
+private val SHAKE_DISTANCE = 10.dp
+
 /** A white card of three tiles. A wrong pick shakes it sideways (instantly red-outlined without motion). */
 @Composable
 private fun CodeOption(
@@ -182,20 +189,13 @@ private fun CodeOption(
     modifier: Modifier = Modifier
 ) {
     val reduce = LocalReduceMotion.current
+    // ±10 three times in 0.4 s, linear (as on iOS); only the picked option.
     val shake = remember { Animatable(0f) }
     LaunchedEffect(wrong, shakeKey) {
         if (wrong && !reduce) {
-            shake.animateTo(
-                0f,
-                keyframes {
-                    durationMillis = 360
-                    -14f at 45
-                    12f at 105
-                    -9f at 165
-                    6f at 225
-                    -3f at 285
-                }
-            )
+            shake.snapTo(0f)
+            shake.animateTo(1f, tween(SHAKE_DURATION_MS, easing = LinearEasing))
+            shake.snapTo(0f)
         }
     }
     val interaction = remember { MutableInteractionSource() }
@@ -205,7 +205,7 @@ private fun CodeOption(
         modifier = modifier
             .padding(horizontal = Dimens.Gutter)
             .fillMaxWidth()
-            .graphicsLayer { translationX = shake.value * density }
+            .graphicsLayer { translationX = SHAKE_DISTANCE.toPx() * sin(shake.value * 2 * PI * SHAKE_SWINGS).toFloat() }
             .alpha(if (pressed) 0.8f else 1f)
             .background(Brand.Card, RoundedCornerShape(Dimens.CardRadius))
             .border(2.dp, if (wrong) Brand.Error else Brand.Card, RoundedCornerShape(Dimens.CardRadius))

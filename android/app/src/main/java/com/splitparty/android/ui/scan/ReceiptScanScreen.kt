@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -15,7 +16,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -76,6 +77,7 @@ import com.splitparty.android.ui.theme.Type
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -158,7 +160,10 @@ fun ReceiptScanRoute(onBack: () -> Unit, onResult: (TotalStep) -> Unit, recogniz
                     return@launch
                 }
                 photo = bitmap.asImageBitmap()
+                val readingSince = SystemClock.elapsedRealtime()
                 val outcome = withTimeoutOrNull(RECOGNITION_BUDGET_MS) { recognizer.recognize(bitmap) } ?: ScanOutcome.Unreadable
+                // As on iOS, the laser stays at least 0.7 s, so a fast read still shows it.
+                delay(MIN_READING_MS - (SystemClock.elapsedRealtime() - readingSince))
                 photo = null
                 onResult(
                     when (outcome) {
@@ -300,15 +305,16 @@ fun ScanLayout(
 }
 
 private const val SWEEP_MS = 1_100
-private const val GLOW_DP = 28
+private const val GLOW_DP = 18
+private const val MIN_READING_MS = 700L
 
-/** A brand-blue line sweeping down and up the photo, with a soft glow trailing it. */
+/** A brand-blue line sweeping down and up the photo (1.1 s each way, ease-in-out, as on iOS) in a soft glow. */
 @Composable
 private fun LaserSweep(modifier: Modifier = Modifier) {
     val y by rememberInfiniteTransition(label = "laser").animateFloat(
         0f,
         1f,
-        infiniteRepeatable(tween(SWEEP_MS, easing = LinearEasing), RepeatMode.Reverse),
+        infiniteRepeatable(tween(SWEEP_MS, easing = EaseInOut), RepeatMode.Reverse),
         label = "laserY"
     )
     Canvas(modifier.testTag(ScanTestTags.LASER)) {

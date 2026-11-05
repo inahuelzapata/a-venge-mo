@@ -1,7 +1,6 @@
 package com.splitparty.android.ui.party
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,6 +29,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -59,7 +60,7 @@ import com.splitparty.android.ui.components.Avatar
 import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.components.PulsingDot
 import com.splitparty.android.ui.components.SoftPillButton
-import com.splitparty.android.ui.components.rememberBreathingAlpha
+import com.splitparty.android.ui.components.rememberBreathing
 import com.splitparty.android.ui.scan.ReceiptScanRoute
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
@@ -280,6 +281,10 @@ private fun CodeCard(code: List<String>, millisLeft: Long, modifier: Modifier = 
 private fun MembersCard(members: List<MemberUi>, modifier: Modifier = Modifier, onRemove: ((MemberUi) -> Unit)? = null) {
     // Members present when the screen opened are simply there; later ones spring in.
     val initial = remember { members.map { it.userId }.toSet() }
+    // Members who leave or are removed spring out (the arrival reversed) before their seat empties.
+    val roster = remember { SeatRoster() }
+    var goneCount by remember { mutableIntStateOf(0) }
+    val seats = remember(members, goneCount) { roster.merge(members) }
     PartyCard(modifier) {
         Text(
             stringResource(R.string.party_members),
@@ -293,29 +298,64 @@ private fun MembersCard(members: List<MemberUi>, modifier: Modifier = Modifier, 
             verticalArrangement = Arrangement.spacedBy(16.dp),
             maxItemsInEachRow = 4
         ) {
-            members.forEach { member ->
-                val remove = onRemove?.takeIf { !member.isHost }?.let { { it(member) } }
-                MemberSeat(member, springIn = member.userId !in initial, onRemove = remove)
+            seats.forEach { seat ->
+                val member = seat.member
+                key(member.userId) {
+                    val remove = onRemove?.takeIf { !member.isHost && !seat.leaving }?.let { { it(member) } }
+                    MemberSeat(
+                        member,
+                        springIn = member.userId !in initial,
+                        leaving = seat.leaving,
+                        onDepart = {
+                            roster.markGone(member.userId)
+                            goneCount++
+                        },
+                        onRemove = remove
+                    )
+                }
             }
-            repeat((MIN_SEATS - members.size).coerceAtLeast(0)) { EmptySeat() }
+            // A departed seat turns back into a pulsing empty one once it has sprung out.
+            repeat((MIN_SEATS - seats.size).coerceAtLeast(0)) { EmptySeat() }
         }
     }
 }
+
+private const val SEAT_FROM_SCALE = 0.3f
+private const val EMPTY_SEAT_SHRINK = 0.06f
+private const val EMPTY_SEAT_FADE = 0.55f
+private const val SEAT_SPRING_DAMPING = 0.7f
+
+/** SwiftUI spring(response: 0.45) as a Compose stiffness: (2π / 0.45)². */
+private const val SEAT_SPRING_STIFFNESS = 195f
 
 private val SeatWidth = 84.dp
 private val SeatAvatar = 60.dp
 
 @Composable
-private fun MemberSeat(member: MemberUi, springIn: Boolean, modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null) {
+private fun MemberSeat(
+    member: MemberUi,
+    springIn: Boolean,
+    modifier: Modifier = Modifier,
+    leaving: Boolean = false,
+    onDepart: () -> Unit = {},
+    onRemove: (() -> Unit)? = null
+) {
     val description = if (member.isHost) stringResource(R.string.party_member_host_description, member.firstName) else member.firstName
     val removeLabel = stringResource(R.string.remove_title, member.firstName)
     val reduce = LocalReduceMotion.current
-    val scale = remember { Animatable(if (springIn && !reduce) 0f else 1f) }
-    LaunchedEffect(Unit) { scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)) }
+    val depart by rememberUpdatedState(onDepart)
+    // 0: 30% and transparent, 1: in place. Arrival springs 0 → 1, departure the same spring back to 0 (as on iOS).
+    val presence = remember { Animatable(if (springIn && !reduce) 0f else 1f) }
+    LaunchedEffect(leaving) {
+        val target = if (leaving) 0f else 1f
+        if (reduce) presence.snapTo(target) else presence.animateTo(target, spring(SEAT_SPRING_DAMPING, SEAT_SPRING_STIFFNESS))
+        if (leaving) depart()
+    }
     Column(
         modifier = modifier
             .width(SeatWidth)
-            .testTag(PartyTestTags.seat(member.userId))
+            // A departing seat is already out of the party: no tag, no action, nothing to announce.
+            .then(if (leaving) Modifier else Modifier.testTag(PartyTestTags.seat(member.userId)))
             // Host only, never on the host's own seat: tap to remove (after a confirmation).
             .then(
                 if (onRemove == null) {
@@ -330,16 +370,18 @@ private fun MemberSeat(member: MemberUi, springIn: Boolean, modifier: Modifier =
                     )
                 }
             )
-            .clearAndSetSemantics { contentDescription = description },
+            .clearAndSetSemantics { if (!leaving) contentDescription = description }
+            // The whole seat (avatar and name) springs, as on iOS.
+            .graphicsLayer {
+                val p = presence.value
+                scaleX = SEAT_FROM_SCALE + (1f - SEAT_FROM_SCALE) * p
+                scaleY = scaleX
+                alpha = p.coerceIn(0f, 1f)
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Box(
-            Modifier.graphicsLayer {
-                scaleX = scale.value
-                scaleY = scale.value
-            }
-        ) {
+        Box {
             Avatar(member.avatar, member.firstName, size = SeatAvatar)
             if (member.isHost) HostBadge(Modifier.align(Alignment.BottomCenter).offset(y = 8.dp))
         }
@@ -362,7 +404,7 @@ private fun HostBadge(modifier: Modifier = Modifier) {
 
 @Composable
 private fun EmptySeat(modifier: Modifier = Modifier) {
-    val breathing = rememberBreathingAlpha()
+    val breathing = rememberBreathing()
     val description = stringResource(R.string.party_empty_seat)
     Column(
         modifier = modifier.width(SeatWidth).testTag(PartyTestTags.EMPTY_SEAT).clearAndSetSemantics { contentDescription = description },
@@ -372,7 +414,13 @@ private fun EmptySeat(modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .size(SeatAvatar)
-                .graphicsLayer { alpha = breathing() }
+                .graphicsLayer {
+                    // Scale to 0.94 and fade, 0.9 s each way (iOS: the fill fades to 35%).
+                    val p = breathing()
+                    scaleX = 1f - EMPTY_SEAT_SHRINK * p
+                    scaleY = scaleX
+                    alpha = 1f - EMPTY_SEAT_FADE * p
+                }
                 .border(2.dp, Brand.Placeholder, CircleShape)
         )
         Text("", style = Type.Body)

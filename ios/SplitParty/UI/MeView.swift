@@ -26,7 +26,8 @@ struct MeView: View {
                                 emptyMessage: "Payments you send or receive show up here.")
                 // Last on the tab, under a "Demo" heading: easy for the presenter
                 // to find, out of a joinee's way.
-                DemoResetSection(repository: liveData.parties.repository, connection: liveData.parties.connection)
+                DemoResetSection(repository: liveData.parties.repository, connection: liveData.parties.connection,
+                                 onResetDone: liveData.parties.replayMerchantCardEntrance)
                     .padding(.top, 16)
             }
             .padding(.bottom, 24)
@@ -112,6 +113,8 @@ private struct DemoModeCard: View {
 private struct DemoResetSection: View {
     let repository: any PaymentDataSource
     let connection: ConnectionMonitor
+    /// The demo starts over: Home plays the merchant card's arrival again.
+    var onResetDone: () -> Void = {}
 
     @State private var isConfirming = false
     @State private var isResetting = false
@@ -193,6 +196,7 @@ private struct DemoResetSection: View {
             defer { isResetting = false }
             do {
                 try await repository.resetDemo()
+                onResetDone()
                 didSucceed = true
                 UIAccessibility.post(notification: .announcement, argument: "Demo reset done")
                 try? await Task.sleep(for: Self.successNoticeDuration)

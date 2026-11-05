@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import com.splitparty.android.format.Money
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.LocalReduceMotion
@@ -21,13 +22,13 @@ private const val ROLL_MS = 600
 private const val ROLL_STEPS = 1_000L
 
 /**
- * An amount in cents (a share, a balance), rolling from the previous value to [cents] (0.6 s,
+ * An amount in cents (a share, a total, a balance), rolling from the previous value to [cents] (0.6 s,
  * ease out). Interpolation is integer cents over a progress fraction, so the
  * shown amount is always a whole number of cents, negative values included.
  * Instant with reduced motion.
  */
 @Composable
-fun RollingAmount(cents: Long, modifier: Modifier = Modifier) {
+fun RollingAmount(cents: Long, modifier: Modifier = Modifier, style: TextStyle = Type.Balance) {
     val reduce = LocalReduceMotion.current
     // Saveable: coming back to a screen (a tab switch restores state) rolls from the value last shown there.
     var from by rememberSaveable { mutableLongStateOf(cents) }
@@ -45,7 +46,7 @@ fun RollingAmount(cents: Long, modifier: Modifier = Modifier) {
             progress.animateTo(1f, tween(ROLL_MS, easing = FastOutSlowInEasing))
         }
     }
-    Text(Money.format(shown(from, target, progress.value)), style = Type.Balance, color = Brand.Ink, modifier = modifier)
+    Text(Money.format(shown(from, target, progress.value)), style = style, color = Brand.Ink, modifier = modifier)
 }
 
 private fun shown(from: Long, to: Long, progress: Float): Long = from + (to - from) * (progress * ROLL_STEPS).toLong() / ROLL_STEPS

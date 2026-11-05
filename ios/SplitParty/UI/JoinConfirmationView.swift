@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Before joining, the joinee picks the host's code out of four (PoC-9): proof
 /// they are at the same table. Three wrong picks lock that party for them; the
@@ -11,6 +12,8 @@ struct JoinConfirmationView: View {
 
     @Environment(LiveDataStore.self) private var liveData
     @State private var room: PartyRoomModel?
+    /// The third wrong pick is still shaking: the locked state waits for it.
+    @State private var isFinalShakePlaying = false
 
     var body: some View {
         let hub = liveData.parties
@@ -48,7 +51,7 @@ struct JoinConfirmationView: View {
         if party.isMember(userId) {
             // Already in (e.g. joined a moment ago): nothing to confirm.
             Color.clear.onAppear(perform: onJoined)
-        } else if party.isLockedOut(userId) {
+        } else if party.isLockedOut(userId) && !isFinalShakePlaying {
             PartyClosedView(title: "Too many wrong codes",
                             message: "You can't join \(hostName)'s party any more. "
                                 + "Ask them to start a new one if you're at the same table.",
@@ -60,7 +63,7 @@ struct JoinConfirmationView: View {
         } else {
             CodeChoices(party: party, userId: userId, hostName: hostName,
                         hostUser: liveData.usersById[party.hostId], merchantName: hub.merchantName,
-                        repository: hub.repository, onJoined: onJoined)
+                        repository: hub.repository, isFinalShakePlaying: $isFinalShakePlaying, onJoined: onJoined)
         }
     }
 }
@@ -73,6 +76,7 @@ private struct CodeChoices: View {
     let hostUser: UserAccount?
     let merchantName: String
     let repository: any PaymentDataSource
+    @Binding var isFinalShakePlaying: Bool
     let onJoined: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -169,6 +173,10 @@ private struct CodeChoices: View {
         Task {
             do {
                 try await repository.joinParty(id: party.id, userId: userId)
+                // The joining phone's own "you're in" haptic. Played here, not with
+                // sensoryFeedback, because onJoined replaces this screen at once.
+                // Haptics never depend on Reduce Motion.
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 onJoined()
             } catch {
                 errorMessage = (error as? PartyActionError ?? .unreachable).joinMessage
@@ -191,10 +199,13 @@ private struct CodeChoices: View {
         shakingOption = option
         shakeProgress = 0
         if !reduceMotion {
+            // The last attempt shakes too; the locked state shows after it.
+            if attemptsLeft <= 0 { isFinalShakePlaying = true }
             withAnimation(.linear(duration: 0.4)) { shakeProgress = 1 }
         }
         Task {
             try? await Task.sleep(for: Self.reshuffleDelay)
+            isFinalShakePlaying = false
             shakingOption = nil
             shakeProgress = 0
             options = JoinCodeChoices.make(for: party.joinCode, previous: options)
