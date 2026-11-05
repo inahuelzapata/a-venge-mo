@@ -110,3 +110,15 @@ What: The party transactions live in PartyWriter, a nonisolated struct, instead 
 ## SwiftUI accessibilityIdentifier on a plain stack overwrites its children's identifiers
 
 What: An .accessibilityIdentifier applied to a VStack that is not an accessibility element is copied onto every child, so the "Back to Home" button lost its own id; UI tests now find the expired state by its text · Why: SwiftUI propagates the modifier when the view is not a single element · Where: ios/SplitParty/UI/PartyView.swift (PartyClosedView), ios/SplitPartyUITests/PartyFlowUITests.swift · Learned: put identifiers on leaf views, or make the container .accessibilityElement(children: .contain) first
+
+## iOS Home and Me snapshots fail on 2026-11-05 on the unmodified base commit
+
+What: ScreenSnapshotTests testHomeFeed, testHomeEmpty and testMe fail by one pixel (match 0.9999997, perceptual precision 0.977 < 0.98) on the iPhone 17 / iOS 26.5 simulator, both on the total-slice branch and on its untouched base commit 3958861; they passed there the day before · Why: unknown; not caused by party code (verified on a clean worktree of the base). Likely date- or simulator-dependent rendering · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift · Learned: before blaming a branch for these failures, rerun them on a clean worktree of the base commit
+
+## XCUITest launch argument values are parsed as property lists
+
+What: A "-key value" launch argument whose value has spaces or an apostrophe (a receipt like "TONY'S|Greenwich Ave") arrives mangled ("TONYS", "Greenwich\ Ave") and can swallow the following arguments. Free text for the Debug app goes in `app.launchEnvironment` instead; the receipt scan reads `UITestReceipt` from the environment · Where: ios/SplitParty/UI/ReceiptScanView.swift ReceiptScanTestLaunch, ios/SplitPartyUITests/TotalFlowUITests.swift applyReceiptEnvironment · Learned: a test passed only because the value was the last argument; keep "-key value" for simple tokens
+
+## The iOS floating tab bar does not inset pushed screens
+
+What: The bottom bar is a safeAreaInset on MainTabView's ZStack, but scroll views on screens pushed in HomeNavigationStack still lay out to the screen bottom, so their last controls can sit under the bar with nothing to scroll. The party screen adds `.contentMargins(.bottom, Theme.floatingBarClearance /* 96 */, for: .scrollContent)` · Where: ios/SplitParty/UI/PartyView.swift, Theme.swift · Learned: any new pushed screen with controls near its end needs the same margin

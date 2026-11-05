@@ -43,6 +43,11 @@ final class PartyHub {
     /// (relaunch or sign-in); Home's navigation opens it and clears this.
     var partyToOpenOnLaunch: String?
 
+    /// A short message Home shows once, e.g. after the host removed this user.
+    private(set) var homeNotice: String?
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    static let homeNoticeDuration: Duration = .seconds(5)
+
     /// The signed-in user's friends (from `users/{id}.friendIds`).
     var friendIds: Set<String> = []
 
@@ -173,6 +178,19 @@ final class PartyHub {
 
     func dismissStartPartyError() {
         startPartyError = nil
+    }
+
+    // MARK: Home notice
+
+    func showHomeNotice(_ message: String) {
+        noticeTask?.cancel()
+        Motion.animate(.spring(response: 0.45, dampingFraction: 0.8)) { homeNotice = message }
+        UIAccessibility.post(notification: .announcement, argument: message)
+        noticeTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.homeNoticeDuration)
+            guard !Task.isCancelled else { return }
+            Motion.animate(.easeInOut(duration: 0.3)) { self?.homeNotice = nil }
+        }
     }
 
     // MARK: Listening

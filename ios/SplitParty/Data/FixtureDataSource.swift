@@ -35,6 +35,8 @@ final class FixtureDataSource: PaymentDataSource {
     /// When set, the other seeded users join a party the signed-in user starts,
     /// one after another at this interval (UI tests and captures).
     var friendsJoinInterval: Double?
+    /// Runs once, after the next successful sign-in (UI tests' scripted changes).
+    var afterSignIn: (() -> Void)?
 
     init(scenario: Scenario, now: Date = .now) {
         self.scenario = scenario
@@ -53,6 +55,8 @@ final class FixtureDataSource: PaymentDataSource {
         guard let userId = Username.normalized(username), let user = usersById[userId] else {
             throw LoginError.unknownUsername
         }
+        afterSignIn?()
+        afterSignIn = nil
         return user
     }
 
@@ -186,19 +190,42 @@ extension FixtureDataSource {
         guard !party.isLockedOut(userId) else { throw PartyActionError.lockedOut }
         guard party.isActive(at: Date()) else { throw PartyActionError.partyNoLongerOpen }
         guard !party.isMember(userId) else { return }
-        replace(party, memberIds: party.memberIds + [userId], wrongCodeAttempts: party.wrongCodeAttempts)
+        replace(party, memberIds: party.memberIds + [userId])
     }
 
     func recordWrongCode(partyId: String, userId: String) async throws {
         guard let party = parties[partyId] else { return }
         var attempts = party.wrongCodeAttempts
         attempts[userId, default: 0] += 1
-        replace(party, memberIds: party.memberIds, wrongCodeAttempts: attempts)
+        replace(party, wrongCodeAttempts: attempts)
     }
 
     func expireParty(id: String) async {
         guard let party = parties[id], party.status == .open, Date() >= party.expiresAt else { return }
-        replace(party, status: .expired, memberIds: party.memberIds, wrongCodeAttempts: party.wrongCodeAttempts)
+        replace(party, status: .expired)
+    }
+
+    func setBill(partyId: String, billCents: Int) async throws {
+        let party = try openFixtureParty(partyId)
+        replace(party, billCents: billCents, tip: party.tip ?? .zero)
+    }
+
+    func setTip(partyId: String, tip: TipChoice) async throws {
+        replace(try openFixtureParty(partyId), tip: tip)
+    }
+
+    func removeMember(partyId: String, memberId: String) async throws {
+        let party = try openFixtureParty(partyId)
+        guard memberId != party.hostId, party.isMember(memberId) else { return }
+        replace(party, memberIds: party.memberIds.filter { $0 != memberId })
+    }
+
+    private func openFixtureParty(_ partyId: String) throws -> SplitParty {
+        guard scenario != .unreachable else { throw PartyActionError.unreachable }
+        guard let party = parties[partyId], party.isActive(at: Date()) else {
+            throw PartyActionError.partyNoLongerOpen
+        }
+        return party
     }
 
     // MARK: Test controls
@@ -206,11 +233,12 @@ extension FixtureDataSource {
     /// A party at Tony's that another phone has just started (or started
     /// `ageSeconds` ago), as if read from the database.
     @discardableResult
-    func addParty(hostId: String, memberIds: [String], createdAt: Date = .now) -> SplitParty {
+    func addParty(hostId: String, memberIds: [String], createdAt: Date = .now, billCents: Int? = nil,
+                  tip: TipChoice? = nil) -> SplitParty {
         let party = SplitParty(id: "fixture_party_\(nextPartyNumber)", hostId: hostId, merchantId: DemoMerchant.id,
                                joinCode: Self.fixedJoinCode, status: .open, createdAt: createdAt,
                                expiresAt: createdAt.addingTimeInterval(TimeInterval(PartySchema.partyLifetimeSeconds)),
-                               memberIds: memberIds, wrongCodeAttempts: [:])
+                               memberIds: memberIds, wrongCodeAttempts: [:], billCents: billCents, tip: tip)
         nextPartyNumber += 1
         store(party)
         return party
@@ -227,11 +255,14 @@ extension FixtureDataSource {
 
     // MARK: Helpers
 
-    private func replace(_ party: SplitParty, status: PartyStatus? = nil, memberIds: [String],
-                         wrongCodeAttempts: [String: Int]) {
+    /// Stores a copy of `party` with the given fields changed; nil keeps a field.
+    private func replace(_ party: SplitParty, status: PartyStatus? = nil, memberIds: [String]? = nil,
+                         wrongCodeAttempts: [String: Int]? = nil, billCents: Int? = nil, tip: TipChoice? = nil) {
         store(SplitParty(id: party.id, hostId: party.hostId, merchantId: party.merchantId, joinCode: party.joinCode,
                          status: status ?? party.status, createdAt: party.createdAt, expiresAt: party.expiresAt,
-                         memberIds: memberIds, wrongCodeAttempts: wrongCodeAttempts))
+                         memberIds: memberIds ?? party.memberIds,
+                         wrongCodeAttempts: wrongCodeAttempts ?? party.wrongCodeAttempts,
+                         billCents: billCents ?? party.billCents, tip: tip ?? party.tip))
     }
 
     private func store(_ party: SplitParty) {

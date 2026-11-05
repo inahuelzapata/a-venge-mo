@@ -134,8 +134,9 @@ final class PartyFlowUITests: XCTestCase {
         XCTAssertEqual(memberSeats.count, 1)
         XCTAssertEqual(memberSeats.firstMatch.label, "Maxi, host")
         XCTAssertEqual(emptySeats.count, 2)
-        XCTAssertTrue(app.staticTexts["Waiting for the total"].exists)
-        XCTAssertFalse(app.buttons["Pay"].exists)
+        // The host adds the total; members keep "Waiting for the total" (TotalFlowUITests).
+        XCTAssertTrue(element("addTotalCard").exists)
+        XCTAssertFalse(app.buttons["Pay"].exists, "Pay stays reserved")
 
         // Annie, then Christophe, join from "other phones".
         XCTAssertTrue(memberSeats.element(boundBy: 1).waitForExistence(timeout: 3 + Self.liveTimeout))

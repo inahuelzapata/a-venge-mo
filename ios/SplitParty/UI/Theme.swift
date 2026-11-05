@@ -37,6 +37,10 @@ enum Theme {
     static let tabIconSlot: CGFloat = 52
     static let payButtonDiameter: CGFloat = 60
     static let payButtonMarkSize: CGFloat = 30
+    /// Height of the floating bar above the home-indicator safe area (measured on
+    /// the iPhone 17 simulator: bar top 95 pt above it), for scroll content that
+    /// must be reachable above the bar.
+    static let floatingBarClearance: CGFloat = 96
 
     // "Split the check" card on Home, measured from the Kalshi card in the Venmo
     // reference. Android uses the same numbers in dp; all are in
@@ -94,6 +98,20 @@ enum Theme {
     static let shakeCount: CGFloat = 3
     /// Light grey of an empty seat; a selected option's border.
     static let emptySeat = Color(hex: 0xE4E4E8)
+
+    // Total area, keypad, scan and share (docs/design/visual-conventions.md "Total area").
+    static let totalSectionSpacing: CGFloat = 18
+    static let totalActionHeight: CGFloat = 48
+    static let totalButtonSpacing: CGFloat = 10
+    static let amountEntryFontSize: CGFloat = 44
+    static let amountEntryFieldHeight: CGFloat = 84
+    static let tipChipHeight: CGFloat = 40
+    static let tipChipSpacing: CGFloat = 8
+    static let shareAmountFontSize: CGFloat = 40
+    static let totalAmountFontSize: CGFloat = 17
+    static let laserLineHeight: CGFloat = 3
+    static let laserGlowHeight: CGFloat = 36
+    static let laserSweepDuration: Double = 1.1
 }
 
 extension Color {

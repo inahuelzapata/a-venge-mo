@@ -168,7 +168,116 @@ final class ReferenceCaptureUITests: XCTestCase {
         try capture("party-expired")
     }
 
+    // MARK: Total, tip and share (names match Android's TotalScreenshotTest)
+
+    private static let tonysReceipt = [
+        "TONY'S", "Greenwich Ave", "2 Margherita\t$36.00", "1 Caesar\t$12.50",
+        "Subtotal\t$48.50", "Tax 6.35%\t$3.08", "TOTAL\t$51.58",
+    ].joined(separator: "|")
+
+    func test10TotalWaitingAndAdd() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers", "annie"])
+        signIn(as: "annie")
+        XCTAssertTrue(app.staticTexts["Waiting for the total"].waitForExistence(timeout: Self.timeout))
+        scrollToBottom()
+        try capture("total-waiting")
+
+        app.terminate()
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers", "annie"])
+        signIn(as: "maxi")
+        XCTAssertTrue(element("addTotalCard").waitForExistence(timeout: Self.timeout))
+        scrollToBottom()
+        measure("total card", element("addTotalCard"))
+        measure("scan button", app.buttons["scanReceiptButton"])
+        try capture("total-add")
+
+        app.buttons["enterTotalButton"].tap()
+        XCTAssertTrue(app.textFields["amountField"].waitForExistence(timeout: Self.timeout))
+        app.textFields["amountField"].typeText("48.50")
+        measure("amount field", app.textFields["amountField"])
+        measure("confirm button", app.buttons["confirmAmountButton"])
+        try capture("total-keypad")
+    }
+
+    func test11Scan() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers", "annie",
+                                               "-UITestReceiptEnv", Self.tonysReceipt, "-UITestScanHold", "4"])
+        signIn(as: "maxi")
+        XCTAssertTrue(app.buttons["scanReceiptButton"].waitForExistence(timeout: Self.timeout))
+        app.buttons["scanReceiptButton"].tap()
+        XCTAssertTrue(element("scanStatus").waitForExistence(timeout: Self.timeout))
+        try capture("total-scanning", settling: false)
+        XCTAssertTrue(element("confirmTotalScreen").waitForExistence(timeout: 8))
+        try capture("total-confirm")
+
+        app.terminate()
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestReceiptEnv", "blank"])
+        signIn(as: "maxi")
+        XCTAssertTrue(app.buttons["scanReceiptButton"].waitForExistence(timeout: Self.timeout))
+        app.buttons["scanReceiptButton"].tap()
+        XCTAssertTrue(element("entryNotice").waitForExistence(timeout: 8))
+        try capture("total-no-total-found")
+
+        app.terminate()
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestCameraDenied", "YES"])
+        signIn(as: "maxi")
+        XCTAssertTrue(app.buttons["scanReceiptButton"].waitForExistence(timeout: Self.timeout))
+        app.buttons["scanReceiptButton"].tap()
+        XCTAssertTrue(element("cameraUnavailable").waitForExistence(timeout: Self.timeout))
+        try capture("total-camera-denied")
+    }
+
+    func test12TipAndShares() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers",
+                                               "annie,christophe", "-UITestFriendPartyBill", "10000",
+                                               "-UITestFriendPartyTip", "18"])
+        signIn(as: "maxi")
+        XCTAssertTrue(element("tipChips").waitForExistence(timeout: Self.timeout))
+        scrollToBottom()
+        measure("share summary", element("shareSummary"))
+        measure("tip chips", element("tipChips"))
+        measure("tip chip 18", app.buttons["tipChip-18%"])
+        try capture("total-tip-chosen")
+
+        for (count, members) in [(1, ""), (2, "annie"), (3, "annie,christophe")] {
+            app.terminate()
+            var extra = ["-UITestFriendParty", "maxi", "-UITestFriendPartyBill", "10000",
+                         "-UITestFriendPartyTip", "18"]
+            if !members.isEmpty { extra += ["-UITestFriendPartyMembers", members] }
+            launch(resettingSession: true, extra: extra)
+            // A member's view (host for the one-member party): own share, total, tip, people.
+            signIn(as: count == 1 ? "maxi" : "annie")
+            XCTAssertTrue(element("shareSummary").waitForExistence(timeout: Self.timeout))
+            scrollToBottom()
+            try capture("total-share-\(count)")
+        }
+    }
+
+    func test13RemovedAndLeave() throws {
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers",
+                                               "annie,christophe", "-UITestPartyScript", "4:remove=christophe"])
+        signIn(as: "christophe")
+        XCTAssertTrue(element("homeNotice").waitForExistence(timeout: 10))
+        try capture("removed-message")
+
+        app.terminate()
+        launch(resettingSession: true, extra: ["-UITestFriendParty", "maxi", "-UITestFriendPartyMembers",
+                                               "annie,christophe", "-UITestFriendPartyBill", "10000",
+                                               "-UITestFriendPartyTip", "18"])
+        signIn(as: "annie")
+        let leave = app.buttons["leavePartyButton"]
+        XCTAssertTrue(leave.waitForExistence(timeout: Self.timeout))
+        scrollToBottom()
+        leave.tap()
+        XCTAssertTrue(app.buttons["confirmLeaveParty"].firstMatch.waitForExistence(timeout: Self.timeout))
+        try capture("leave-confirm")
+    }
+
     // MARK: Helpers
+
+    private func scrollToBottom() {
+        element("partyScreen").swipeUp()
+    }
 
     private var seats: XCUIElementQuery {
         app.descendants(matching: .any).matching(identifier: "memberSeat")
@@ -182,8 +291,8 @@ final class ReferenceCaptureUITests: XCTestCase {
 
     private func launch(scenario: String = "seeded", resettingSession: Bool,
                         insertingIncomingPaymentAfter delay: TimeInterval? = nil, extra: [String] = []) {
-        app.launchArguments = ["-UITestFixture", scenario,
-                               "-UITestResetSession", resettingSession ? "YES" : "NO"] + extra
+        app.launchArguments = applyReceiptEnvironment(
+            ["-UITestFixture", scenario, "-UITestResetSession", resettingSession ? "YES" : "NO"] + extra, to: app)
         if let delay { app.launchArguments += ["-UITestInsertIncomingPaymentAfter", String(delay)] }
         app.launch()
     }

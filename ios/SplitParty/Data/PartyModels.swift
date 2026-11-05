@@ -131,8 +131,8 @@ enum JoinCodeChoices {
     }
 }
 
-/// `parties/{id}`, with what this slice reads. Bill and tip are not read: the
-/// total slice owns them.
+/// `parties/{id}`, with what the app reads. `paidAt` is not read yet: the
+/// settle slice owns it.
 struct SplitParty: Equatable, Identifiable {
     let id: String
     let hostId: String
@@ -144,6 +144,10 @@ struct SplitParty: Equatable, Identifiable {
     /// Host first, then joinees in join order.
     let memberIds: [String]
     let wrongCodeAttempts: [String: Int]
+    /// Pre-tip bill in cents; nil until the host confirms a total.
+    let billCents: Int?
+    /// Nil until the first bill is confirmed (shown as 0%).
+    let tip: TipChoice?
 
     /// Nil when a required field is missing or malformed.
     init?(id: String, data: [String: Any], dateOf: (Any?) -> Date?) {
@@ -157,13 +161,16 @@ struct SplitParty: Equatable, Identifiable {
             return nil
         }
         let rawAttempts = data[PartySchema.PartyField.wrongCodeAttempts] as? [String: Any] ?? [:]
+        let billCents = FirestoreValue.integer(data[PartySchema.PartyField.billCents]).flatMap { $0 >= 0 ? $0 : nil }
         self.init(id: id, hostId: hostId, merchantId: merchantId, joinCode: joinCode, status: status,
                   createdAt: createdAt, expiresAt: expiresAt, memberIds: memberIds,
-                  wrongCodeAttempts: rawAttempts.compactMapValues { FirestoreValue.integer($0) })
+                  wrongCodeAttempts: rawAttempts.compactMapValues { FirestoreValue.integer($0) },
+                  billCents: billCents, tip: TipChoice(firestoreValue: data[PartySchema.PartyField.tip]))
     }
 
     init(id: String, hostId: String, merchantId: String, joinCode: JoinCode, status: PartyStatus,
-         createdAt: Date, expiresAt: Date, memberIds: [String], wrongCodeAttempts: [String: Int]) {
+         createdAt: Date, expiresAt: Date, memberIds: [String], wrongCodeAttempts: [String: Int],
+         billCents: Int? = nil, tip: TipChoice? = nil) {
         self.id = id
         self.hostId = hostId
         self.merchantId = merchantId
@@ -173,6 +180,13 @@ struct SplitParty: Equatable, Identifiable {
         self.expiresAt = expiresAt
         self.memberIds = memberIds
         self.wrongCodeAttempts = wrongCodeAttempts
+        self.billCents = billCents
+        self.tip = tip
+    }
+
+    /// Every member's share, or nil while there is no bill.
+    var split: PartySplit? {
+        PartySplit(billCents: billCents, tip: tip, memberIds: memberIds)
     }
 
     /// Open by status AND by the clock. An `open` party past `expiresAt` counts
@@ -219,6 +233,17 @@ enum PartyActionError: Error, Equatable {
         case .rejected: "The database refused the party. Nothing was created; try again."
         case .partyNoLongerOpen: "This party is no longer open."
         case .lockedOut: "Too many wrong codes for this party."
+        }
+    }
+
+    /// For changes to an existing party (total, tip, removal, leaving), where
+    /// "nothing was created" would be the wrong thing to say.
+    var changeMessage: String {
+        switch self {
+        case .offline: "You're offline. Nothing was saved; try again when you're connected."
+        case .unreachable: "Couldn't reach the database. Nothing was saved; try again."
+        case .rejected: "The database refused the change. Nothing was saved."
+        case .partyNoLongerOpen, .lockedOut: message
         }
     }
 }

@@ -120,34 +120,62 @@ Android change:
 | Expired | "Nothing was charged. Start a new party from Home." | "Nothing was charged." |
 | Confirmation | Title "Join Annie's party", options are cards of three 60 tiles, shake ±14 decaying in 360 ms, "That's not the code. Try again." | Bar title "Join Split Party", host avatar and "Join Maxi's party at Tony's", 72-tall option buttons with emoji 34, shake ±10 three times in 0.4 s, message counts the tries left |
 | Demo switch row (Me) | Green `#34C759` switch | System switch tinted brand blue `#0087E0`, 20 × 14 padding |
-| Total area | Filled in by the total slice ("Total, tip and share" below): "Add the total" for the host, the live share for everyone, so `party-one-member` (host view) and `party-three-members` (member view) differ here | Reserved: `hourglass`, "Waiting for the total", until the iOS total slice lands |
+| Total area | Filled in by the total slice ("Total, tip and share" below): "Add the total" for the host, the live share for everyone | Same, since the iOS total slice; `party-one-member` and `party-three-members` were taken before it and still show the reserved area |
 
 Both platforms agree on the behaviour: slot priority, clock-based expiry, the
 three-strike lock, haptics kept with reduced motion, and the Firestore writes.
 
 ## Total, tip and share (PoC-10)
 
-**Android values, provisional.** No iOS captures of these screens existed when
-they were built. When the iOS total slice records its values here, replace these
-and reconcile Android, then commit the comparisons (`total-add`, `total-keypad`,
-`total-scanning`, `total-confirm`, `total-no-total-found`, `total-tip-chosen`,
-`total-share-1/2/3`, `removed-message`, `leave-confirm`; the Android renders are
-in `TotalScreenshotTest`).
+**iOS is the reference** (captures in `ios-captures/`: `total-waiting`, `total-add`,
+`total-keypad`, `total-scanning`, `total-confirm`, `total-no-total-found`,
+`total-camera-denied`, `total-tip-chosen`, `total-share-1/2/3`, `removed-message`,
+`leave-confirm`; same names as Android's `TotalScreenshotTest`). Measured on the
+iPhone 17 Pro simulator (402 × 874 pt). Lives in the party screen's third card
+(white, radius 28, 20 padding); the screen's scroll content keeps **96** clear
+at the bottom so nothing ends under the floating tab bar.
 
-| Element | Value |
-| ------- | ----- |
-| Add the total (host, no bill) | Total card: "Add the total" (section heading), "Scan the receipt or type the amount. Everyone's share updates as you go." (body, secondary), then a black 52 pill "Scan receipt" and a chip-grey 52 pill "Enter total", 10 apart |
-| Share figures (everyone, bill set) | "Your share" (body, secondary) over the amount (balance role, 36 bold). Then three rows, 6 vertical padding: label (subtitle, secondary) left, value (amount role) right: Total, Tip ("18% · $18.00"), People. The share rolls old → new over 600 ms (ease out), integer cents; instant with animations off. A light tick haptic whenever this member's share changes |
-| Tip chips (host only) | "Tip" (amount role), then one row 6 apart: 0%, 15%, 18%, 20% (equal widths) and Custom (1.6 ×), each 44 tall, capsule. Chip grey with black text (chip-count role); the chosen one black with white text. Custom shows its amount once chosen ("$7.00"). No ripple, elevation or Material chip styling |
-| Change total (host) | Below the chips: two chip-grey 44 capsules, "Scan receipt" and "Change total", 8 apart |
-| Write error | 16 red exclamation, 6 gap, "Couldn't save. Check your connection and try again." (body, error red) at the bottom of the card |
-| Keypad screen | Party-style header ("Enter total" / "Custom tip"), the amount centred (balance role; "$0.00" in placeholder grey when empty), a 40-tall line for the inline error (body, error red), then a 3 × 4 keypad (white keys, radius 16, 56 tall, 8 gaps, digits in screen-title role; "." and ⌫), 16 margins, then the black "Confirm" pill. No system keyboard |
-| Scan screen | Header "Scan receipt", the camera in a black rounded (28) frame, 16 margins; status line (body, secondary): "Hold the receipt flat so the total line is in the frame, then tap Scan." / "Reading the receipt…"; black "Scan" pill (spinner while reading). Reading: the photo freezes and a 3-wide brand-blue line with a 28 glow sweeps down and up (1.1 s each way, linear); none with animations off |
-| Confirmation | Header "Confirm the total", "Found on the receipt" (body, secondary), the amount (balance role), 'From the line "Total"' (body, secondary), then "Confirm" (black pill) and "Edit amount" (grey pill) |
-| No total / no camera | The keypad screen with a centred explanation above the amount (body, secondary) |
-| Remove / leave confirmation | Custom dialog card (not Material): white, radius 28, 20 padding: title (section heading), body (body, secondary), black action pill and grey cancel pill, 10 apart. Remove: tap a non-host seat (host only). Leave: grey "Leave party" capsule under the total card (members only) |
-| Removed message | White capsule with 12% shadow, 52 below the header's top, "You were removed from Maxi's party" (amount role); gone after 4 s |
-| Dark mode | Identical to light: the app is light-only (`total-tip-chosen-dark` is byte-identical to `total-tip-chosen`) |
+| Element | iOS (pt) |
+| ------- | -------- |
+| Waiting (members, no bill) | Unchanged from the party slice: `hourglass` 24 secondary, "Waiting for the total" (17 semibold), "The host enters the bill and tip next." (14 secondary), min 120 tall. No entry or tip controls |
+| Add the total (host, no bill) | `receipt` 24 brand blue, "Add the total" (17 semibold), "Scan the receipt or type the amount." (14 secondary), 8 apart; then 8 lower two equal capsules **48** tall, 10 apart (each 168 wide on this phone): "Scan receipt" (`camera.viewfinder`, black, white 15 semibold) and "Enter total" (`keyboard`, `#F1F1F3`, black 15 semibold). Card content 346 × 145 |
+| Share row (everyone, bill set) | "Your share" (15 medium, secondary) over the amount (**40 bold**, monospaced digits), 2 apart. 14 below, a `#F1F1F3` block, radius 20, 12 vertical padding, three equal columns: label (13 medium, secondary) over value (17 semibold): "Total" $118.00, "Tip" 18% with $18.00 under it (13 secondary), "People" 3. Share, total, tip and people change in one frame; the digits roll (`numericText`, spring 0.5 / 0.85). Light impact haptic when this phone's share changes. Summary block 346 × 162 |
+| Tip chips (host only) | 18 below the share row: "Tip" (15 semibold), 8 above one row of five **equal** capsules, **40** tall, 8 apart (62.7 wide each here): 0%, 15%, 18%, 20%, Custom. Unselected `#F1F1F3` with black 15 semibold, selected black with white. Custom shows its amount once chosen ("$7.00"); a stored 25% also shows on Custom. Selection haptic. Members see the tip only in the share row |
+| Change total (host, bill set) | 18 below the chips: the same two 48 capsules as "Add the total" ("Scan receipt" black, "Enter total" grey) |
+| Write error | Under the chips or the member row: `exclamationmark.circle.fill` + message, 15 medium, `#D92D20` ("Couldn't reach the database. Nothing was saved; try again.") |
+| Keypad screen | Sheet with inline bar title "Enter total" / "Confirm total" / "Custom tip" and Cancel. 20 side margins, 12 top: prompt (17 semibold, secondary), then a white field, radius 20, **84** tall, 18 horizontal padding: "$" (26 bold, secondary) + amount (**44 bold**, monospaced) on the system decimal pad, focused on open. Invalid input: 2 pt red outline and the red message under the field, error haptic. Black 52 "Confirm total" / "Set tip" pill pinned 12 above the keyboard |
+| Scan screen | Sheet, bar title "Scan receipt" with Cancel. The system camera; after capture the page turns black, the photo sits 20 in from the edges, radius 20, with "Reading the receipt…" (white 17 semibold) and a white spinner 18 below |
+| Laser line | Over the photo: a 3 tall `#6CC4FF` line with a brand-blue 6 radius shadow, centred in a 36 tall glow (brand blue 0 → 35% → 0). Sweeps top to bottom and back, 1.1 s each way, ease-in-out, repeating, clipped to the photo's 20 radius. At least 0.7 s on screen. None with Reduce Motion (status and spinner stay) |
+| Confirm detected amount | The keypad screen titled "Confirm total", prompt "Is this the receipt's total?", the detected amount pre-filled and editable. Nothing is written until "Confirm total" |
+| No total found / unreadable | The keypad screen with a `#F1F1F3` notice (radius 16, 14 padding, `doc.text.magnifyingglass` + 15 medium): "We couldn't find a total on that receipt. Type it instead." / "We couldn't read that photo. Type the total instead." |
+| Camera unavailable | In the scan sheet: `camera.slash` 52 secondary, "Camera access is off" / "No camera available" (24 bold), the reason (17 secondary), black 52 "Enter total" pill 12 lower, and for denied a brand-blue "Open Settings" (17 semibold), 32 side margins |
+| Remove member (host) | Tap a non-host seat: system confirmation dialog "Remove Christophe from the party?", "Everyone's share is recalculated. They can rejoin with the code while the party is open.", destructive "Remove Christophe" |
+| Leave party (members) | "Leave party", red 17 semibold text button, 44 tall, under the total card. System confirmation dialog "Leave Maxi's party?", "Your share goes back to the others. You can rejoin with the code while the party is open.", destructive "Leave party" |
+| Removed message | On Home between the header and the banner slot: 85% black card, radius 18, 16 × 12 padding, 8 gutter, `person.crop.circle.badge.minus` + "You were removed from Maxi's party" (white 15 medium). Drops in from the top; gone after 5 s. The Join banner for that party shows below it |
+| Expired with a bill | The expired treatment, then the last share row frozen in a white card (70% opacity), no chips or buttons |
+| Accessibility | Share row: "Your share, 39 dollars and 34 cents"; "Total, 118 dollars"; "Tip, 18 percent, 18 dollars" ("No tip" at 0%); "People, 3 people". Chips: a "Tip" group, each chip a button with the Selected trait, the choice announced ("18 percent tip selected"). Scan: "Reading the receipt" announced. Host's member seats hint "Double-tap to remove from the party" |
+| Reduce Motion | No laser sweep, no digit roll; changes are instant. Haptics stay |
+
+### Android reconciliation (total slice)
+
+Where the Android values recorded before these captures differ from iOS:
+
+| Element | Android (before) | iOS (reference) |
+| ------- | ---------------- | --------------- |
+| Add the total | Body "Scan the receipt or type the amount. Everyone's share updates as you go."; 52 tall pills | Body "Scan the receipt or type the amount."; 48 tall capsules with icons; `receipt` icon above the heading |
+| Share figures | Share 36 bold; Total / Tip / People as three label-value rows | Share 40 bold; the three as columns in a grey radius-20 block, tip amount under the percent |
+| Tip chips | 44 tall, 6 apart, Custom 1.6 × wide | 40 tall, 8 apart, all five equal |
+| Change total | Grey "Scan receipt" and "Change total", 44 tall | Black "Scan receipt" and grey "Enter total", 48 tall |
+| Keypad | Custom 3 × 4 keypad, no system keyboard | The system decimal pad under an 84 tall white field (platform keypad; allowed difference) |
+| Confirmation | Its own screen with "Found on the receipt", the source line and "Edit amount" | The keypad screen pre-filled ("Is this the receipt's total?"), editable in place |
+| Remove / leave dialogs | Custom white card dialogs | System confirmation dialogs (platform-mandated look; wording matches) |
+| Leave action | Grey capsule | Red text button |
+| Removed message | White capsule, 4 s | Black card under the header, 5 s, with an icon |
+
+Both platforms agree on the data and behaviour: integer cents, 0% stored as
+`{type: custom, amountCents: 0}`, a bill always written with its tip state,
+percent tips rounded half up, the host carrying the leftover cents, transactions
+for every write, nothing written after expiry or before the host confirms a scan.
 
 ## Bottom (tab) bar
 
@@ -263,7 +291,7 @@ section cards, radius 28, 8 gutter, 20 padding, 16 apart, 8 below the bar.
 | Countdown | `timer` symbol + "Expires in 4:59", 17 semibold, monospaced digits, primary; error red for the last 30 s. Ticks on the whole second and exactly at expiry |
 | Member card | "Who's in" (17 semibold), 14 above the seats. Seats 14 apart, each 84 wide: avatar **56**, first name 14 medium 6 below (one line, shrinks to 80% before truncating). The host's avatar carries a black "Host" capsule (11 bold white, 7 × 2 padding, 1.5 white ring) overlapping its bottom edge by 7. At least 3 seats: empty ones are a 56 circle with a 2 pt dashed `#7F7F7F`-at-50% ring over `#E4E4E8`, "Waiting" below, pulsing (scale 0.94 and fill opacity 0.35, 0.9 s, autoreversing) |
 | Member arrival | New seat scales from 30% with opacity, spring (0.45 / 0.7). Success haptic on the phones already in the party |
-| Total area | Reserved, min 120 tall: `hourglass` 24 secondary, "Waiting for the total" (17 semibold), "The host enters the bill and tip next." (14 secondary). No Pay action |
+| Total area | See "Total, tip and share" above: "Add the total" for the host, "Waiting for the total" for members until a bill exists, then the live share for everyone. No Pay action yet |
 | Reconnecting | While the party document only comes from the cache or the network is down: capsule above the code card, white, small spinner + "Reconnecting…" (14 medium, secondary), 14 × 8 padding |
 | Expired | Replaces the cards: `clock.badge.xmark` 52 secondary, "This party has expired" (24 bold), "Nothing was charged." (17 secondary), 12 apart, then the black 52 "Back to Home" pill 12 lower, 32 side margins |
 | Accessibility | Code: one element, "Join code: pizza, beer, party popper". Each seat: "Maxi, host", "Annie", "Empty seat" |

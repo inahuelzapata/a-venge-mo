@@ -117,6 +117,12 @@ final class AppModel {
 ///   `-UITestFriendPartyAfter <seconds>` makes it appear only after that delay.
 /// - `-UITestFriendsJoinEvery <seconds>`: when the signed-in user starts a party,
 ///   the other seeded users join it one by one at this interval.
+/// - `-UITestFriendPartyBill <cents>` and `-UITestFriendPartyTip 18|custom:700`
+///   give that party a bill and tip from the start.
+/// - `-UITestPartyScript "2:tip=20;4:join=christophe;6:remove=annie;8:bill=20000"`:
+///   changes other phones make to that party, each at its second after sign-in
+///   (typing the username takes a variable few seconds, so launch is no anchor).
+///   (Receipt-scan arguments: `ReceiptScanTestLaunch` in ReceiptScanView.swift.)
 struct UITestLaunch {
     static let fixtureKey = "UITestFixture"
     static let resetSessionKey = "UITestResetSession"
@@ -126,6 +132,9 @@ struct UITestLaunch {
     static let friendPartyAgeKey = "UITestFriendPartyAge"
     static let friendPartyAfterKey = "UITestFriendPartyAfter"
     static let friendsJoinEveryKey = "UITestFriendsJoinEvery"
+    static let friendPartyBillKey = "UITestFriendPartyBill"
+    static let friendPartyTipKey = "UITestFriendPartyTip"
+    static let partyScriptKey = "UITestPartyScript"
 
     let scenario: FixtureDataSource.Scenario
     let resetsSession: Bool
@@ -135,6 +144,9 @@ struct UITestLaunch {
     var friendPartyAge: Double = 0
     var friendPartyDelay: Double?
     var friendsJoinInterval: Double?
+    var friendPartyBillCents: Int?
+    var friendPartyTip: TipChoice?
+    var partyScript: [(seconds: Double, change: String)] = []
 
     @MainActor
     func applyPartySetup(to fixture: FixtureDataSource) {
@@ -142,14 +154,52 @@ struct UITestLaunch {
         guard let hostId = friendPartyHostId else { return }
         let memberIds = [hostId] + friendPartyMemberIds
         let age = friendPartyAge
+        let bill = friendPartyBillCents
+        let tip = friendPartyTip
+        let script = partyScript
+        let addFriendParty = {
+            let party = fixture.addParty(hostId: hostId, memberIds: memberIds,
+                                         createdAt: Date().addingTimeInterval(-age), billCents: bill, tip: tip)
+            guard !script.isEmpty else { return }
+            fixture.afterSignIn = {
+                Task { @MainActor in
+                    let start = ContinuousClock.now
+                    for step in script.sorted(by: { $0.seconds < $1.seconds }) {
+                        try? await Task.sleep(until: start + .seconds(step.seconds))
+                        try? await Self.apply(step.change, to: party.id, in: fixture)
+                    }
+                }
+            }
+        }
+        // Without a delay the party must exist before the first parties snapshot,
+        // so a signed-in member lands straight on it (as after a relaunch).
         guard let delay = friendPartyDelay else {
-            fixture.addParty(hostId: hostId, memberIds: memberIds, createdAt: Date().addingTimeInterval(-age))
+            addFriendParty()
             return
         }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
-            fixture.addParty(hostId: hostId, memberIds: memberIds, createdAt: Date().addingTimeInterval(-age))
+            addFriendParty()
         }
+    }
+
+    /// "tip=18", "tip=custom:700", "bill=20000", "join=christophe", "remove=annie".
+    @MainActor
+    private static func apply(_ change: String, to partyId: String, in fixture: FixtureDataSource) async throws {
+        let parts = change.split(separator: "=", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return }
+        switch parts[0] {
+        case "tip": if let tip = parseTip(parts[1]) { try await fixture.setTip(partyId: partyId, tip: tip) }
+        case "bill": if let cents = Int(parts[1]) { try await fixture.setBill(partyId: partyId, billCents: cents) }
+        case "join": try await fixture.joinParty(id: partyId, userId: parts[1])
+        case "remove": try await fixture.removeMember(partyId: partyId, memberId: parts[1])
+        default: break
+        }
+    }
+
+    private static func parseTip(_ raw: String) -> TipChoice? {
+        if raw.hasPrefix("custom:") { return Int(raw.dropFirst("custom:".count)).map { .custom(amountCents: $0) } }
+        return Int(raw).map(TipChoice.percent)
     }
 
     /// "-key value" launch arguments land in UserDefaults' argument domain, which
@@ -170,6 +220,13 @@ struct UITestLaunch {
             ? nil : defaults.double(forKey: friendPartyAfterKey)
         launch.friendsJoinInterval = defaults.object(forKey: friendsJoinEveryKey) == nil
             ? nil : defaults.double(forKey: friendsJoinEveryKey)
+        launch.friendPartyBillCents = defaults.string(forKey: friendPartyBillKey).flatMap { Int($0) }
+        launch.friendPartyTip = defaults.string(forKey: friendPartyTipKey).flatMap(parseTip)
+        launch.partyScript = (defaults.string(forKey: partyScriptKey) ?? "").split(separator: ";").compactMap { step in
+            let parts = step.split(separator: ":", maxSplits: 1).map(String.init)
+            guard parts.count == 2, let seconds = Double(parts[0]) else { return nil }
+            return (seconds, parts[1])
+        }
         return launch
     }
 }
