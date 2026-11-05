@@ -36,7 +36,7 @@ enum class JoinPhase { Loading, Choosing, Locked, Unavailable }
 data class JoinUiState(
     val phase: JoinPhase = JoinPhase.Loading,
     val hostName: String = "",
-    /** Four three-emoji options, exactly one of them the host's code. */
+    /** Four two-emoji options, exactly one of them the host's code. */
     val options: ImmutableList<ImmutableList<String>> = persistentListOf(),
     /** Index of the option that was just picked wrong: it shakes, then the options reshuffle. */
     val wrongPick: Int? = null,

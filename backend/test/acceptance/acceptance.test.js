@@ -104,7 +104,7 @@ test('a full party (create, join, pay) then reset restores the fresh-seed state'
   const partyRef = db.collection('parties').doc();
   const createdAt = Timestamp.now();
   const expiresAt = Timestamp.fromMillis(createdAt.toMillis() + PARTY_TTL_MS);
-  const joinCode = ['🍕', '🍺', '🎉'];
+  const joinCode = ['🍕', '🍺'];
   const lockRef = db.doc(`joinCodes/${joinCodeLockId(MERCHANT_ID, joinCode)}`);
   await db.runTransaction(async (tx) => {
     const lock = await tx.get(lockRef);
@@ -209,7 +209,7 @@ async function clientCreateParty(id, data) {
 function clientParty(over = {}) {
   const created = new Date(Math.floor(Date.now() / 1000) * 1000);
   return {
-    hostId: 'maxi', merchantId: MERCHANT_ID, joinCode: ['🍕', '🍺', '🎉'], status: 'open',
+    hostId: 'maxi', merchantId: MERCHANT_ID, joinCode: ['🍕', '🍺'], status: 'open',
     createdAt: created, expiresAt: new Date(created.getTime() + PARTY_TTL_MS), paidAt: null,
     billCents: 10000, tip: { type: 'percent', percent: 18 }, memberIds: ['maxi', 'annie'],
     members: { maxi: { joinedAt: created, paid: false }, annie: { joinedAt: created, paid: false } },
@@ -225,8 +225,9 @@ test('deployed rules: a client may create a schema-conforming party', async () =
 for (const [name, over] of [
   ['non-integer bill', { billCents: 12.5 }],
   ['status outside the allowed set', { status: 'closed' }],
-  ['join code with 2 emojis', { joinCode: ['🍕', '🍺'] }],
-  ['emoji outside the palette', { joinCode: ['🍕', '🍺', '😀'] }],
+  ['join code with 1 emoji', { joinCode: ['🍕'] }],
+  ['join code with 3 emojis', { joinCode: ['🍕', '🍺', '🎉'] }],
+  ['emoji outside the palette', { joinCode: ['🍕', '😀'] }],
   ['stored share field', { shareCents: 3933 }],
 ]) {
   test(`deployed rules: a client party with ${name} is rejected`, async () => {

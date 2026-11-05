@@ -8,6 +8,7 @@ import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.Username
+import com.splitparty.android.domain.party.JoinCodes
 import com.splitparty.android.domain.split.Tip
 
 /** Collection and field names from docs/firestore-schema.md. */
@@ -45,11 +46,17 @@ internal fun DocumentSnapshot.toTransaction(): Transaction = Transaction(
     commentsCount = getLong("commentsCount") ?: 0L
 )
 
-/** Null when missing or not shaped like a party (it then never shows anywhere). */
+/**
+ * Null when missing or not shaped like a party (it then never shows anywhere),
+ * including a join code that is not [JoinCodes.LENGTH] palette emojis, e.g. one
+ * written by an older build with a different code length.
+ */
 internal fun DocumentSnapshot.toParty(): Party? {
     val createdAt = getTimestamp("createdAt")?.toDate()?.time
     val expiresAt = getTimestamp("expiresAt")?.toDate()?.time
     if (!exists() || createdAt == null || expiresAt == null) return null
+    val joinCode = (get("joinCode") as? List<*>).orEmpty().filterIsInstance<String>()
+    if (!JoinCodes.isValid(joinCode)) return null
     val memberMaps = get("members") as? Map<*, *> ?: emptyMap<Any, Any>()
     val members = (get("memberIds") as? List<*>).orEmpty().filterIsInstance<String>().map { uid ->
         val member = memberMaps[uid] as? Map<*, *>
@@ -63,7 +70,7 @@ internal fun DocumentSnapshot.toParty(): Party? {
         id = id,
         hostId = getString("hostId").orEmpty(),
         merchantId = getString("merchantId").orEmpty(),
-        joinCode = (get("joinCode") as? List<*>).orEmpty().filterIsInstance<String>(),
+        joinCode = joinCode,
         status = PartyStatus.fromWire(getString("status")),
         createdAtMillis = createdAt,
         expiresAtMillis = expiresAt,

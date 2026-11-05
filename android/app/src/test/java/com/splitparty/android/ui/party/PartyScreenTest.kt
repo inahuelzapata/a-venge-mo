@@ -30,7 +30,7 @@ class PartyScreenTest {
     private val maxi = MemberUi("maxi", "Maxi", "avatar_maxi", isHost = false)
     private val open = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(annie),
         millisLeft = 300_000
     )
@@ -44,7 +44,7 @@ class PartyScreenTest {
         show(open)
         compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
         compose.onNodeWithTag(PartyTestTags.CODE)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Party code: pizza, beer, party popper")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Party code: pizza, beer")))
         compose.onNodeWithText("Expires in 5:00").assertIsDisplayed()
         compose.onNodeWithContentDescription("Annie, host").assertIsDisplayed()
         compose.onAllNodesWithTag(PartyTestTags.EMPTY_SEAT).assertCountEquals(2)

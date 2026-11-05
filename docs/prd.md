@@ -22,7 +22,7 @@ a social feed of payments, and one new feature: the **Split Party**.
    the signed-in user took part in.
 3. **Split Party at a partner merchant** (Tony's, Greenwich CT):
    - The host starts a party while inside the merchant's geofence. The app
-     shows a three-emoji join code; the party expires after 5 minutes.
+     shows a two-emoji join code; the party expires after 5 minutes.
    - Friends join by entering the code. Three wrong attempts lock a user out
      of that party.
    - The host enters the bill and picks a tip (15/18/20/25 % or a custom

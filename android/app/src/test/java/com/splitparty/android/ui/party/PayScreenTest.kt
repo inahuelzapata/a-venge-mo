@@ -37,7 +37,7 @@ class PayScreenTest {
     private val total = TotalUi(10_000, TipChoice.Percent(18), 1_800, 11_800, headcount = 3, shareCents = 3_934)
     private val hostOpen = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(annie, maxi, christophe),
         millisLeft = 200_000,
         isHost = true,

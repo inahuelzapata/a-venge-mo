@@ -48,7 +48,7 @@ class TotalAreaTest {
 
     private val open = PartyUiState(
         phase = PartyPhase.Open,
-        joinCode = persistentListOf("🍕", "🍺", "🎉"),
+        joinCode = persistentListOf("🍕", "🍺"),
         members = persistentListOf(MemberUi("maxi", "Maxi", null, isHost = true)),
         millisLeft = 300_000,
         hostName = "Maxi"

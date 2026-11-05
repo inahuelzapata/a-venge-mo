@@ -90,6 +90,16 @@ class SettleRulesE2ETest {
     @Test
     fun hostFlowThenPaySettlesEveryoneThroughTheRules() = runBlocking {
         val partyId = (repo.createParty("annie", MERCHANT, now) as CreatePartyResult.Created).partyId
+        // Created through the rules with a two-emoji code, and its lock {merchantId}_{e1}{e2} holds the same code and expiry.
+        val created = doc("parties/$partyId")
+        val createdCode = (created.get("joinCode") as List<*>).filterIsInstance<String>()
+        assertEquals(2, createdCode.size)
+        assertTrue(createdCode.all { it in JoinCodes.PALETTE })
+        val lock = doc("joinCodes/${MERCHANT}_${createdCode.joinToString("")}")
+        assertTrue("join-code lock reserved", lock.exists())
+        assertEquals(createdCode, lock.get("joinCode"))
+        assertEquals(partyId, lock.getString("partyId"))
+        assertEquals(created.getTimestamp("expiresAt"), lock.getTimestamp("expiresAt"))
         assertEquals(JoinPartyResult.Joined, repo.join(partyId, "maxi"))
         assertEquals(JoinPartyResult.Joined, repo.join(partyId, "christophe"))
         assertEquals(PartyWriteResult.Done, repo.setBill(partyId, "annie", 10_000))
@@ -213,7 +223,7 @@ class SettleRulesE2ETest {
             mapOf(
                 "hostId" to members.first(),
                 "merchantId" to MERCHANT,
-                "joinCode" to listOf("🍕", "🍺", "🎉"),
+                "joinCode" to listOf("🍕", "🍺"),
                 "status" to "open",
                 "createdAt" to created,
                 "expiresAt" to Date(createdAt + FIVE_MINUTES),

@@ -1,7 +1,7 @@
 # aven-mo — Split Party
 
 A Venmo-like PoC that demoes nearby payments: friends at a partner merchant
-join a **Split Party** with a three-emoji code and settle the bill in one tap.
+join a **Split Party** with a two-emoji code and settle the bill in one tap.
 Two native apps (iOS and Android) share a single Firestore database.
 
 **Start here:** [Integration & Setup Guide](docs/integration-setup-guide.md)

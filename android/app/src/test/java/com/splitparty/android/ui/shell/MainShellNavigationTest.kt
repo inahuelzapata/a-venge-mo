@@ -168,7 +168,7 @@ class MainShellNavigationTest {
         parties.partyFlow("annies").value = server(anniesParty)
         parties.open.value = server(listOf(anniesParty))
         compose.onNodeWithTag(PartyBannerTestTags.JOIN).performClick()
-        compose.onNode(hasContentDescription("pizza, beer, party popper")).performScrollTo().performClick()
+        compose.onNode(hasContentDescription("pizza, beer")).performScrollTo().performClick()
         compose.onNodeWithText("Split Party at Tony's").assertIsDisplayed()
         assertEquals(listOf("annies" to "maxi"), parties.joins)
 

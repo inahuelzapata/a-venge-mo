@@ -306,7 +306,7 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
     private companion object {
         const val WRITE_TIMEOUT_MS = 8_000L
 
-        /** 1728 codes per merchant; a handful of tries always finds a free one at demo scale. */
+        /** 144 codes per merchant; a handful of tries always finds a free one at demo scale. */
         const val MAX_CODE_TRIES = 20
     }
 }
