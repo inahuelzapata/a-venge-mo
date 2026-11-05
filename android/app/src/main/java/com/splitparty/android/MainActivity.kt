@@ -6,10 +6,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
+import com.splitparty.android.data.AvatarImageStore
+import com.splitparty.android.ui.components.LocalAvatarImages
 import com.splitparty.android.ui.root.SplitPartyApp
 import com.splitparty.android.ui.theme.SplitPartyTheme
+import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
+    private val avatarImages: AvatarImageStore by inject()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // As in the iOS captures: the page shows through a transparent status bar
@@ -19,8 +25,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         )
         setContent {
-            SplitPartyTheme {
-                SplitPartyApp()
+            CompositionLocalProvider(LocalAvatarImages provides avatarImages) {
+                SplitPartyTheme {
+                    SplitPartyApp()
+                }
             }
         }
     }

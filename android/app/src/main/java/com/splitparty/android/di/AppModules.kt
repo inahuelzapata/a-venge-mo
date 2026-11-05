@@ -4,6 +4,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.splitparty.android.BuildConfig
 import com.splitparty.android.data.AndroidConnectivityObserver
+import com.splitparty.android.data.AvatarImageStore
 import com.splitparty.android.data.DataStoreDemoSettingsRepository
 import com.splitparty.android.data.DataStoreSessionRepository
 import com.splitparty.android.data.FirebaseDemoResetRepository
@@ -35,6 +36,7 @@ import com.splitparty.android.ui.me.MeViewModel
 import com.splitparty.android.ui.party.PartyViewModel
 import com.splitparty.android.ui.root.SessionViewModel
 import com.splitparty.android.ui.scan.ReceiptRecognizer
+import java.io.File
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.factoryOf
@@ -69,6 +71,7 @@ val dataModule = module {
     singleOf(::AndroidConnectivityObserver) { bind<ConnectivityObserver>() }
     single<Clock> { Clock.System }
     single<ReceiptRecognizer> { MlKitReceiptRecognizer() }
+    single { AvatarImageStore(File(androidContext().filesDir, "avatars")) }
 }
 
 val domainModule = module {

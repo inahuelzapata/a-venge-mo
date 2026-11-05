@@ -29,10 +29,51 @@ Side-by-side comparisons (iOS on the left, Android on the right, same width) and
 | Tab bar fill | `#F2F2F4` | Capsule over the page. iOS draws a translucent material over the content |
 | Selected tab pill | black at 6% over the tab bar | Behind Home or Me when selected. Never behind Pay/Request |
 | Mark navy | `#021F40` | The Aven-mo mark on the login screen and in the Home header (white inside the centre button) |
-| Avatars | Maxi `#0087E0`, Annie `#E5487D`, Christophe `#2EAF6F`, other `#8E8E93` | Circle with white initials |
+| Avatar initials | Maxi `#0087E0`, Annie `#E5487D`, Christophe `#2EAF6F`, other `#8E8E93` | Circle with white initials, shown while a photo loads, when it can't be shown, or when there is no photo. See [Avatars](#avatars) |
 
 There is no dark appearance. iOS forces light mode, so Android renders this
 light design whatever the system theme.
+
+## Avatars
+
+Every person bubble (header, feed sentence, banners, party seats, pay and
+settlement rows, Me profile card) is drawn from `users.avatar`
+([schema](../firestore-schema.md)). Both apps follow these rules:
+
+- **Seeded people show their photo.** The value is either the person's taller.ai
+  URL (what the seed stores now) or the older `avatar_maxi` / `avatar_annie` /
+  `avatar_christophe` key. Both mean the same photo, crop and initials colour:
+
+  | Person | Photo URL (fetched as is) | Crop: centre x, centre y, side | Initials colour |
+  | ------ | ------------------------- | ------------------------------ | --------------- |
+  | Maxi | `https://taller.ai/_next/image?url=%2Fleadership%2Fmaximiliano-armesto.jpg&w=1080&q=75` (1080 × 720) | 0.50, 0.40, 0.70 | `#0087E0` |
+  | Annie | `https://taller.ai/_next/image?url=%2Fleadership%2Fannie-rodriguez.jpg&w=1080&q=75` (1080 × 720) | 0.55, 0.40, 0.70 | `#E5487D` |
+  | Christophe | `https://taller.ai/_next/image?url=%2Fleadership%2Fchristophe-kolb.jpg&w=1080&q=75` (667 × 1000) | 0.50, 0.35, 1.00 | `#2EAF6F` |
+
+  **The crop is a square.** Its centre is given as a fraction of the image's
+  width (x) and height (y), and its side as a fraction of the shorter edge. It is
+  moved back inside the image if it would stick out. In pixels: Maxi
+  x 288–792, y 36–540; Annie x 342–846, y 36–540; Christophe x 0–667, y 16–683.
+  The square fills the circle with no stretching. **iOS must use the same
+  numbers** so both phones frame the faces the same way.
+- **Any other `https://` URL** is loaded with the largest centred square over
+  grey `#8E8E93` initials.
+- **Anything else** (missing, empty, an unknown key, not an https URL) draws
+  initials on grey. Nothing is fetched.
+- **Photos are fetched at runtime, never bundled.** Each one is downloaded once,
+  cropped, scaled to 320 × 320 px and stored in app storage that the system does
+  not evict. 320 px covers the 80 Me bubble at 4×, and each file is about
+  20–30 KB. After that, every bubble reads the stored file (and memory within a
+  run) with no network call, so after one online launch the demo works in
+  Airplane Mode. A changed URL or crop is a new file.
+- **Fallback:** while a photo is loading, if it has never been fetched and the
+  phone is offline, or if the download or decode fails, the bubble shows the
+  coloured initials for that person. A failed fetch is retried (Android: after
+  5 s, doubling up to 60 s, while the bubble is on screen). It never shows a
+  blank or broken image.
+- Previews and screenshot tests have no photo store, so they draw initials.
+
+Android: `ui/components/Avatar.kt`, `AvatarPhotos.kt`, `data/AvatarImageStore.kt`.
 
 ## Status bar
 
