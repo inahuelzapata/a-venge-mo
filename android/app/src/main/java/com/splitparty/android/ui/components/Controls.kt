@@ -48,9 +48,18 @@ private const val DISABLED_ALPHA = 0.3f
 /**
  * The black full-width capsule of the iOS captures ("Sign in", "Log out"): no
  * ripple or elevation. A press only dims it to 80%, and when disabled it is black at 30%.
+ * [height] and [style] let a compact card action (the Split the check card) use the same look.
  */
 @Composable
-fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false) {
+fun PillButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    busy: Boolean = false,
+    height: Dp = Dimens.PillHeight,
+    style: TextStyle = Type.Button
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     // While busy the button can't be pressed, but it stays black so the white spinner shows.
@@ -58,13 +67,13 @@ fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(Dimens.PillHeight)
+            .height(height)
             .alpha(if (pressed) PRESSED_ALPHA else 1f)
             .background(Color.Black.copy(alpha = fillAlpha), CircleShape)
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        if (busy) ActivitySpinner(color = Color.White) else Text(text, style = Type.Button, color = Color.White)
+        if (busy) ActivitySpinner(color = Color.White) else Text(text, style = style, color = Color.White)
     }
 }
 

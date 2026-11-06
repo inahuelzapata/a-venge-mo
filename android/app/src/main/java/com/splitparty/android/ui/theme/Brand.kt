@@ -60,8 +60,9 @@ object Dimens {
 
     val PillHeight = 52.dp
 
-    // "Split the check with friends" card (Kalshi-style feed banner, no header).
-    // Provisional until the iOS card's measured values land in the conventions note.
+    // "Split the check with friends" card (Kalshi-style feed banner, no header),
+    // the iOS card's measured values: 267 tall on a 402 screen (4 + 197 image + 12
+    // + 38 button + 16), the image at the artwork's own 1738 : 905.
 
     /** Card edge to the hero image (top and sides); the image radius stays concentric with the card's 28. */
     val BannerCardInset = 4.dp
@@ -70,8 +71,14 @@ object Dimens {
     /** Between the hero image and the button. */
     val BannerButtonGap = 12.dp
 
-    /** Card edge to the button, left, right and bottom. */
-    val BannerButtonMargin = 16.dp
+    /** The "Start a party" capsule. */
+    val BannerButtonHeight = 38.dp
+
+    /** Card edge to the button, left and right. */
+    val BannerButtonSideMargin = 18.dp
+
+    /** Button to the card's bottom edge. */
+    val BannerButtonBottomMargin = 16.dp
     val FieldHeight = 56.dp
 
     val TabBarSideMargin = 16.dp

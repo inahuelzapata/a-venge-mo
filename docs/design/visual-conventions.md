@@ -122,23 +122,28 @@ Spacing values used: **4, 6, 8, 12, 14, 16, 20, 24, 28, 32**.
 The Home feed's entry to Split Party: a feed item directly below the header,
 above the first row (and above the loading, empty and error cards). Modelled on
 the Kalshi ad card in [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg)
-**without** its logo/name/"Sponsored" header. **Android values below are
-provisional** (built from the reference before the iOS card existed). Replace
-them with the iOS card's measured values when its capture lands, then reconcile
-Android.
+**without** its logo/name/"Sponsored" header. Android now uses the iOS card's
+measured values ("Split the check card" below): the two cards are the same
+height side by side.
 
 | Element | Value |
 | ------- | ----- |
-| Card | White, radius 28, 8 gutter (386 wide on 402), no shadow or elevation. 16 below the header, 12 above the first row |
+| Card | White, radius 28, 8 gutter (386 wide on 402), no shadow or elevation. 267 tall on a 402 screen (4 + 197 image + 12 + 38 button + 16). 16 below the header, 12 above the first row |
 | Hero image | `brand/banners/split-the-check-with-friends.png` (1738 × 905, about 1.92 : 1), 4 from the card's top and sides, full card width minus 8, scaled to fit with no crop, radius 24 (concentric with the card) |
-| Button | Pill button (52, black, "Start a party"), 12 below the image, 16 from the card's sides and bottom |
+| Button | Black capsule, 38 tall, "Start a party" 15 semibold (`Type.ButtonCompact`), 12 below the image, 18 from the card's sides, 16 from its bottom (`Dimens.Banner*`) |
 | Taps | Image and button open Split Party. Nothing else on the card is tappable. No ripple; the button dims to 80% while pressed |
 | Accessibility | The image is announced by the banner's own copy ("Tony's at the J House. Answer a trivia and get a 10% discount."), the button as "Start a party, button" |
 | Demo switch | Shown only while "Demo mode: at Tony's" (Me tab) is on, which it is by default. Off: no item at all, so the feed sits directly below the header with no gap. Arrival animation: see "Home banner slot" below (iOS values) |
 
 The banner artwork is committed once, in `brand/banners/`. Android copies it into
 generated resources at build time (`drawable-nodpi`, see `android/app/build.gradle.kts`),
-so there is no copy under `android/`.
+so there is no copy under `android/`. The card sizes the image from the
+drawable's intrinsic size, so a new artwork needs no code change unless the
+card height must follow. If the file is missing, or is an unpulled Git LFS
+pointer rather than a PNG, the build still succeeds with a warning and generates
+a plain `#F1F1F3` vector drawable at 1738 : 905 under the same name
+(`drawable/split_party_banner.xml`): the card keeps its height and its working
+"Start a party" button. Run `git lfs pull` for the real artwork.
 
 ## Split Party screens: Android reconciliation
 
