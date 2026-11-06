@@ -8,6 +8,8 @@ struct SplitPartyApp: App {
         WindowGroup {
             RootView()
                 .environment(appModel)
+                // Avatar photos (users.avatar URLs), fetched once and kept on the phone.
+                .environment(\.avatarImageStore, AvatarImageStore.shared)
                 // The reference screenshots are light; one look on every demo phone.
                 .preferredColorScheme(.light)
         }

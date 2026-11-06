@@ -56,6 +56,8 @@ struct TransactionRow: View {
     private static let sentenceFontSize: CGFloat = 20
     private static let inlineAvatarSize: CGFloat = 22
 
+    @Environment(\.avatarImageStore) private var photoStore
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -84,6 +86,19 @@ struct TransactionRow: View {
         .padding(.horizontal, Theme.screenGutter)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("transactionRow")
+        // The inline avatars are flat images, so the row loads their photos itself.
+        .task(id: [payer?.avatarKey, payee?.avatarKey]) { await loadAvatarPhotos() }
+    }
+
+    private func loadAvatarPhotos() async {
+        guard let photoStore else { return }
+        let specs = [payer, payee].map { AvatarPhotos.spec(for: $0?.avatarKey) }
+        await withTaskGroup(of: Void.self) { group in
+            for spec in specs {
+                guard let url = spec.url else { continue }
+                group.addTask { await photoStore.keepLoadingPhoto(url: url, crop: spec.crop) }
+            }
+        }
     }
 
     /// Names, never "You": every phone must show the identical feed text.
@@ -100,9 +115,11 @@ struct TransactionRow: View {
     }
 
     private func avatar(for user: UserAccount?, fallbackName: String) -> Text {
-        let image = AvatarView.inlineImage(avatarKey: user?.avatarKey ?? "",
+        let avatarKey = user?.avatarKey ?? ""
+        let image = AvatarView.inlineImage(avatarKey: avatarKey,
                                            displayName: user?.displayName ?? fallbackName,
-                                           size: Self.inlineAvatarSize)
+                                           size: Self.inlineAvatarSize,
+                                           photo: photoStore?.cachedPhoto(for: AvatarPhotos.spec(for: avatarKey)))
         // Lowered so the circle sits on the text's baseline like the reference.
         return Text(image).baselineOffset(-4)
     }

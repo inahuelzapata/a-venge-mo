@@ -54,8 +54,10 @@ settlement rows, Me profile card) is drawn from `users.avatar`
   width (x) and height (y), and its side as a fraction of the shorter edge. It is
   moved back inside the image if it would stick out. In pixels: Maxi
   x 288–792, y 36–540; Annie x 342–846, y 36–540; Christophe x 0–667, y 16–683.
-  The square fills the circle with no stretching. **iOS must use the same
-  numbers** so both phones frame the faces the same way.
+  The square fills the circle with no stretching. **iOS uses the same
+  numbers** so both phones frame the faces the same way (iOS's Double maths
+  truncates Maxi's and Annie's 504 px side to 503, one source pixel, invisible
+  in the bubble).
 - **Any other `https://` URL** is loaded with the largest centred square over
   grey `#8E8E93` initials.
 - **Anything else** (missing, empty, an unknown key, not an https URL) draws
@@ -65,13 +67,18 @@ settlement rows, Me profile card) is drawn from `users.avatar`
   not evict. 320 px covers the 80 Me bubble at 4×, and each file is about
   20–30 KB. After that, every bubble reads the stored file (and memory within a
   run) with no network call, so after one online launch the demo works in
-  Airplane Mode. A changed URL or crop is a new file.
+  Airplane Mode. A changed URL or crop is a new file. Android keeps them in app
+  files; iOS in `Application Support/AvatarPhotos` (excluded from backup), not
+  `Caches`, which iOS may purge (`AvatarImageStore`).
 - **Fallback:** while a photo is loading, if it has never been fetched and the
   phone is offline, or if the download or decode fails, the bubble shows the
-  coloured initials for that person. A failed fetch is retried (Android: after
-  5 s, doubling up to 60 s, while the bubble is on screen). It never shows a
-  blank or broken image.
-- Previews and screenshot tests have no photo store, so they draw initials.
+  coloured initials for that person. A failed fetch is retried after 5 s,
+  doubling up to 60 s, while the bubble is on screen (both apps). It never shows
+  a blank or broken image. On iOS the feed's inline 22 avatars are flat images,
+  so the feed row loads its two photos itself and redraws when they arrive.
+- Previews and screenshot tests have no photo store, so they draw initials
+  (Android: `LocalAvatarImages`; iOS: the `avatarImageStore` environment value,
+  set only at the app root).
 
 Android: `ui/components/Avatar.kt`, `AvatarPhotos.kt`, `data/AvatarImageStore.kt`.
 
