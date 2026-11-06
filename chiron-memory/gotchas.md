@@ -174,3 +174,11 @@ What: A new CompositionLocal must be added to both `compose_allowed_composition_
 
 What: All 8 ScreenSnapshotTests (login, home, Me, pay placeholder) fail with "Snapshot does not match reference" on the iOS 26.5 iPhone Air simulator, including on a pristine copy of main, while the rest of SplitPartyTests pass · Why: the reference PNGs are out of date with main or with the simulator/OS build, not caused by feature changes · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, ios/SplitPartyTests/__Snapshots__/ · Learned: before blaming a change for snapshot failures, run the same tests on a clean `git archive HEAD` copy; re-recording the references is separate work
 
+
+## iOS 26+ confirmationDialog has no cancel button; UI tests must tap outside
+
+What: On the iOS 27.2 simulator a SwiftUI `.confirmationDialog` shows as a popover with only the destructive action; the `.cancel`-role button ("Keep party") is not in the hierarchy, so a test dismisses it by tapping outside. A button low on the party screen also sits under the floating tab bar until scrolled, and a tap there lands on the tab bar ("Pay or request") · Where: ios/SplitPartyUITests/CancelFlowUITests.swift · Learned: swipe the party screen up before tapping controls under Pay; and `.accessibilityIdentifier` on a plain container view overrides its children's identifiers (it hid backToHomeButton)
+
+## Shared booted simulator: other sessions' builds collide with UI tests
+
+What: UI tests run on the already-booted "iPhone 18 Pro" landed signed in on a party screen (no username field) even with -UITestResetSession, because other worktree sessions were using the same simulator; on a freshly created simulator the same tests pass · Where: ios UI tests · Learned: create a dedicated simulator per worktree (`xcrun simctl create`) before running UI tests, and delete it afterwards
