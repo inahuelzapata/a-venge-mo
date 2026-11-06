@@ -9,7 +9,8 @@ Two native apps (iOS and Android) share a single Firestore database.
 
 **Docs:** [PRD](docs/prd.md) · [Firestore schema (the data contract)](docs/firestore-schema.md) ·
 [Demo runbook](docs/demo-runbook.md) · [Firestore target](docs/firestore-target.md) ·
-[Repository structure](docs/repo-structure.md)
+[Repository structure](docs/repo-structure.md) ·
+[Payments integration PRD](docs/payments-integration/prd-payments-integration.md)
 
 ## What's where
 
