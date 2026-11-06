@@ -90,6 +90,18 @@ class MeViewModelTest {
     }
 
     @Test
+    fun `custom shares switch is off by default and reads and writes the stored value`() = runTest {
+        viewModel.state.test {
+            assertEquals(false, expectMostRecentItem().customShares)
+            viewModel.onAction(MeAction.SetCustomShares(true))
+            assertEquals(true, awaitItem().customShares)
+            assertEquals(true, demoSettings.customShares.value)
+            // Independent of the demo switch.
+            assertEquals(true, demoSettings.atMerchant.value)
+        }
+    }
+
+    @Test
     fun `demo reset shows progress, then success, and ignores a second tap while running`() = runTest {
         val gate = CompletableDeferred<Unit>().also { demoReset.gate = it }
         viewModel.state.test {

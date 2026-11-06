@@ -8,6 +8,7 @@ import {
   TIP_PERCENT_PRESETS,
   TRANSACTION_SOURCES,
 } from './schema.js';
+import { customSharesOf, customSharesProblem, tipCents } from './split.js';
 
 const isInt = (v) => Number.isSafeInteger(v);
 const isNonNegInt = (v) => isInt(v) && v >= 0;
@@ -95,10 +96,20 @@ export function validateParty(p) {
       problems.push('members keys must equal memberIds');
     }
     for (const [uid, m] of Object.entries(p.members)) {
-      if (!isPlainObject(m) || typeof m.paid !== 'boolean' || millis(m.joinedAt) === null ||
-          Object.keys(m).sort().join() !== 'joinedAt,paid') {
-        problems.push(`members.${uid} must be {joinedAt: timestamp, paid: bool}`);
+      const keys = isPlainObject(m) ? Object.keys(m).filter((k) => k !== 'customShareCents').sort().join() : '';
+      if (!isPlainObject(m) || typeof m.paid !== 'boolean' || millis(m.joinedAt) === null || keys !== 'joinedAt,paid') {
+        problems.push(`members.${uid} must be {joinedAt: timestamp, paid: bool, customShareCents?: cents | null}`);
+      } else if (m.customShareCents !== undefined && m.customShareCents !== null && !isNonNegInt(m.customShareCents)) {
+        problems.push(`members.${uid}.customShareCents must be a non-negative integer (cents) or null`);
       }
+    }
+    // Custom amounts may stop fitting an open party when the bill or tip drops (the host is
+    // told and cannot settle); a paid party was settled with amounts that fit its total.
+    if (p.status === 'paid' && problems.length === 0 && isNonNegInt(p.billCents)) {
+      const problem = customSharesProblem({
+        totalCents: p.billCents + tipCents(p.billCents, p.tip), memberIds: p.memberIds, customShares: customSharesOf(p.members),
+      });
+      if (problem) problems.push(`a paid party needs custom amounts that fit its total: ${problem}`);
     }
   }
 

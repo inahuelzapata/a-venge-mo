@@ -1,5 +1,6 @@
 package com.splitparty.android.domain.model
 
+import com.splitparty.android.domain.split.CustomShareProblem
 import com.splitparty.android.domain.split.Split
 import com.splitparty.android.domain.split.SplitResult
 import com.splitparty.android.domain.split.Tip
@@ -19,12 +20,16 @@ enum class PartyStatus(val wire: String) {
     }
 }
 
-/** One entry of `parties.members`, in `memberIds` order. */
-data class PartyMember(val userId: String, val joinedAtMillis: Long?, val paid: Boolean)
+/**
+ * One entry of `parties.members`, in `memberIds` order. [customShareCents]: the
+ * host's custom amount for this member; null = on the equal split of the rest.
+ */
+data class PartyMember(val userId: String, val joinedAtMillis: Long?, val paid: Boolean, val customShareCents: Long? = null)
 
 /**
  * A `parties/{partyId}` document, the fields the apps read. The per-person
- * share is never stored: [split] derives it from bill, tip and headcount.
+ * share is never stored: [split] derives it from bill, tip, headcount and the
+ * host's custom amounts.
  */
 data class Party(
     val id: String,
@@ -65,10 +70,30 @@ data class Party(
     /** Three wrong picks lock that user out of this party for good. */
     fun isLockedOut(userId: String): Boolean = wrongAttemptsOf(userId) >= MAX_WRONG_CODE_ATTEMPTS
 
-    /** Total, tip and shares in [memberIds] order; null until a bill exists. */
-    val split: SplitResult? get() = billCents?.takeIf { members.isNotEmpty() }?.let { Split.compute(it, tip, members.size) }
+    /**
+     * Total, tip and shares in [memberIds] order, custom amounts included; null
+     * until a bill exists. Check [SplitResult.fits] before settling.
+     */
+    val split: SplitResult? get() = billCents?.takeIf {
+        members.isNotEmpty()
+    }?.let { Split.compute(it, tip, members.map { m -> m.customShareCents }) }
 
     fun shareOf(userId: String): Long? = split?.shares?.getOrNull(memberIds.indexOf(userId))
+
+    val hasCustomShares: Boolean get() = members.any { it.customShareCents != null }
+
+    fun customShareOf(userId: String): Long? = members.firstOrNull { it.userId == userId }?.customShareCents
+
+    /**
+     * What would be wrong with the custom amounts if [userId]'s were [cents]
+     * (null = back to the equal split); null when they fit, or while there is
+     * no total to check against.
+     */
+    fun customShareProblemWith(userId: String, cents: Long?): CustomShareProblem? {
+        val bill = billCents ?: return null
+        val amounts = members.map { if (it.userId == userId) cents else it.customShareCents }
+        return Split.problem(bill + Split.tipCents(bill, tip), amounts)
+    }
 
     /** Everyone but the host, in join order: the members Pay settles. */
     val joinees: List<PartyMember> get() = members.drop(1)
@@ -80,6 +105,7 @@ data class Party(
         !isActiveAt(nowMillis) -> PayBlocker.Expired
         billCents == null -> PayBlocker.NoTotal
         joinees.isEmpty() -> PayBlocker.NoMembers
+        split?.fits == false -> PayBlocker.CustomSharesDontFit
         else -> null
     }
 
@@ -94,8 +120,8 @@ data class Party(
     }
 }
 
-/** Why the host cannot tap Pay yet. */
-enum class PayBlocker { AlreadyPaid, Cancelled, Expired, NoTotal, NoMembers }
+/** Why the host cannot tap Pay yet. [CustomSharesDontFit]: the custom amounts no longer fit the total. */
+enum class PayBlocker { AlreadyPaid, Cancelled, Expired, NoTotal, NoMembers, CustomSharesDontFit }
 
 /** A cancel this phone committed: the fields of the `party_cancelled` analytics event. */
 data class PartyCancellation(val partyId: String, val memberCount: Int, val secondsSinceCreated: Long)

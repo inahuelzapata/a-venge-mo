@@ -18,15 +18,43 @@ sealed interface Tip {
     }
 }
 
-/** Shares in `memberIds` order (host first). */
-data class SplitResult(val tipCents: Long, val totalCents: Long, val shares: List<Long>) {
-    val headcount: Int get() = shares.size
+/** Why a party's custom amounts cannot be used with its total (docs/firestore-schema.md, "Custom shares"). */
+enum class CustomShareProblem {
+    /** The custom amounts add up to more than the total. */
+    OverTotal,
+
+    /** Every member has a custom amount, but they add up to less than the total. */
+    Unassigned
 }
 
 /**
- * Port of backend/lib/split.js, integer cents only. Percent tips round half up;
- * share = floor(total / headcount); the leftover cents go to the host (first
- * member), so the shares sum exactly to the total. A null tip counts as 0%.
+ * Shares in `memberIds` order (host first). [custom]: which members pay a custom
+ * amount (the others split the remainder). When [problem] is set the amounts do
+ * not fit the total: [shares] then holds the custom amounts and 0 for everyone
+ * else, for display only — nothing may be settled.
+ */
+data class SplitResult(
+    val tipCents: Long,
+    val totalCents: Long,
+    val shares: List<Long>,
+    val custom: List<Boolean> = List(shares.size) { false },
+    val problem: CustomShareProblem? = null
+) {
+    val headcount: Int get() = shares.size
+
+    val fits: Boolean get() = problem == null
+
+    /** Sum of the custom amounts. */
+    val customCents: Long get() = shares.withIndex().sumOf { (i, share) -> if (custom[i]) share else 0L }
+}
+
+/**
+ * Port of backend/lib/split.js, integer cents only. Percent tips round half up.
+ * Members with a custom amount pay exactly that; the rest of the total is split
+ * equally among the others (floor), and the leftover cents go to the first of
+ * them in member order (the host if the host is on the equal split, otherwise
+ * the first joinee on it), so the shares sum exactly to the total. A null tip
+ * counts as 0%.
  */
 object Split {
     fun tipCents(billCents: Long, tip: Tip?): Long {
@@ -46,13 +74,44 @@ object Split {
         }
     }
 
-    fun compute(billCents: Long, tip: Tip?, headcount: Int): SplitResult {
+    fun compute(billCents: Long, tip: Tip?, headcount: Int): SplitResult = compute(billCents, tip, List(headcount) { null })
+
+    /** [customShares]: one entry per member in `memberIds` order, null = on the equal split. */
+    fun compute(billCents: Long, tip: Tip?, customShares: List<Long?>): SplitResult {
+        val headcount = customShares.size
         require(headcount > 0) { "headcount must be > 0" }
+        require(customShares.all { it == null || it >= 0 }) { "custom amounts must be >= 0" }
         val tipValue = tipCents(billCents, tip)
         val total = billCents + tipValue
-        val base = Math.floorDiv(total, headcount.toLong())
-        val leftover = total - base * headcount
-        return SplitResult(tipValue, total, List(headcount) { i -> if (i == 0) base + leftover else base })
+        val custom = customShares.map { it != null }
+        val problem = problem(total, customShares)
+        val equalCount = custom.count { !it }
+        val remainder = total - customShares.sumOf { it ?: 0L }
+        val shares = if (problem != null || equalCount == 0) {
+            customShares.map { it ?: 0L }
+        } else {
+            val base = Math.floorDiv(remainder, equalCount.toLong())
+            val leftover = remainder - base * equalCount
+            val firstEqual = custom.indexOfFirst { !it }
+            customShares.mapIndexed { i, amount ->
+                when {
+                    amount != null -> amount
+                    i == firstEqual -> base + leftover
+                    else -> base
+                }
+            }
+        }
+        return SplitResult(tipValue, total, shares, custom, problem)
+    }
+
+    /** Null when [customShares] (null = equal split) can be used with [totalCents]. */
+    fun problem(totalCents: Long, customShares: List<Long?>): CustomShareProblem? {
+        val sum = customShares.sumOf { it ?: 0L }
+        return when {
+            sum > totalCents -> CustomShareProblem.OverTotal
+            customShares.isNotEmpty() && customShares.all { it != null } && sum != totalCents -> CustomShareProblem.Unassigned
+            else -> null
+        }
     }
 
     private const val HALF_CENT_ROUNDING = 50L

@@ -24,19 +24,30 @@ service cloud.firestore {
             && isNonNegInt(t.amountCents));
     }
 
+    // customShareCents: the host's custom amount for this member (docs/firestore-schema.md
+    // "Custom shares"); absent or null = on the equal split.
     function validMember(m) {
-      return m is map && m.keys().hasOnly(['joinedAt', 'paid']) && m.keys().hasAll(['joinedAt', 'paid'])
-        && m.joinedAt is timestamp && m.paid is bool;
+      return m is map && m.keys().hasOnly(['joinedAt', 'paid', 'customShareCents']) && m.keys().hasAll(['joinedAt', 'paid'])
+        && m.joinedAt is timestamp && m.paid is bool
+        && (m.get('customShareCents', null) == null || isNonNegInt(m.customShareCents));
     }
 
-    // Rules have no loops; the PoC caps parties at 8 members, so check up to 8.
-    function validMembers(p) {
+    // memberIds and members agree: host first, 1-8 entries (PoC cap), same keys.
+    function consistentMembers(p) {
       let ids = p.memberIds;
       return ids is list && ids.size() >= 1 && ids.size() <= 8
         && ids[0] == p.hostId
         && p.members is map
         && p.members.keys().size() == ids.size()
-        && p.members.keys().hasAll(ids) && ids.hasAll(p.members.keys())
+        && p.members.keys().hasAll(ids) && ids.hasAll(p.members.keys());
+    }
+
+    // Every entry checked. Rules have no loops; the PoC caps parties at 8 members, so check up to 8.
+    // Rules also evaluate at most 1000 expressions per request, so updates (below) check only the
+    // entries their write shape can change instead of all eight.
+    function validMembers(p) {
+      let ids = p.memberIds;
+      return consistentMembers(p)
         && validMember(p.members[ids[0]])
         && (ids.size() < 2 || validMember(p.members[ids[1]]))
         && (ids.size() < 3 || validMember(p.members[ids[2]]))
@@ -47,6 +58,85 @@ service cloud.firestore {
         && (ids.size() < 8 || validMember(p.members[ids[7]]));
     }
 
+    // --- Custom shares ---
+    // Rules evaluate at most 1000 expressions per request and an 8-member party is close to
+    // it, so each member entry is read once and its amount and "has one" are packed into one
+    // integer: amount * 16 + 1 (0 when on the equal split). A sum of these is
+    // (sum of amounts) * 16 + (members with an amount), since there are at most 8 members.
+    // An amount that is not an integer >= 0, or an entry that breaks the write's shape, packs
+    // as 10^12 * 16 + 1: over any total, so it never fits.
+    function packed(v) {
+      return v == null ? 0 : (v is int && v >= 0 ? v * 16 + 1 : 16000000000001);
+    }
+    function packedAt(p, i) {
+      return p.memberIds.size() <= i ? 0 : packed(p.members[p.memberIds[i]].get('customShareCents', null));
+    }
+    // Custom amounts packed and summed over the whole party.
+    function packedSum(p) {
+      return packedAt(p, 0) + packedAt(p, 1) + packedAt(p, 2) + packedAt(p, 3)
+        + packedAt(p, 4) + packedAt(p, 5) + packedAt(p, 6) + packedAt(p, 7);
+    }
+    // The split rule's total (tip half up); a null tip counts as 0.
+    function totalCentsOf(p) {
+      return p.billCents + (p.tip == null ? 0
+        : (p.tip.type == 'custom' ? p.tip.amountCents : math.floor((p.billCents * p.tip.percent + 50) / 100)));
+    }
+    // Packed amounts that fit party p: never over the total, exactly it when everyone has one.
+    // Without a bill there is no total yet, so any valid amounts fit.
+    function packedFits(sum, p) {
+      let cents = (sum - sum % 16) / 16;
+      return cents < 1000000000000
+        && (sum == 0 || p.billCents == null
+            || (cents <= totalCentsOf(p) && (sum % 16 < p.memberIds.size() || cents == totalCentsOf(p))));
+    }
+
+    // For an update that keeps the member list: member i's entry may change in nothing but
+    // [keys] (and must end paid when [mustBePaid]); its amount packed, or the bad value.
+    function entryAt(before, after, i, keys, mustBePaid) {
+      let ids = after.memberIds;
+      let m = ids.size() <= i ? null : after.members[ids[i]];
+      return m == null ? 0
+        : (m.diff(before.members[ids[i]]).affectedKeys().hasOnly(keys) && (!mustBePaid || m.paid == true)
+            ? packed(m.get('customShareCents', null)) : 16000000000001);
+    }
+    // The host's custom-amount write ([keys] = customShareCents) or Pay ([keys] = paid): every
+    // entry has the write's shape and the amounts fit the total.
+    function entriesFit(before, after, keys, mustBePaid) {
+      return packedFits(entryAt(before, after, 0, keys, mustBePaid) + entryAt(before, after, 1, keys, mustBePaid)
+        + entryAt(before, after, 2, keys, mustBePaid) + entryAt(before, after, 3, keys, mustBePaid)
+        + entryAt(before, after, 4, keys, mustBePaid) + entryAt(before, after, 5, keys, mustBePaid)
+        + entryAt(before, after, 6, keys, mustBePaid) + entryAt(before, after, 7, keys, mustBePaid), after);
+    }
+
+    // The member-entry shapes an update may have (docs/firestore-schema.md). Without Firebase
+    // Auth, these shapes are what makes custom amounts "host only":
+    // - members untouched (bill, tip, cancel, expiry, wrong attempts). A bill or tip change may
+    //   leave amounts over the total; the host's phone then blocks Collect until they are fixed.
+    // - the host's custom-amount write: only `members` changes, same member list, entries change
+    //   in nothing but customShareCents, and the amounts fit the current total.
+    // - Pay: same member list, entries change in nothing but `paid` (all true), amounts fit.
+    // - join, leave, removal: no remaining entry changes (so no amount moves), and the one
+    //   member a join appends (always last in memberIds) arrives valid and without an amount.
+    function validMembersUpdate(before, after) {
+      let changed = after.diff(before).affectedKeys();
+      let sameIds = after.memberIds == before.memberIds;
+      return !changed.hasAny(['members'])
+        || (sameIds && changed.hasOnly(['members'])
+            && entriesFit(before, after, ['customShareCents'], false))
+        || (sameIds && after.status == 'paid'
+            && entriesFit(before, after, ['paid'], true))
+        || (!sameIds && validMembership(before, after));
+    }
+    function validMembership(before, after) {
+      let d = after.members.diff(before.members);
+      let ids = after.memberIds;
+      let last = ids[ids.size() - 1];
+      return d.changedKeys().size() == 0
+        && (d.addedKeys().size() == 0
+            || (d.addedKeys().hasOnly([last]) && validMember(after.members[last])
+                && after.members[last].get('customShareCents', null) == null));
+    }
+
     // A cancelled party carries who cancelled it (always the host) and when; no other status does.
     function validCancellation(p) {
       return p.status == 'cancelled'
@@ -55,7 +145,8 @@ service cloud.firestore {
         : !p.keys().hasAny(['cancelledAt', 'cancelledBy']);
     }
 
-    function validParty(p) {
+    // Everything but the member entries (validMembers on create, validMembersUpdate on update).
+    function validPartyCore(p) {
       return p.keys().hasOnly(['hostId', 'merchantId', 'joinCode', 'status', 'createdAt', 'expiresAt',
                                'paidAt', 'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts',
                                'cancelledAt', 'cancelledBy'])
@@ -71,7 +162,7 @@ service cloud.firestore {
         && (p.billCents == null || isNonNegInt(p.billCents))
         && validTip(p.tip)
         && (p.status != 'paid' || (p.paidAt != null && p.billCents != null && p.tip != null))
-        && validMembers(p)
+        && consistentMembers(p)
         && p.wrongCodeAttempts is map;
     }
 
@@ -87,15 +178,18 @@ service cloud.firestore {
 
     match /parties/{partyId} {
       allow read: if true;
-      allow create: if validParty(request.resource.data)
-        && request.resource.data.status == 'open';
-      allow update: if validParty(request.resource.data)
+      allow create: if validPartyCore(request.resource.data) && validMembers(request.resource.data)
+        && request.resource.data.status == 'open'
+        // nobody starts with a custom amount
+        && packedSum(request.resource.data) == 0;
+      allow update: if validPartyCore(request.resource.data)
         // identity, code and timing never change
         && request.resource.data.diff(resource.data).unchangedKeys()
              .hasAll(['hostId', 'merchantId', 'joinCode', 'createdAt', 'expiresAt'])
         // paid, expired and cancelled are terminal
         && resource.data.status == 'open'
-        && (request.resource.data.status != 'cancelled' || isCancellation());
+        && (request.resource.data.status != 'cancelled' || isCancellation())
+        && validMembersUpdate(resource.data, request.resource.data);
       allow delete: if false;
     }
 

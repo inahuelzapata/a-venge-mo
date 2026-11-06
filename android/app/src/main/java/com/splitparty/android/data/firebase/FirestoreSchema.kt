@@ -61,7 +61,9 @@ internal fun DocumentSnapshot.toParty(): Party? {
     val members = (get("memberIds") as? List<*>).orEmpty().filterIsInstance<String>().map { uid ->
         val member = memberMaps[uid] as? Map<*, *>
         val joinedAt = getTimestamp("members.$uid.joinedAt", ServerTimestampBehavior.ESTIMATE)?.toDate()?.time
-        PartyMember(uid, joinedAt, member?.get("paid") as? Boolean ?: false)
+        // A malformed or negative amount reads as the equal split (the rules never accept one).
+        val custom = (member?.get("customShareCents") as? Number)?.toLong()?.takeIf { it >= 0 }
+        PartyMember(uid, joinedAt, member?.get("paid") as? Boolean ?: false, custom)
     }
     val attempts = (get("wrongCodeAttempts") as? Map<*, *>).orEmpty()
         .mapNotNull { (k, v) -> (k as? String)?.let { key -> (v as? Number)?.let { key to it.toLong() } } }

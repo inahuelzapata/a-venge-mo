@@ -76,7 +76,7 @@ fun ConfirmCard(
         Text(title, style = Type.SectionTitle, color = Brand.Ink, textAlign = TextAlign.Center)
         Text(body, style = Type.Body, color = Brand.InkSecondary, textAlign = TextAlign.Center)
         val errorMessage = errorText ?: error?.let {
-            stringResource(if (it == WriteError.Failed) R.string.write_failed else R.string.write_not_allowed)
+            writeErrorText(it)
         }
         if (errorMessage != null) {
             Text(
