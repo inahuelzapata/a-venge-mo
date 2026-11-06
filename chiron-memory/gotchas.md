@@ -190,3 +190,11 @@ What: Re-validating every member entry (validMember x8) plus summing custom amou
 ## Android unit tests: whole-suite run SIGABRTs and LoginScreenTest fails on this Mac, also on main
 
 What: `./gradlew testDebugUnitTest` / `check` aborts the test JVM (exit 134, layoutlib `Surface.nativeSetProducerThrottlingEnabled` NoSuchMethodError) once Paparazzi classes share a JVM with the rest, and LoginScreenTest.showsTheInlineErrorAndTarget fails — both reproduced on untouched main (2026-11-05) · Where: android/ · Learned: run the non-screenshot packages together (`--tests 'com.splitparty.android.ui.*'` etc.) and each *ScreenshotTest class on its own (`verifyPaparazziDebug --tests "*MeScreenshotTest"`); after recordPaparazziDebug, revert goldens that changed but already verified (sub-tolerance noise)
+
+## `simctl spawn … defaults write` leaves a session UI-test resets can't clear
+
+What: Writing `signedInUserId` with `xcrun simctl spawn booted defaults write com.splitparty.ios …` (e.g. to screenshot a fixture party) makes every later UI test fail at the username field, because `-UITestResetSession YES` doesn't remove that value · Where: ios UI tests, SessionStore · Learned: run `xcrun simctl spawn booted defaults delete com.splitparty.ios` afterwards
+
+## ScreenSnapshotTests testHomeFeed / testHomeEmpty fail on main with no visible difference
+
+What: On the iOS 26.5 iPhone 17 Pro simulator (2026-11-05) these two snapshots fail "does not match reference" on the unchanged branch, while the images look identical to the eye (pixel-level drift in the Home banner area); the other six snapshots pass · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, __Snapshots__/testHomeFeed.1.png, testHomeEmpty.1.png · Learned: not caused by party/Me changes; re-record them in a dedicated change after checking the diff
