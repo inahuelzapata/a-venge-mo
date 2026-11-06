@@ -53,11 +53,26 @@ Seeded accounts (see `backend/lib/seedData.js` for the exact values):
 
 | id           | displayName | avatar (photo URL)                                                                    | balanceCents | friendIds             |
 | ------------ | ----------- | ------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| `maxi`       | Maxi        | `https://taller.ai/_next/image?url=%2Fleadership%2Fmaximiliano-armesto.jpg&w=1080&q=75` | 25000        | `annie`, `christophe` |
-| `annie`      | Annie       | `https://taller.ai/_next/image?url=%2Fleadership%2Fannie-rodriguez.jpg&w=1080&q=75`     | 18050        | `maxi`, `christophe`  |
-| `christophe` | Christophe  | `https://taller.ai/_next/image?url=%2Fleadership%2Fchristophe-kolb.jpg&w=1080&q=75`     | 32075        | `maxi`, `annie`       |
+| `maxi`       | Maxi        | `https://taller.ai/_next/image?url=%2Fleadership%2Fmaximiliano-armesto.jpg&w=1080&q=75` | 25000        | the other thirteen |
+| `annie`      | Annie       | `https://taller.ai/_next/image?url=%2Fleadership%2Fannie-rodriguez.jpg&w=1080&q=75`     | 18050        | the other thirteen |
+| `christophe` | Christophe  | `https://taller.ai/_next/image?url=%2Fleadership%2Fchristophe-kolb.jpg&w=1080&q=75`     | 32075        | the other thirteen |
+| `jan` | Jan | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/jan.jpg` | 10000 | the other thirteen |
+| `belen` | Belen | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/belen.jpg` | 10000 | the other thirteen |
+| `ale` | Ale | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/ale.jpg` | 10000 | the other thirteen |
+| `paloma` | Paloma | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/paloma.jpg` | 10000 | the other thirteen |
+| `marcelo` | Marcelo | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/marcelo.jpg` | 10000 | the other thirteen |
+| `pochi` | Pochi | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/pochi.jpg` | 10000 | the other thirteen |
+| `nahuel` | Nahuel | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/nahuel.jpg` | 10000 | the other thirteen |
+| `dami` | Dami | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/dami.jpg` | 10000 | the other thirteen |
+| `coco` | Coco | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/coco.jpg` | 10000 | the other thirteen |
+| `franco` | Franco | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/franco.jpg` | 10000 | the other thirteen |
+| `guille` | Guille | `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/guille.jpg` | 10000 | the other thirteen |
 
-The URLs are the taller.ai Next.js image-optimizer links (`w=1080`), stored
+Every seeded user is friends with every other one (`friendIds` = the other
+thirteen). Maxi, Annie and Christophe use the taller.ai Next.js image-optimizer
+links (`w=1080`); the other eleven use the public GitHub raw URL of their photo in
+the repo's [`avatars/`](../avatars) folder (`<username>.jpg`, about 512 px square,
+kept out of Git LFS so the URL serves the image itself). All URLs are stored
 verbatim. Changing them is a seed change, which also needs the Demo reset
 redeployed ([setup guide, section 3b](integration-setup-guide.md)).
 

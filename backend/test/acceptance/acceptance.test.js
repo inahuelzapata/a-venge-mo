@@ -48,20 +48,27 @@ before(async () => {
 
 let afterFirstSeed;
 
-test('seed on an empty DB: 3 mutual-friend users with name, avatar, non-zero balance', async () => {
+const TEAM = ['jan', 'belen', 'ale', 'paloma', 'marcelo', 'pochi', 'nahuel', 'dami', 'coco', 'franco', 'guille'];
+
+test('seed on an empty DB: 14 mutual-friend users with name, avatar, non-zero balance', async () => {
   assert.equal((await db.collection('users').get()).size, 0);
   await seed(db);
   const users = await db.collection('users').get();
-  assert.equal(users.size, 3);
+  assert.equal(users.size, 14);
   const ids = users.docs.map((d) => d.id).sort();
-  assert.deepEqual(ids, ['annie', 'christophe', 'maxi']);
+  assert.deepEqual(ids, ['annie', 'christophe', 'maxi', ...TEAM].sort());
   for (const d of users.docs) {
     const u = d.data();
     assert.deepEqual(validateUser(d.id, u), []);
-    assert.deepEqual([...u.friendIds].sort(), ids.filter((i) => i !== d.id));
+    assert.deepEqual([...u.friendIds].sort(), ids.filter((i) => i !== d.id)); // the other thirteen
     assert.ok(u.displayName);
     assert.equal(u.avatar, SEED_USERS[d.id].avatar); // the person's photo URL
-    assert.match(u.avatar, /^https:\/\/taller\.ai\//);
+    if (TEAM.includes(d.id)) {
+      assert.equal(u.avatar, `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/${d.id}.jpg`);
+      assert.equal(u.balanceCents, 10000);
+    } else {
+      assert.match(u.avatar, /^https:\/\/taller\.ai\//);
+    }
     assert.ok(Number.isInteger(u.balanceCents) && u.balanceCents !== 0);
   }
   afterFirstSeed = await snapshot();

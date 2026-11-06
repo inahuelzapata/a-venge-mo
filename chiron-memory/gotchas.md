@@ -198,3 +198,6 @@ What: Writing `signedInUserId` with `xcrun simctl spawn booted defaults write co
 ## ScreenSnapshotTests testHomeFeed / testHomeEmpty fail on main with no visible difference
 
 What: On the iOS 26.5 iPhone 17 Pro simulator (2026-11-05) these two snapshots fail "does not match reference" on the unchanged branch, while the images look identical to the eye (pixel-level drift in the Home banner area); the other six snapshots pass · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, __Snapshots__/testHomeFeed.1.png, testHomeEmpty.1.png · Learned: not caused by party/Me changes; re-record them in a dedicated change after checking the diff
+## Images served by GitHub raw URL must not be tracked by Git LFS
+
+What: For an LFS-tracked path (brand/**, docs/design/*.jpg|png, iOS snapshots in .gitattributes), raw.githubusercontent.com returns the 130-byte LFS pointer as text/plain, not the image; a normally committed image is served with its image/* content type · Where: .gitattributes, avatars/ (deliberately not LFS) · Learned: check `git check-attr filter <path>` shows "unspecified" before seeding any raw URL as an avatar

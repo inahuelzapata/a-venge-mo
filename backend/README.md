@@ -64,7 +64,7 @@ service-account key or for another project, or no credentials at all.
 ```sh
 npm run deploy:firestore   # hosted: deploy firestore.rules + firestore.indexes.json to FIREBASE_PROJECT_ID
 npm run deploy:functions   # hosted: deploy the resetDemo callable (us-central1) to FIREBASE_PROJECT_ID
-npm run seed               # 3 friends (Maxi, Annie, Christophe), Tony's, seeded feed; safe to re-run
+npm run seed               # 14 mutual friends (Maxi, Annie, Christophe + 11 team), Tony's, seeded feed; safe to re-run
 npm run reset -- --yes     # delete all parties and party transactions, restore balances and feed
                            # (--yes is required for hosted; without it reset refuses and exits 2)
 npm run emulators          # emulator opt-in only: start the local Firestore emulator

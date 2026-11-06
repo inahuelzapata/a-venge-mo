@@ -9,10 +9,23 @@ export const MERCHANT_ID = 'tonys-greenwich';
 // initials when it is missing, empty or not a URL; the backend stores URLs only.
 const photo = (file) => `https://taller.ai/_next/image?url=%2Fleadership%2F${file}.jpg&w=1080&q=75`;
 
+// The rest of the team's photos are committed in the repo's `avatars/` folder
+// (one <username>.jpg each, kept OUT of Git LFS so the raw URL serves the image
+// bytes, not a pointer) and stored as their public GitHub raw URL.
+const repoPhoto = (username) => `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/${username}.jpg`;
+const TEAM_BALANCE_CENTS = 10000;
+
 export const SEED_USERS = Object.freeze({
   maxi: { displayName: 'Maxi', avatar: photo('maximiliano-armesto'), balanceCents: 25000 },
   annie: { displayName: 'Annie', avatar: photo('annie-rodriguez'), balanceCents: 18050 },
   christophe: { displayName: 'Christophe', avatar: photo('christophe-kolb'), balanceCents: 32075 },
+  ...Object.fromEntries(
+    ['jan', 'belen', 'ale', 'paloma', 'marcelo', 'pochi', 'nahuel', 'dami', 'coco', 'franco', 'guille'].map((id) => [id, {
+      displayName: id[0].toUpperCase() + id.slice(1),
+      avatar: repoPhoto(id),
+      balanceCents: TEAM_BALANCE_CENTS,
+    }]),
+  ),
 });
 
 // [id, payer, payee, amountCents, memo, fromTonys, ISO time, likes, comments]

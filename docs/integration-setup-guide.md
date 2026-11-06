@@ -182,7 +182,7 @@ Before choosing it, know that:
 ## 4. Seed the demo database
 
 ```sh
-npm run seed                # Done: 3 users, 1 merchant, 6 feed transactions.
+npm run seed                # Done: 14 users, 1 merchant, 6 feed transactions.
 npm run reset -- --yes      # back to exactly the seeded state (deletes all parties)
 ```
 

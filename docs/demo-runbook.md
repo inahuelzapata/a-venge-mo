@@ -42,14 +42,18 @@ device-to-device traffic (guest networks often block it; use a phone hotspot).
 npm run seed
 ```
 
-Result: users `maxi`, `annie`, `christophe` (mutual friends), merchant
+Result: fourteen users, all mutual friends: `maxi`, `annie`, `christophe`,
+`jan`, `belen`, `ale`, `paloma`, `marcelo`, `pochi`, `nahuel`, `dami`, `coco`,
+`franco`, `guille`;
+merchant
 `tonys-greenwich` (Tony's), six seeded feed transactions, zero parties. Safe
 to run again.
 
 ## 4. Run the demo
 
 1. Install the app on three phones (any mix of iPhone and Android) and log in
-   as `maxi`, `annie` and `christophe`.
+   as `maxi`, `annie` and `christophe`. Extra phones can log in as any of the
+   other eleven seeded users (`jan` … `guille`) and join the party too.
 2. Maxi (host) starts a Split Party at Tony's and reads out the two-emoji code.
 3. Annie and Christophe enter the code within 5 minutes.
 4. Maxi enters the bill and tip; all three phones show the same shares.
