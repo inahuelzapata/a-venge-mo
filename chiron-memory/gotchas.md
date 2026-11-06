@@ -169,3 +169,8 @@ What: `./gradlew testDebugUnitTest` (and plain record/verifyPaparazziDebug) can 
 ## Android lint has two CompositionLocal allowlists
 
 What: A new CompositionLocal must be added to both `compose_allowed_composition_locals` in android/.editorconfig (ktlint compose rules) and `CompositionLocalAllowlist.allowedCompositionLocals` in android/config/detekt/detekt.yml. Also, Koin's verify() in KoinModulesTest flags constructor parameters such as File or defaulted interfaces on hand-built singles, so list them in extraTypes · Where: android/.editorconfig, android/config/detekt/detekt.yml, android/app/src/test/.../di/KoinModulesTest.kt · Learned: hit while adding LocalAvatarImages and AvatarImageStore
+
+## iOS ScreenSnapshotTests all fail on unmodified main (2026-11-05)
+
+What: All 8 ScreenSnapshotTests (login, home, Me, pay placeholder) fail with "Snapshot does not match reference" on the iOS 26.5 iPhone Air simulator, including on a pristine copy of main, while the rest of SplitPartyTests pass · Why: the reference PNGs are out of date with main or with the simulator/OS build, not caused by feature changes · Where: ios/SplitPartyTests/ScreenSnapshotTests.swift, ios/SplitPartyTests/__Snapshots__/ · Learned: before blaming a change for snapshot failures, run the same tests on a clean `git archive HEAD` copy; re-recording the references is separate work
+
