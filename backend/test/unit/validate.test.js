@@ -75,6 +75,8 @@ test('seeded users carry their photo URL as avatar and pass the validator', () =
     maxi: `${base}maximiliano-armesto.jpg&w=1080&q=75`,
     annie: `${base}annie-rodriguez.jpg&w=1080&q=75`,
     christophe: `${base}christophe-kolb.jpg&w=1080&q=75`,
+    ...Object.fromEntries(['jan', 'belen', 'ale', 'paloma', 'marcelo', 'pochi', 'nahuel', 'dami', 'coco', 'franco', 'guille'].map((id) =>
+      [id, `https://raw.githubusercontent.com/inahuelzapata/a-venge-mo/main/avatars/${id}.jpg`])),
   });
   for (const [id, u] of Object.entries(SEED_USERS)) {
     const doc = { username: id, displayName: u.displayName, avatar: u.avatar, balanceCents: u.balanceCents,
