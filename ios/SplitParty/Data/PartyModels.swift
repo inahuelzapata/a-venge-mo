@@ -22,6 +22,8 @@ enum PartySchema {
         static let memberIds = "memberIds"
         static let members = "members"
         static let wrongCodeAttempts = "wrongCodeAttempts"
+        static let cancelledAt = "cancelledAt"
+        static let cancelledBy = "cancelledBy"
     }
 
     enum MemberField {
@@ -60,8 +62,10 @@ enum DemoMerchant {
     static let fallbackName = "Tony's"
 }
 
+/// `parties.status`. `cancelled` (host only, schema "Cancelling a party") is its
+/// own state: it is never shown as expired or paid.
 enum PartyStatus: String {
-    case open, paid, expired
+    case open, paid, expired, cancelled
 }
 
 /// The two-emoji join code. Every emoji is one code point from the palette, so
@@ -153,6 +157,8 @@ struct SplitParty: Equatable, Identifiable {
     let paidAt: Date?
     /// Members whose `members.{uid}.paid` is true. Pay sets every member at once.
     let paidMemberIds: Set<String>
+    /// When the host cancelled; nil unless `status == .cancelled` (or while the server time is pending).
+    let cancelledAt: Date?
 
     /// Nil when a required field is missing or malformed.
     init?(id: String, data: [String: Any], dateOf: (Any?) -> Date?) {
@@ -175,12 +181,14 @@ struct SplitParty: Equatable, Identifiable {
                   createdAt: createdAt, expiresAt: expiresAt, memberIds: memberIds,
                   wrongCodeAttempts: rawAttempts.compactMapValues { FirestoreValue.integer($0) },
                   billCents: billCents, tip: TipChoice(firestoreValue: data[PartySchema.PartyField.tip]),
-                  paidAt: dateOf(data[PartySchema.PartyField.paidAt]), paidMemberIds: Set(paidMemberIds))
+                  paidAt: dateOf(data[PartySchema.PartyField.paidAt]), paidMemberIds: Set(paidMemberIds),
+                  cancelledAt: dateOf(data[PartySchema.PartyField.cancelledAt]))
     }
 
     init(id: String, hostId: String, merchantId: String, joinCode: JoinCode, status: PartyStatus,
          createdAt: Date, expiresAt: Date, memberIds: [String], wrongCodeAttempts: [String: Int],
-         billCents: Int? = nil, tip: TipChoice? = nil, paidAt: Date? = nil, paidMemberIds: Set<String> = []) {
+         billCents: Int? = nil, tip: TipChoice? = nil, paidAt: Date? = nil, paidMemberIds: Set<String> = [],
+         cancelledAt: Date? = nil) {
         self.id = id
         self.hostId = hostId
         self.merchantId = merchantId
@@ -194,6 +202,7 @@ struct SplitParty: Equatable, Identifiable {
         self.tip = tip
         self.paidAt = paidAt
         self.paidMemberIds = paidMemberIds
+        self.cancelledAt = cancelledAt
     }
 
     /// Every member's share, or nil while there is no bill.
@@ -207,7 +216,17 @@ struct SplitParty: Equatable, Identifiable {
         status == .open && now < expiresAt
     }
 
-    /// Expired by status or by the clock (a paid party is settled, not expired).
+    /// Cancelled by the host (never expired, never paid).
+    var isCancelled: Bool {
+        status == .cancelled
+    }
+
+    /// Whether `userId` may cancel right now: the host, while the party is open and unexpired.
+    func canCancel(by userId: String, at now: Date) -> Bool {
+        userId == hostId && isActive(at: now)
+    }
+
+    /// Expired by status or by the clock (a paid or cancelled party is not expired).
     func isExpired(at now: Date) -> Bool {
         status == .expired || (status == .open && now >= expiresAt)
     }
@@ -221,6 +240,7 @@ struct SplitParty: Equatable, Identifiable {
     /// at least one friend in). A paid party has nothing left to pay.
     func payBlocker(at now: Date) -> PayBlocker? {
         if status == .paid { return .alreadyPaid }
+        if status == .cancelled { return .cancelled }
         guard isActive(at: now) else { return .expired }
         guard billCents != nil else { return .needsTotal }
         guard !joineeIds.isEmpty else { return .needsFriends }
@@ -250,6 +270,7 @@ enum PayBlocker: Equatable {
     case needsFriends
     case expired
     case alreadyPaid
+    case cancelled
 
     var label: String {
         switch self {
@@ -257,6 +278,7 @@ enum PayBlocker: Equatable {
         case .needsFriends: "Waiting for friends to join"
         case .expired: "Party expired"
         case .alreadyPaid: "Paid"
+        case .cancelled: "Party cancelled"
         }
     }
 }
@@ -290,6 +312,17 @@ enum PartyActionError: Error, Equatable {
         case .unreachable: "Couldn't reach the database. Nothing was paid; try again."
         case .rejected: "The database refused the payment. Nothing was paid."
         case .partyNoLongerOpen: "This party is no longer open. Nothing was paid."
+        case .lockedOut, .notReadyToPay: message
+        }
+    }
+
+    /// For the host's cancel: says the party is still running when it failed.
+    var cancelMessage: String {
+        switch self {
+        case .offline: "You're offline. The party wasn't cancelled; try again when you're connected."
+        case .unreachable: "Couldn't reach the database. The party wasn't cancelled; try again."
+        case .rejected: "The database refused the cancel. The party is still open."
+        case .partyNoLongerOpen: "This party is no longer open, so it can't be cancelled."
         case .lockedOut, .notReadyToPay: message
         }
     }

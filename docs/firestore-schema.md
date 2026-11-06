@@ -94,7 +94,7 @@ One document per Split Party. The id is a Firestore auto id.
 | `hostId`            | string                        | `users` id of the host. The host is also a member. |
 | `merchantId`        | string                        | `merchants` id where the party happens. |
 | `joinCode`          | array\<string\>, length 2     | The two-emoji join code, one emoji per element, each from the **emoji palette** below. Repeats are allowed (e.g. `["🍕","🍕"]`). Example: `["🍕","🍺"]`. |
-| `status`            | string enum                   | `"open"`, `"paid"` or `"expired"`. See *Lifecycle*. |
+| `status`            | string enum                   | `"open"`, `"paid"`, `"expired"` or `"cancelled"`. See *Lifecycle*. |
 | `createdAt`         | Timestamp                     | When the host created the party. **The client writes this value itself** (not `serverTimestamp()`) so that `expiresAt` can be computed in the same write. |
 | `expiresAt`         | Timestamp (derived, stored)   | Always `createdAt + 5 minutes`. Written once at creation, never changed. |
 | `paidAt`            | Timestamp \| null             | When the host tapped Pay. `null` until then. |
@@ -107,6 +107,8 @@ One document per Split Party. The id is a Firestore auto id.
 | `members`           | map\<userId, map\>            | Per-member state, keyed by user id. |
 | `members.{uid}.joinedAt` | Timestamp                | When this member joined (for the host: same as `createdAt`). |
 | `members.{uid}.paid`     | bool                     | `false` on join. Set to `true` for every member in the Pay transaction. |
+| `cancelledAt`       | Timestamp (only when cancelled) | When the host cancelled. Present **only** on a `cancelled` party, written as `serverTimestamp()`. |
+| `cancelledBy`       | string (only when cancelled)  | `users` id of who cancelled. Present **only** on a `cancelled` party and always equal to `hostId`. |
 | `wrongCodeAttempts` | map\<userId, int\>            | Wrong join-code attempts per user against this party. Missing key means 0. A user with a value `>= 3` is **locked out**: the app must refuse further attempts and never add them to `members`. |
 
 **Not stored (derived on each phone):** total, tip in cents for percent tips,
@@ -131,7 +133,10 @@ That gives 12² = 144 possible codes per merchant.
   open ─────────────────────────────▶ paid      
     │                                            
     │ now >= expiresAt (and not paid)            
-    └───────────────────────────────▶ expired   
+    ├───────────────────────────────▶ expired   
+    │                                            
+    │ host confirms Cancel (now < expiresAt)     
+    └───────────────────────────────▶ cancelled 
 ```
 
 - `open`: created by the host. Joinees can join only while
@@ -142,7 +147,13 @@ That gives 12² = 144 possible codes per merchant.
   the host's app writes `status: "expired"` and deletes the join-code lock (see
   below) in one batch. Clients must treat an `open` party past `expiresAt` as
   expired even if nobody has written it yet.
-- A party never goes back to `open`.
+- `cancelled`: terminal. Set only by the host, only from `open` and only
+  while `now < expiresAt` (PRD US-12/13, FR-2.8–2.10). See *Cancelling a party*.
+  Nobody is charged and nobody can join it any more. It is **not** an expiry:
+  apps show "Party cancelled by host", never "expired".
+- A party never goes back to `open`. Apps must read an unknown status as a
+  finished party, but `paid`, `expired` and `cancelled` each have their own
+  wording.
 
 ### Join-code uniqueness (per merchant, among active parties)
 
@@ -170,7 +181,7 @@ Creating a party is one Firestore **transaction**:
 
 Firestore transactions abort if a document they read is changed before they
 commit. So two hosts at the same merchant can never both get the same code
-while it is active. When a party becomes `paid` or `expired`, delete its lock
+while it is active. When a party becomes `paid`, `expired` or `cancelled`, delete its lock
 in the same write. Stale locks are harmless because step 2 ignores them.
 
 Joining by code: read `joinCodes/{merchantId}_{code}`. If it exists, its
@@ -178,6 +189,33 @@ Joining by code: read `joinCodes/{merchantId}_{code}`. If it exists, its
 party to join. Wrong attempts are counted on the party the joinee is trying to
 join (the party whose host they picked nearby) in `wrongCodeAttempts.{uid}`,
 using `FieldValue.increment(1)`.
+
+### Cancelling a party (host only)
+
+One Firestore transaction, run by the host's app after the host confirms
+"Cancel party?":
+
+1. Read the party. It must be `open` with `now < expiresAt`, and the caller
+   must be `hostId`. If it is already `cancelled`, do nothing (a retried tap).
+   It does not matter whether a bill is set, how many joinees there are or how
+   much time is left.
+2. Read the lock `joinCodes/{merchantId}_{code}`.
+3. Party update, exactly these fields: `status = "cancelled"`,
+   `cancelledAt = serverTimestamp()`, `cancelledBy = hostId`. Bill, tip and
+   members stay as they were; no `transactions` are written and no balance moves.
+4. Delete the lock if it still points at this party, so the host can start a
+   new party straight away.
+
+The rules accept the cancel only from `open`, before `expiresAt`, with
+`cancelledAt == request.time`, `cancelledBy == hostId` and no other field
+changed. Because `cancelled` is terminal, any later write (join, wrong code,
+Pay, a second cancel) is rejected.
+
+The host's app emits one `party_cancelled` analytics event per committed
+cancel: `partyId`, `memberCount` (host included) and `secondsSinceCreated`.
+With `paidAt`, `cancelledAt` and the `expired` status on the documents, the
+PRD's "cancelled vs settled vs timed out" metric can also be computed from
+`parties` directly.
 
 ### Split rule (equal split, integer cents)
 
@@ -290,7 +328,9 @@ Declared in `firestore.indexes.json` as well.
 party document is **invalid** (rejected) if, among other things:
 
 - `billCents` is not an integer (e.g. `12.5`, `"1250"`) or is negative;
-- `status` is not one of `open`, `paid`, `expired`;
+- `status` is not one of `open`, `paid`, `expired`, `cancelled`;
+- `cancelledAt`/`cancelledBy` are present on a party that is not `cancelled`,
+  missing on one that is, or `cancelledBy != hostId`;
 - `joinCode` does not have exactly 2 elements, or an element is not in the
   emoji palette (so `["🍕","🍺"]` and `["🍕","🍺","🎉","🔥"]` are both rejected);
 - `tip` has neither or both of `percent`/`amountCents`, or a percent outside

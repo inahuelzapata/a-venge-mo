@@ -64,4 +64,20 @@ protocol PartyDataSource: AnyObject {
     /// or a retry after a dropped connection never charges twice. Throws
     /// `PartyActionError` (expired, no bill or no friend, rules, network).
     func settleParty(id: String) async throws
+
+    /// Host only, Cancel (FR-2.8, schema "Cancelling a party"): in ONE transaction
+    /// sets `status: cancelled`, `cancelledAt`, `cancelledBy` and frees the party's
+    /// own join-code lock. No payment, no balance move. Works with or without a
+    /// bill or joinees, at any time before expiry. Returns what this call
+    /// cancelled, or nil when the party was already cancelled (a retried tap).
+    /// Throws `PartyActionError` (not the host, paid, expired, rules, network).
+    func cancelParty(id: String, hostId: String) async throws -> PartyCancellation?
+}
+
+/// A cancel this phone committed: the fields of the `party_cancelled` event.
+struct PartyCancellation: Equatable, Sendable {
+    let partyId: String
+    /// Everyone in the party at cancel time, host included.
+    let memberCount: Int
+    let secondsSinceCreated: Int
 }

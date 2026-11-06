@@ -4,6 +4,8 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.splitparty.android.domain.Clock
+import com.splitparty.android.domain.analytics.Analytics
+import com.splitparty.android.domain.analytics.AnalyticsEvent
 import com.splitparty.android.domain.countdown
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
@@ -12,7 +14,9 @@ import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.model.PayBlocker
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.Username
+import com.splitparty.android.domain.repository.CancelPartyResult
 import com.splitparty.android.domain.repository.ConnectivityObserver
+import com.splitparty.android.domain.repository.LastPartyRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.PartyWriteResult
 import com.splitparty.android.domain.split.Tip
@@ -45,7 +49,8 @@ import kotlinx.coroutines.launch
 @Immutable
 data class MemberUi(val userId: String, val firstName: String, val avatar: String?, val isHost: Boolean, val paid: Boolean = false)
 
-enum class PartyPhase { Loading, Open, Expired, Settled, NotFound }
+/** [Cancelled]: the host ended it; its own screen, never shown as [Expired] or [Settled]. */
+enum class PartyPhase { Loading, Open, Expired, Settled, Cancelled, NotFound }
 
 /** The tip as the chips show it. A stored null or custom 0 is the 0% chip. */
 @Immutable
@@ -81,7 +86,7 @@ data class TotalUi(
 )
 
 /** The host's Pay button: enabled only when [Ready], otherwise disabled with the reason as its label. */
-enum class PayState { Ready, NeedsTotal, NeedsMembers, Expired }
+enum class PayState { Ready, NeedsTotal, NeedsMembers, Expired, Cancelled }
 
 /**
  * A settled party. [amountCents]: collected (host) or paid (member); null when
@@ -116,7 +121,11 @@ data class PartyUiState(
     /** The Pay write is running. */
     val paying: Boolean = false,
     /** Set once the party is paid. */
-    val settlement: SettlementUi? = null
+    val settlement: SettlementUi? = null,
+    /** Host only, while the party is open: the Cancel party control is shown. */
+    val canCancel: Boolean = false,
+    /** The host's cancel write is running. */
+    val cancelling: Boolean = false
 )
 
 sealed interface PartyEvent {
@@ -140,6 +149,9 @@ sealed interface PartyEvent {
 
     /** The party this screen showed open just got paid: the settlement plays, with a success haptic. */
     data object Settled : PartyEvent
+
+    /** The host's own cancel landed: back to Home, where the merchant card is free again. */
+    data object CancelledByMe : PartyEvent
 }
 
 /**
@@ -154,7 +166,9 @@ class PartyViewModel(
     private val parties: PartyRepository,
     observeUsers: ObserveUsersUseCase,
     connectivity: ConnectivityObserver,
-    private val clock: Clock
+    private val clock: Clock,
+    private val analytics: Analytics = Analytics.None,
+    private val lastParty: LastPartyRepository = LastPartyRepository.None
 ) : ViewModel() {
     private val _events = Channel<PartyEvent>(Channel.BUFFERED)
     val events: Flow<PartyEvent> = _events.receiveAsFlow()
@@ -197,6 +211,7 @@ class PartyViewModel(
         } else {
             PartyUiState(
                 phase = when {
+                    party.isCancelled -> PartyPhase.Cancelled
                     party.status == PartyStatus.Paid -> PartyPhase.Settled
                     !party.isActiveAt(now) -> PartyPhase.Expired
                     else -> PartyPhase.Open
@@ -212,7 +227,9 @@ class PartyViewModel(
                 writeError = write.error,
                 pay = party.payState(now),
                 paying = write.paying,
-                settlement = party.toSettlementUi()
+                settlement = party.toSettlementUi(),
+                canCancel = party.canCancel(userId, now),
+                cancelling = write.cancelling
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PartyUiState())
@@ -266,6 +283,37 @@ class PartyViewModel(
         }
     }
 
+    /**
+     * Host, after "Cancel party?" was confirmed: ends the party for everyone with
+     * nothing charged. Records `party_cancelled` once, for the cancel this call
+     * committed; on failure the party is still open and the error shows inline.
+     */
+    fun cancel() {
+        val party = latestParty ?: return
+        if (writeState.value.saving || !party.canCancel(userId, clock.now())) return
+        writeState.value = WriteState(saving = true, cancelling = true)
+        viewModelScope.launch {
+            val result = parties.cancel(partyId, userId)
+            writeState.value = WriteState(
+                error = when (result) {
+                    is CancelPartyResult.Cancelled -> null
+                    CancelPartyResult.NotAllowed -> WriteError.NotAllowed
+                    CancelPartyResult.Failed -> WriteError.Failed
+                }
+            )
+            if (result is CancelPartyResult.Cancelled) {
+                result.cancellation?.let { analytics.record(AnalyticsEvent.partyCancelled(it)) }
+                lastParty.forget()
+                _events.trySend(PartyEvent.CancelledByMe)
+            }
+        }
+    }
+
+    /** "Back to Home" from a finished party: a relaunch no longer reopens it. */
+    fun leaveFinishedParty() {
+        viewModelScope.launch { lastParty.forget() }
+    }
+
     fun clearWriteError() {
         writeState.value = writeState.value.copy(error = null)
     }
@@ -314,7 +362,12 @@ class PartyViewModel(
         }
     }
 
-    private data class WriteState(val saving: Boolean = false, val error: WriteError? = null, val paying: Boolean = false)
+    private data class WriteState(
+        val saving: Boolean = false,
+        val error: WriteError? = null,
+        val paying: Boolean = false,
+        val cancelling: Boolean = false
+    )
 
     private fun Party.payState(now: Long): PayState? = if (hostId != userId) {
         null
@@ -322,6 +375,7 @@ class PartyViewModel(
         when (payBlockerAt(now)) {
             null, PayBlocker.AlreadyPaid -> PayState.Ready
             PayBlocker.Expired -> PayState.Expired
+            PayBlocker.Cancelled -> PayState.Cancelled
             PayBlocker.NoTotal -> PayState.NeedsTotal
             PayBlocker.NoMembers -> PayState.NeedsMembers
         }
@@ -339,6 +393,8 @@ class PartyViewModel(
     }
 
     init {
+        // Remembered so a relaunch can show how this party ended while the app was closed.
+        viewModelScope.launch { lastParty.remember(partyId) }
         // The host's phone writes `expired` (and frees the lock) once the clock passes
         // `expiresAt`, retrying every few seconds while the stored status is still
         // `open` (offline at that moment). A lost race is ignored by the repository;

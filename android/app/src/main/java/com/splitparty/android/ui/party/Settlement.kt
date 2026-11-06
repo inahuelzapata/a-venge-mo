@@ -77,6 +77,21 @@ import kotlinx.coroutines.launch
 
 private const val PRESSED_ALPHA = 0.8f
 
+/** What the Pay button reads: the amount when ready, otherwise why it is disabled. */
+@Composable
+private fun payLabel(pay: PayState, collectCents: Long?): String = when (pay) {
+    PayState.Ready -> collectCents?.let { stringResource(R.string.pay_action_amount, Money.format(it)) }
+        ?: stringResource(R.string.pay_action)
+
+    PayState.NeedsTotal -> stringResource(R.string.pay_needs_total)
+
+    PayState.NeedsMembers -> stringResource(R.string.pay_needs_members)
+
+    PayState.Expired -> stringResource(R.string.pay_expired)
+
+    PayState.Cancelled -> stringResource(R.string.pay_cancelled)
+}
+
 /**
  * The host's Pay button (PoC-11), the bottom of the total area: brand blue
  * capsule, no ripple or elevation (a press dims it). Disabled it is grey and
@@ -85,16 +100,7 @@ private const val PRESSED_ALPHA = 0.8f
 @Composable
 fun PayButton(pay: PayState, collectCents: Long?, paying: Boolean, onPay: () -> Unit, modifier: Modifier = Modifier) {
     val enabled = pay == PayState.Ready && !paying
-    val label = when (pay) {
-        PayState.Ready -> collectCents?.let { stringResource(R.string.pay_action_amount, Money.format(it)) }
-            ?: stringResource(R.string.pay_action)
-
-        PayState.NeedsTotal -> stringResource(R.string.pay_needs_total)
-
-        PayState.NeedsMembers -> stringResource(R.string.pay_needs_members)
-
-        PayState.Expired -> stringResource(R.string.pay_expired)
-    }
+    val label = payLabel(pay, collectCents)
     val spoken = if (pay == PayState.Ready) {
         stringResource(R.string.pay_description_ready, Money.spoken(collectCents ?: 0L))
     } else {

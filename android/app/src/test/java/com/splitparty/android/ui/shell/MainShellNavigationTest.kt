@@ -17,15 +17,18 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.splitparty.android.di.domainModule
 import com.splitparty.android.di.viewModelModule
 import com.splitparty.android.domain.Clock
+import com.splitparty.android.domain.analytics.Analytics
 import com.splitparty.android.domain.repository.ConnectivityObserver
 import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoSettingsRepository
+import com.splitparty.android.domain.repository.LastPartyRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
 import com.splitparty.android.testing.FakeConnectivityObserver
 import com.splitparty.android.testing.FakeDemoResetRepository
 import com.splitparty.android.testing.FakeDemoSettingsRepository
+import com.splitparty.android.testing.FakeLastPartyRepository
 import com.splitparty.android.testing.FakePartyRepository
 import com.splitparty.android.testing.FakeSessionRepository
 import com.splitparty.android.testing.FakeSplitPartyRepository
@@ -77,6 +80,8 @@ class MainShellNavigationTest {
             single<DemoSettingsRepository> { FakeDemoSettingsRepository() }
             single<DemoResetRepository> { FakeDemoResetRepository() }
             single<Clock> { Clock { NOW } }
+            single<LastPartyRepository> { FakeLastPartyRepository() }
+            single<Analytics> { Analytics.None }
         }
         startKoin { modules(fakeData, domainModule, viewModelModule) }
     }

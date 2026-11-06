@@ -128,7 +128,8 @@ final class AppModel {
 /// - `-UITestPartyScript "2:tip=20;4:join=christophe;6:remove=annie;8:bill=20000"`:
 ///   changes other phones make to that party, each at its second after sign-in
 ///   (typing the username takes a variable few seconds, so launch is no anchor).
-///   "pay=host" settles the party as the host's phone would; "reset=demo" runs
+///   "pay=host" settles the party as the host's phone would; "cancel=host"
+///   cancels it as the host's phone would; "reset=demo" runs
 ///   Demo reset as if another phone had tapped it.
 /// - `-UITestDemoReset fail`: the Demo reset function answers with an error.
 /// - `-UITestWriteDelay <seconds>`: how long the fake Pay and Demo reset take.
@@ -208,6 +209,10 @@ struct UITestLaunch {
         case "join": try await fixture.joinParty(id: partyId, userId: parts[1])
         case "remove": try await fixture.removeMember(partyId: partyId, memberId: parts[1])
         case "pay": try await fixture.settleParty(id: partyId)
+        case "cancel":
+            if let party = fixture.parties[partyId] {
+                _ = try await fixture.cancelParty(id: partyId, hostId: party.hostId)
+            }
         case "reset": try await fixture.resetDemo()
         default: break
         }

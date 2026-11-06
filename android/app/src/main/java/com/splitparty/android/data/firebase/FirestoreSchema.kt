@@ -54,9 +54,9 @@ internal fun DocumentSnapshot.toTransaction(): Transaction = Transaction(
 internal fun DocumentSnapshot.toParty(): Party? {
     val createdAt = getTimestamp("createdAt")?.toDate()?.time
     val expiresAt = getTimestamp("expiresAt")?.toDate()?.time
-    if (!exists() || createdAt == null || expiresAt == null) return null
     val joinCode = (get("joinCode") as? List<*>).orEmpty().filterIsInstance<String>()
-    if (!JoinCodes.isValid(joinCode)) return null
+    val readable = exists() && JoinCodes.isValid(joinCode)
+    if (!readable || createdAt == null || expiresAt == null) return null
     val memberMaps = get("members") as? Map<*, *> ?: emptyMap<Any, Any>()
     val members = (get("memberIds") as? List<*>).orEmpty().filterIsInstance<String>().map { uid ->
         val member = memberMaps[uid] as? Map<*, *>
@@ -77,7 +77,8 @@ internal fun DocumentSnapshot.toParty(): Party? {
         members = members,
         wrongCodeAttempts = attempts,
         billCents = (get("billCents") as? Number)?.toLong()?.takeIf { it >= 0 },
-        tip = (get("tip") as? Map<*, *>)?.toTip()
+        tip = (get("tip") as? Map<*, *>)?.toTip(),
+        cancelledAtMillis = getTimestamp("cancelledAt", ServerTimestampBehavior.ESTIMATE)?.toDate()?.time
     )
 }
 

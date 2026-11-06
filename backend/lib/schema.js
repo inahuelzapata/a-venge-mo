@@ -8,7 +8,7 @@ export const COLLECTIONS = Object.freeze({
   transactions: 'transactions',
 });
 
-export const PARTY_STATUSES = Object.freeze(['open', 'paid', 'expired']);
+export const PARTY_STATUSES = Object.freeze(['open', 'paid', 'expired', 'cancelled']);
 
 /** 12 single-code-point emojis (no variation selectors or skin tones). */
 export const EMOJI_PALETTE = Object.freeze(['🍕', '🍔', '🌮', '🍣', '🍩', '🍺', '🎉', '🔥', '🚀', '🎸', '🐶', '🌵']);

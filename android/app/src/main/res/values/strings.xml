@@ -107,6 +107,16 @@
     <string name="pay_needs_total">Add the total</string>
     <string name="pay_needs_members">Waiting for friends to join</string>
     <string name="pay_expired">This party has expired</string>
+    <string name="pay_cancelled">Party cancelled</string>
+    <string name="cancel_action">Cancel party</string>
+    <string name="cancel_action_description">Cancel party. Ends the party for everyone. Nobody is charged.</string>
+    <string name="cancel_title">Cancel party?</string>
+    <string name="cancel_body">The party ends for everyone and nobody is charged.</string>
+    <string name="cancel_confirm">Cancel party</string>
+    <string name="cancel_keep">Keep party</string>
+    <string name="party_cancelled_title">Party cancelled by host</string>
+    <string name="party_cancelled_title_host">You cancelled this party</string>
+    <string name="party_cancelled_body">Nobody was charged.</string>
     <string name="pay_description_ready">Pay, collects %1$s from everyone</string>
     <string name="pay_description_disabled">Pay, disabled. %1$s</string>
     <string name="settle_member_paid">%1$s, paid</string>

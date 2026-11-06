@@ -10,6 +10,7 @@ import com.splitparty.android.domain.live.map
 import com.splitparty.android.domain.model.DemoMerchant
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.Username
@@ -17,6 +18,7 @@ import com.splitparty.android.domain.party.BannerSlot
 import com.splitparty.android.domain.repository.ConnectivityObserver
 import com.splitparty.android.domain.repository.CreatePartyResult
 import com.splitparty.android.domain.repository.DemoSettingsRepository
+import com.splitparty.android.domain.repository.LastPartyRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.usecase.ObserveFeedUseCase
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
@@ -47,6 +49,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Immutable
 data class HomeUiState(
@@ -79,7 +82,8 @@ class HomeViewModel(
     demoSettings: DemoSettingsRepository,
     private val connectivity: ConnectivityObserver,
     private val clock: Clock,
-    private val merchantEntrance: MerchantCardEntrance = MerchantCardEntrance()
+    private val merchantEntrance: MerchantCardEntrance = MerchantCardEntrance(),
+    private val lastParty: LastPartyRepository = LastPartyRepository.None
 ) : ViewModel() {
     private val highlighted = MutableStateFlow(persistentSetOf<String>())
     private var knownIds: Set<String>? = null
@@ -177,8 +181,29 @@ class HomeViewModel(
         if (resumeChecked || event.fromCache) return
         resumeChecked = true
         val now = clock.now()
-        event.value.filter { it.isActiveAt(now) && it.hasMember(userId) }.maxByOrNull { it.createdAtMillis }?.let {
-            _events.trySend(HomeEvent.OpenParty(it.id))
+        val active = event.value.filter { it.isActiveAt(now) && it.hasMember(userId) }.maxByOrNull { it.createdAtMillis }
+        if (active != null) {
+            _events.trySend(HomeEvent.OpenParty(active.id))
+        } else {
+            viewModelScope.launch { resumeCancelledParty() }
+        }
+    }
+
+    /**
+     * No open party: if the party screen this phone last showed was cancelled by
+     * its host while the app was closed (and not long ago), show that state
+     * rather than plain Home, so the member learns it ended.
+     */
+    private suspend fun resumeCancelledParty() {
+        val partyId = lastParty.lastPartyId() ?: return
+        val party = withTimeoutOrNull(RESUME_LOOKUP_MS) {
+            parties.party(partyId).filterIsInstance<LiveEvent.Data<Party?>>().first { !it.fromCache }.value
+        }
+        val cancelledAt = party?.takeIf { it.isCancelled && it.hasMember(userId) }?.let { it.cancelledAtMillis ?: clock.now() }
+        if (cancelledAt != null && clock.now() - cancelledAt < REOPEN_CANCELLED_WINDOW_MS) {
+            _events.trySend(HomeEvent.OpenParty(partyId))
+        } else if (party?.status != PartyStatus.Open) {
+            lastParty.forget()
         }
     }
 
@@ -204,5 +229,9 @@ class HomeViewModel(
     companion object {
         /** As on iOS: a new row stays tinted for 1.5 s, then fades back to white. */
         const val HIGHLIGHT_HOLD_MS = 1_500L
+
+        /** As iOS reopens a just-paid party: a cancel this recent is shown on relaunch. */
+        const val REOPEN_CANCELLED_WINDOW_MS = 15 * 60 * 1_000L
+        private const val RESUME_LOOKUP_MS = 5_000L
     }
 }

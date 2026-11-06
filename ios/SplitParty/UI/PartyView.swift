@@ -87,6 +87,25 @@ final class PartyRoomModel {
         }
     }
 
+    /// Host only, after "Cancel party?" was confirmed. Nil on success (nobody is
+    /// charged; joinees' screens turn to "Party cancelled by host"), or the inline
+    /// error, in which case the party is still open. Records `party_cancelled`
+    /// once, for the cancel this call committed.
+    func cancel() async -> String? {
+        guard isHost, !isSaving, !isPaying else { return nil }
+        guard connection.isNetworkAvailable else { return PartyActionError.offline.cancelMessage }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            if let cancellation = try await repository.cancelParty(id: partyId, hostId: userId) {
+                Analytics.record(.partyCancelled(cancellation))
+            }
+            return nil
+        } catch {
+            return (error as? PartyActionError ?? .unreachable).cancelMessage
+        }
+    }
+
     private func write(_ operation: (any PaymentDataSource) async throws -> Void) async -> String? {
         guard connection.isNetworkAvailable else { return PartyActionError.offline.changeMessage }
         isSaving = true
@@ -183,6 +202,11 @@ struct PartyView: View {
             hub.forgetLastParty()
             onBackToHome()
         }
+        // The cancelled state replaces the live split: VoiceOver says so as it appears.
+        .onChange(of: room?.party?.isCancelled == true) { _, isCancelled in
+            guard isCancelled, room?.isHost == false else { return }
+            UIAccessibility.post(notification: .announcement, argument: "Party cancelled by host. Nobody was charged.")
+        }
         // Removed by the host: back to Home, where the Join banner offers a rejoin.
         .onChange(of: room?.wasRemoved == true) { _, wasRemoved in
             guard wasRemoved, let party = room?.party else { return }
@@ -200,7 +224,13 @@ struct PartyView: View {
     @ViewBuilder
     private func content(room: PartyRoomModel, hub: PartyHub) -> some View {
         if let party = room.party {
-            if party.isExpired(at: hub.now) {
+            if party.isCancelled {
+                // Its own wording: a cancelled party is never shown as expired or paid.
+                PartyClosedView(title: room.isHost ? "You cancelled this party" : "Party cancelled by host",
+                                message: "Nobody was charged.", systemImage: "xmark.circle",
+                                onBackToHome: leaveScreen)
+                    .transition(.opacity)
+            } else if party.isExpired(at: hub.now) {
                 // The last total, tip and share stay on screen, frozen (no controls).
                 PartyClosedView(title: "This party has expired", message: "Nothing was charged.",
                                 systemImage: "clock.badge.xmark", onBackToHome: leaveScreen,
@@ -216,7 +246,7 @@ struct PartyView: View {
             } else {
                 OpenPartyContent(party: party, room: room, now: hub.now, usersById: liveData.usersById,
                                  isReconnecting: room.isFromCache || !hub.connection.isNetworkAvailable,
-                                 onLeft: onBackToHome)
+                                 onLeft: onBackToHome, onCancelled: leaveScreen)
             }
         } else if room.hasLoaded {
             PartyClosedView(title: "This party isn't available", message: "It may have been cleared.",
@@ -242,9 +272,13 @@ private struct OpenPartyContent: View {
     let usersById: [String: UserAccount]
     let isReconnecting: Bool
     let onLeft: () -> Void
+    /// The host's cancel landed: back to Home, where the merchant card is free again.
+    let onCancelled: () -> Void
 
     @State private var memberToRemove: String?
     @State private var isConfirmingLeave = false
+    @State private var isConfirmingCancel = false
+    @State private var cancelError: String?
     @State private var memberError: String?
     @State private var payError: String?
 
@@ -284,6 +318,9 @@ private struct OpenPartyContent: View {
                 if room.isHost {
                     PayArea(party: party, now: now, usersById: usersById, isPaying: room.isPaying,
                             error: payError, onPay: pay)
+                    CancelPartyArea(isDisabled: room.isSaving || room.isPaying, error: cancelError) {
+                        isConfirmingCancel = true
+                    }
                 }
                 if !room.isHost {
                     Button("Leave party", role: .destructive) { isConfirmingLeave = true }
@@ -313,6 +350,16 @@ private struct OpenPartyContent: View {
                 .accessibilityIdentifier("confirmLeaveParty")
         } message: {
             Text("Your share goes back to the others. You can rejoin with the code while the party is open.")
+        }
+        // Host only. Nothing is cancelled until "Cancel party" is tapped here;
+        // "Keep party" or dismissing the sheet leaves the party as it was.
+        .confirmationDialog("Cancel party?", isPresented: $isConfirmingCancel, titleVisibility: .visible) {
+            Button("Cancel party", role: .destructive) { cancelParty() }
+                .accessibilityIdentifier("confirmCancelParty")
+            Button("Keep party", role: .cancel) {}
+                .accessibilityIdentifier("keepParty")
+        } message: {
+            Text("The party ends for everyone and nobody is charged.")
         }
         // The floating tab bar is drawn over pushed screens without insetting them;
         // without this the tip chips and total buttons could end up under it.
@@ -353,6 +400,17 @@ private extension OpenPartyContent {
         Task { payError = await room.pay() }
     }
 
+    func cancelParty() {
+        cancelError = nil
+        Task {
+            if let failure = await room.cancel() {
+                cancelError = failure
+            } else {
+                onCancelled()
+            }
+        }
+    }
+
     func leave() {
         memberError = nil
         Task {
@@ -362,6 +420,33 @@ private extension OpenPartyContent {
                 onLeft()
             }
         }
+    }
+}
+
+/// Host only, under Pay/Collect: ends the party for everyone after a confirmation.
+private struct CancelPartyArea: View {
+    let isDisabled: Bool
+    let error: String?
+    let onTap: () -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Button("Cancel party", role: .destructive, action: onTap)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.errorText)
+                .frame(minHeight: 44)
+                .disabled(isDisabled)
+                .accessibilityLabel("Cancel party")
+                .accessibilityHint("Ends the party for everyone. Nobody is charged.")
+                .accessibilityIdentifier("cancelPartyButton")
+            if let error {
+                Label(error, systemImage: "exclamationmark.circle.fill")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.errorText)
+                    .accessibilityIdentifier("cancelError")
+            }
+        }
+        .padding(.horizontal, Theme.screenGutter + 8)
     }
 }
 

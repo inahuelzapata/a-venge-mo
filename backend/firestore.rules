@@ -47,14 +47,24 @@ service cloud.firestore {
         && (ids.size() < 8 || validMember(p.members[ids[7]]));
     }
 
+    // A cancelled party carries who cancelled it (always the host) and when; no other status does.
+    function validCancellation(p) {
+      return p.status == 'cancelled'
+        ? (p.keys().hasAll(['cancelledAt', 'cancelledBy']) && p.cancelledAt is timestamp
+           && p.cancelledBy == p.hostId)
+        : !p.keys().hasAny(['cancelledAt', 'cancelledBy']);
+    }
+
     function validParty(p) {
       return p.keys().hasOnly(['hostId', 'merchantId', 'joinCode', 'status', 'createdAt', 'expiresAt',
-                               'paidAt', 'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts'])
+                               'paidAt', 'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts',
+                               'cancelledAt', 'cancelledBy'])
         && p.keys().hasAll(['hostId', 'merchantId', 'joinCode', 'status', 'createdAt', 'expiresAt',
                             'paidAt', 'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts'])
         && isId(p.hostId) && isId(p.merchantId)
         && validJoinCode(p.joinCode)
-        && p.status in ['open', 'paid', 'expired']
+        && p.status in ['open', 'paid', 'expired', 'cancelled']
+        && validCancellation(p)
         && p.createdAt is timestamp && p.expiresAt is timestamp
         && p.expiresAt == p.createdAt + duration.value(5, 'm')
         && (p.paidAt == null || p.paidAt is timestamp)
@@ -65,6 +75,16 @@ service cloud.firestore {
         && p.wrongCodeAttempts is map;
     }
 
+    // Host-only cancel (docs/firestore-schema.md "Cancelling a party"): from open, before
+    // expiresAt, touching nothing but the status and the cancel stamp. cancelledBy == hostId
+    // is checked by validCancellation; without Firebase Auth that is the identity check.
+    function isCancellation() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'cancelledAt', 'cancelledBy'])
+        && request.resource.data.cancelledAt == request.time
+        && request.time < resource.data.expiresAt;
+    }
+
     match /parties/{partyId} {
       allow read: if true;
       allow create: if validParty(request.resource.data)
@@ -73,8 +93,9 @@ service cloud.firestore {
         // identity, code and timing never change
         && request.resource.data.diff(resource.data).unchangedKeys()
              .hasAll(['hostId', 'merchantId', 'joinCode', 'createdAt', 'expiresAt'])
-        // paid and expired are terminal
-        && resource.data.status == 'open';
+        // paid, expired and cancelled are terminal
+        && resource.data.status == 'open'
+        && (request.resource.data.status != 'cancelled' || isCancellation());
       allow delete: if false;
     }
 

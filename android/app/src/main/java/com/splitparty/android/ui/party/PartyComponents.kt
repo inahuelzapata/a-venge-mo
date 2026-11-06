@@ -186,6 +186,8 @@ object PartyTestTags {
     const val EMPTY_SEAT = "party_empty_seat"
     const val RECONNECTING = "party_reconnecting"
     const val EXPIRED = "party_expired"
+    const val CANCELLED = "party_cancelled"
+    const val CANCEL = "party_cancel"
     const val TOTAL = "party_total"
     const val SCAN = "party_scan"
     const val ENTER = "party_enter_total"

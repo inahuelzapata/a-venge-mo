@@ -6,18 +6,22 @@ import com.splitparty.android.BuildConfig
 import com.splitparty.android.data.AndroidConnectivityObserver
 import com.splitparty.android.data.AvatarImageStore
 import com.splitparty.android.data.DataStoreDemoSettingsRepository
+import com.splitparty.android.data.DataStoreLastPartyRepository
 import com.splitparty.android.data.DataStoreSessionRepository
 import com.splitparty.android.data.FirebaseDemoResetRepository
 import com.splitparty.android.data.FirestorePartyRepository
 import com.splitparty.android.data.FirestoreSplitPartyRepository
+import com.splitparty.android.data.LogcatAnalytics
 import com.splitparty.android.data.MlKitReceiptRecognizer
 import com.splitparty.android.data.firebase.FirebaseConnection
 import com.splitparty.android.data.firebase.FirebaseSetup
 import com.splitparty.android.data.firebase.FirestoreTarget
 import com.splitparty.android.domain.Clock
+import com.splitparty.android.domain.analytics.Analytics
 import com.splitparty.android.domain.repository.ConnectivityObserver
 import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoSettingsRepository
+import com.splitparty.android.domain.repository.LastPartyRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.SessionRepository
 import com.splitparty.android.domain.repository.SplitPartyRepository
@@ -68,6 +72,8 @@ val dataModule = module {
     single<DemoResetRepository> { FirebaseDemoResetRepository(get(), endpointUrl = BuildConfig.RESET_DEMO_URL) }
     singleOf(::DataStoreSessionRepository) { bind<SessionRepository>() }
     singleOf(::DataStoreDemoSettingsRepository) { bind<DemoSettingsRepository>() }
+    singleOf(::DataStoreLastPartyRepository) { bind<LastPartyRepository>() }
+    single<Analytics> { LogcatAnalytics() }
     singleOf(::AndroidConnectivityObserver) { bind<ConnectivityObserver>() }
     single<Clock> { Clock.System }
     single<ReceiptRecognizer> { MlKitReceiptRecognizer() }
@@ -93,7 +99,7 @@ val viewModelModule = module {
     viewModelOf(::HomeViewModel)
     viewModelOf(::MeViewModel)
     // Two String parameters (partyId, userId): resolved by position, not by type.
-    viewModel { (partyId: String, userId: String) -> PartyViewModel(partyId, userId, get(), get(), get(), get()) }
+    viewModel { (partyId: String, userId: String) -> PartyViewModel(partyId, userId, get(), get(), get(), get(), get(), get()) }
     viewModel { (partyId: String, userId: String) -> JoinViewModel(partyId, userId, get(), get(), get()) }
 }
 

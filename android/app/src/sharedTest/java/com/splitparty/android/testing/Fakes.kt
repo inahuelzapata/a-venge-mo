@@ -1,19 +1,24 @@
 package com.splitparty.android.testing
 
+import com.splitparty.android.domain.analytics.Analytics
+import com.splitparty.android.domain.analytics.AnalyticsEvent
 import com.splitparty.android.domain.model.DemoMerchant
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyCancellation
 import com.splitparty.android.domain.model.PartyMember
 import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.model.Transaction
 import com.splitparty.android.domain.model.User
 import com.splitparty.android.domain.model.UserLookup
+import com.splitparty.android.domain.repository.CancelPartyResult
 import com.splitparty.android.domain.repository.ConnectivityObserver
 import com.splitparty.android.domain.repository.CreatePartyResult
 import com.splitparty.android.domain.repository.DemoResetRepository
 import com.splitparty.android.domain.repository.DemoResetResult
 import com.splitparty.android.domain.repository.DemoSettingsRepository
 import com.splitparty.android.domain.repository.JoinPartyResult
+import com.splitparty.android.domain.repository.LastPartyRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.PartyWriteResult
 import com.splitparty.android.domain.repository.SessionRepository
@@ -147,6 +152,34 @@ class FakePartyRepository : PartyRepository {
         }
     }
 
+    /** Null: like the real cancel (host, open party). Otherwise this result, with nothing written. */
+    var cancelResult: CancelPartyResult? = null
+    var cancelGate: CompletableDeferred<Unit>? = null
+
+    /** Like the real cancel: host + open → cancelled (listeners see it), already cancelled → no event. */
+    override suspend fun cancel(partyId: String, hostId: String): CancelPartyResult {
+        writes += "cancel:$hostId"
+        cancelGate?.await()
+        cancelResult?.let { return it }
+        val flow = parties[partyId] ?: return CancelPartyResult.NotAllowed
+        val party = (flow.value as? LiveEvent.Data)?.value ?: return CancelPartyResult.NotAllowed
+        return when {
+            party.hostId != hostId -> CancelPartyResult.NotAllowed
+
+            party.isCancelled -> CancelPartyResult.Cancelled(null)
+
+            party.status != PartyStatus.Open -> CancelPartyResult.NotAllowed
+
+            else -> {
+                flow.value = LiveEvent.Data(party.copy(status = PartyStatus.Cancelled), fromCache = false)
+                open.value = (open.value as? LiveEvent.Data)?.let { list ->
+                    LiveEvent.Data(list.value.filterNot { it.id == partyId }, list.fromCache)
+                } ?: open.value
+                CancelPartyResult.Cancelled(PartyCancellation(partyId, party.members.size, 0L))
+            }
+        }
+    }
+
     /** Like the real write: a stored-open party becomes expired, and its listeners see it. */
     override suspend fun expire(partyId: String) {
         expired += partyId
@@ -159,6 +192,28 @@ class FakePartyRepository : PartyRepository {
 
     override suspend fun expireStaleHostedParties(hostId: String, nowMillis: Long) {
         staleCleanups += hostId
+    }
+}
+
+/** [Analytics] that keeps every event. */
+class FakeAnalytics : Analytics {
+    val events = mutableListOf<AnalyticsEvent>()
+
+    override fun record(event: AnalyticsEvent) {
+        events += event
+    }
+}
+
+/** [LastPartyRepository] in memory. */
+class FakeLastPartyRepository(var partyId: String? = null) : LastPartyRepository {
+    override suspend fun lastPartyId(): String? = partyId
+
+    override suspend fun remember(partyId: String) {
+        this.partyId = partyId
+    }
+
+    override suspend fun forget() {
+        partyId = null
     }
 }
 
