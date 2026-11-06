@@ -25,6 +25,32 @@ struct DemoModeStore {
     }
 }
 
+/// Remembers the "Custom shares" switch on the Me tab across restarts. Off on a
+/// fresh install. It only decides whether THIS phone shows the host the controls
+/// to set custom amounts: it never changes what a party is worth, and every phone
+/// shows a party's custom shares whatever its own switch says.
+struct CustomSharesStore {
+    private static let isEnabledKey = "customSharesEnabled"
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    var isEnabled: Bool {
+        defaults.bool(forKey: Self.isEnabledKey)
+    }
+
+    func save(isEnabled: Bool) {
+        defaults.set(isEnabled, forKey: Self.isEnabledKey)
+    }
+
+    func reset() {
+        defaults.removeObject(forKey: Self.isEnabledKey)
+    }
+}
+
 /// The party screen the user last had open, so a relaunch right after Pay
 /// (or during it) can show the paid party instead of plain Home.
 struct LastPartyStore {

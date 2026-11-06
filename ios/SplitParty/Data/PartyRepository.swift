@@ -70,6 +70,10 @@ extension PaymentRepository {
         try await PartyWriter(firestore: firestore).removeMember(partyId: partyId, memberId: memberId)
     }
 
+    func setCustomShare(partyId: String, memberId: String, cents: Int?) async throws {
+        try await PartyWriter(firestore: firestore).setCustomShare(partyId: partyId, memberId: memberId, cents: cents)
+    }
+
     func settleParty(id: String) async throws {
         try await PartyWriter(firestore: firestore).settleParty(id: id)
     }
@@ -298,13 +302,26 @@ private struct PartyWriter: @unchecked Sendable {
         }
     }
 
+    /// One field per write: `members.{uid}.customShareCents`, a number or `null`
+    /// to clear (docs/firestore-schema.md "Custom shares", step 3). Removing or
+    /// leaving deletes the whole member map, amount included.
+    func setCustomShare(partyId: String, memberId: String, cents: Int?) async throws {
+        try await updateOpenParty(id: partyId) { party in
+            guard party.isMember(memberId) else { return nil }
+            _ = try party.customShares(setting: cents, for: memberId)
+            let field = FieldPath([PartySchema.PartyField.members, memberId, PartySchema.MemberField.customShareCents])
+            guard let cents else { return [field: NSNull()] }
+            return [field: cents]
+        }
+    }
+
     /// Reads the party in a transaction and applies `makeUpdate` only while it is
-    /// open and unexpired. A transaction (not a blind update) because the member
+    /// open and unexpired. `makeUpdate` may refuse with a `PartyActionError`. A transaction (not a blind update) because the member
     /// list is rewritten whole: Firestore retries the block on top of any join or
     /// leave that commits first, so no two phones overwrite each other. A nil
     /// update means there is nothing to change.
     private func updateOpenParty(id: String,
-                                 _ makeUpdate: @escaping @Sendable (SplitParty) -> [AnyHashable: Any]?)
+                                 _ makeUpdate: @escaping @Sendable (SplitParty) throws -> [AnyHashable: Any]?)
         async throws {
         let partyReference = parties.document(id)
         try await withPartyTimeout {
@@ -314,10 +331,12 @@ private struct PartyWriter: @unchecked Sendable {
                     guard let party = Self.party(from: snapshot), party.isActive(at: Date()) else {
                         return PartyActionError.partyNoLongerOpen
                     }
-                    if let update = makeUpdate(party) {
+                    if let update = try makeUpdate(party) {
                         transaction.updateData(update, forDocument: partyReference)
                     }
                     return nil
+                } catch let refusal as PartyActionError {
+                    return refusal
                 } catch {
                     errorPointer?.pointee = error as NSError
                     return nil
@@ -367,6 +386,7 @@ private struct PartyWriter: @unchecked Sendable {
                     case .alreadyPaid: return nil
                     case .expired, .cancelled: return PartyActionError.partyNoLongerOpen
                     case .needsTotal, .needsFriends: return PartyActionError.notReadyToPay
+                    case .customSharesDontFit: return party.settleRefusalForCustomShares
                     case nil: break
                     }
                     // Every read before the first write (a Firestore transaction rule).

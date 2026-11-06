@@ -75,3 +75,19 @@ final class DocumentMappingTests: XCTestCase {
         XCTAssertEqual(user.avatarKey, "avatar_annie")
     }
 }
+
+/// The Me tab's "Custom shares" switch: off on a fresh install, remembered after.
+final class CustomSharesStoreTests: XCTestCase {
+    func testOffByDefaultAndRemembered() throws {
+        let suiteName = "CustomSharesStoreTests"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertFalse(CustomSharesStore(defaults: defaults).isEnabled)
+        CustomSharesStore(defaults: defaults).save(isEnabled: true)
+        XCTAssertTrue(CustomSharesStore(defaults: defaults).isEnabled, "A new store, as after a restart")
+        CustomSharesStore(defaults: defaults).save(isEnabled: false)
+        XCTAssertFalse(CustomSharesStore(defaults: defaults).isEnabled)
+    }
+}

@@ -158,7 +158,8 @@ final class FixtureDataSource: PaymentDataSource {
                          status: .paid, createdAt: party.createdAt, expiresAt: party.expiresAt,
                          memberIds: party.memberIds, wrongCodeAttempts: party.wrongCodeAttempts,
                          billCents: party.billCents, tip: settlement.tip, paidAt: now,
-                         paidMemberIds: Set(party.memberIds)))
+                         paidMemberIds: Set(party.memberIds),
+                         customShareCentsByMember: party.customShareCentsByMember))
     }
 
     private func adjustBalance(of userId: String, by cents: Int) {
@@ -290,7 +291,15 @@ extension FixtureDataSource {
     func removeMember(partyId: String, memberId: String) async throws {
         let party = try openFixtureParty(partyId)
         guard memberId != party.hostId, party.isMember(memberId) else { return }
-        replace(party, memberIds: party.memberIds.filter { $0 != memberId })
+        // Like deleting `members.{uid}` in Firestore: their custom amount goes too.
+        replace(party, memberIds: party.memberIds.filter { $0 != memberId },
+                customShareCentsByMember: party.customShareCentsByMember.filter { $0.key != memberId })
+    }
+
+    func setCustomShare(partyId: String, memberId: String, cents: Int?) async throws {
+        let party = try openFixtureParty(partyId)
+        guard party.isMember(memberId) else { return }
+        replace(party, customShareCentsByMember: try party.customShares(setting: cents, for: memberId))
     }
 
     func settleParty(id: String) async throws {
@@ -302,6 +311,7 @@ extension FixtureDataSource {
         case .alreadyPaid: return
         case .expired, .cancelled: throw PartyActionError.partyNoLongerOpen
         case .needsTotal, .needsFriends: throw PartyActionError.notReadyToPay
+        case .customSharesDontFit: throw party.settleRefusalForCustomShares
         case nil: break
         }
         guard let settlement = PartySettlement(party: party, merchantName: DemoMerchant.fallbackName) else {
@@ -324,11 +334,12 @@ extension FixtureDataSource {
     /// `ageSeconds` ago), as if read from the database.
     @discardableResult
     func addParty(hostId: String, memberIds: [String], createdAt: Date = .now, billCents: Int? = nil,
-                  tip: TipChoice? = nil) -> SplitParty {
+                  tip: TipChoice? = nil, customShareCentsByMember: [String: Int] = [:]) -> SplitParty {
         let party = SplitParty(id: "fixture_party_\(nextPartyNumber)", hostId: hostId, merchantId: DemoMerchant.id,
                                joinCode: Self.fixedJoinCode, status: .open, createdAt: createdAt,
                                expiresAt: createdAt.addingTimeInterval(TimeInterval(PartySchema.partyLifetimeSeconds)),
-                               memberIds: memberIds, wrongCodeAttempts: [:], billCents: billCents, tip: tip)
+                               memberIds: memberIds, wrongCodeAttempts: [:], billCents: billCents, tip: tip,
+                               customShareCentsByMember: customShareCentsByMember)
         nextPartyNumber += 1
         store(party)
         return party
@@ -348,13 +359,14 @@ extension FixtureDataSource {
     /// Stores a copy of `party` with the given fields changed; nil keeps a field.
     private func replace(_ party: SplitParty, status: PartyStatus? = nil, memberIds: [String]? = nil,
                          wrongCodeAttempts: [String: Int]? = nil, billCents: Int? = nil, tip: TipChoice? = nil,
-                         cancelledAt: Date? = nil) {
+                         cancelledAt: Date? = nil, customShareCentsByMember: [String: Int]? = nil) {
         store(SplitParty(id: party.id, hostId: party.hostId, merchantId: party.merchantId, joinCode: party.joinCode,
                          status: status ?? party.status, createdAt: party.createdAt, expiresAt: party.expiresAt,
                          memberIds: memberIds ?? party.memberIds,
                          wrongCodeAttempts: wrongCodeAttempts ?? party.wrongCodeAttempts,
                          billCents: billCents ?? party.billCents, tip: tip ?? party.tip,
-                         cancelledAt: cancelledAt ?? party.cancelledAt))
+                         cancelledAt: cancelledAt ?? party.cancelledAt,
+                         customShareCentsByMember: customShareCentsByMember ?? party.customShareCentsByMember))
     }
 
     private func store(_ party: SplitParty) {
