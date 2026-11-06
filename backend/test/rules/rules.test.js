@@ -162,6 +162,101 @@ test('nobody can join a cancelled party or be counted against it, and it cannot 
   await assertFails(setDoc(doc(db, 'parties/cancel-born'), liveParty(cancelBy('maxi'))));
 });
 
+// Custom shares (docs/firestore-schema.md "Custom shares"): members.{uid}.customShareCents,
+// set by the host's own write (only `members` changes) and only when it fits the total.
+const trioMembers = (over = {}) => ({
+  maxi: { joinedAt: created, paid: false, ...over.maxi },
+  annie: { joinedAt: created, paid: false, ...over.annie },
+  christophe: { joinedAt: created, paid: false, ...over.christophe },
+});
+const trioParty = (over = {}) => party({
+  billCents: 6000, tip: { type: 'custom', amountCents: 0 }, memberIds: ['maxi', 'annie', 'christophe'],
+  members: trioMembers(), ...over,
+});
+
+test('accepts a party without the field, with null for some members, and with amounts for everyone', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'parties/custom-shapes'), trioParty()));
+  const ref = doc(db, 'parties/custom-shapes');
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': null }));
+  await assertSucceeds(updateDoc(ref, { 'members.maxi.customShareCents': 1000 }));
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': 3500 }));
+  await assertSucceeds(updateDoc(ref, { 'members.christophe.customShareCents': 1500 }));
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': null }));
+});
+
+test('rejects a bad amount, an amount over the total, and any other new member key', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'parties/custom-bad'), trioParty()));
+  const ref = doc(db, 'parties/custom-bad');
+  await assertFails(updateDoc(ref, { 'members.annie.customShareCents': 12.5 }));
+  await assertFails(updateDoc(ref, { 'members.annie.customShareCents': -1 }));
+  await assertFails(updateDoc(ref, { 'members.annie.customShareCents': '3500' }));
+  await assertFails(updateDoc(ref, { 'members.annie.shareCents': 3500 }));
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': 3500 }));
+  // $35 + $35 > $60: refused, the party keeps the last valid state.
+  await assertFails(updateDoc(ref, { 'members.christophe.customShareCents': 3500 }));
+  // Everyone custom but not adding up to the total.
+  await assertFails(updateDoc(ref, { 'members.maxi.customShareCents': 1000, 'members.christophe.customShareCents': 1000 }));
+  // Percent tip: $50 + 20% = $60; $60.01 for one member is over.
+  await assertSucceeds(updateDoc(ref, { billCents: 5000, tip: { type: 'percent', percent: 20 } }));
+  await assertFails(updateDoc(ref, { 'members.christophe.customShareCents': 2501 }));
+  await assertSucceeds(updateDoc(ref, { 'members.christophe.customShareCents': 2500 }));
+  assert.equal((await getDoc(ref)).get('members.christophe.customShareCents'), 2500);
+});
+
+test('a non-host write shape cannot set a custom amount: not with a join, a leave, a bill or at creation', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'parties/custom-guard'),
+    trioParty({ memberIds: ['maxi', 'annie'], members: { maxi: { joinedAt: created, paid: false }, annie: { joinedAt: created, paid: false } } })));
+  const ref = doc(db, 'parties/custom-guard');
+  // A joinee arriving with their own amount.
+  await assertFails(updateDoc(ref, {
+    memberIds: ['maxi', 'annie', 'christophe'], 'members.christophe': { joinedAt: Timestamp.now(), paid: false, customShareCents: 0 },
+  }));
+  // A join that also changes someone else's amount.
+  await assertFails(updateDoc(ref, {
+    memberIds: ['maxi', 'annie', 'christophe'], 'members.christophe': { joinedAt: Timestamp.now(), paid: false },
+    'members.annie.customShareCents': 0,
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    memberIds: ['maxi', 'annie', 'christophe'], 'members.christophe': { joinedAt: Timestamp.now(), paid: false, customShareCents: null },
+  }));
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': 3500 }));
+  // A bill change or a leave that also touches an amount.
+  await assertFails(updateDoc(ref, { billCents: 7000, 'members.annie.customShareCents': 0 }));
+  await assertFails(updateDoc(ref, { memberIds: ['maxi', 'annie'], 'members.christophe': deleteField(), 'members.annie.customShareCents': 0 }));
+  await assertFails(setDoc(doc(db, 'parties/custom-born'), trioParty({ members: trioMembers({ annie: { customShareCents: 0 } }) })));
+});
+
+test('a leave takes the amount with it; a lowered bill may leave amounts over the total, which cannot be paid', async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'parties/custom-life'),
+    trioParty({ members: trioMembers({ maxi: { customShareCents: 1000 }, annie: { customShareCents: 3500 } }) })));
+  const ref = doc(db, 'parties/custom-life');
+  await assertSucceeds(updateDoc(ref, { memberIds: ['maxi', 'christophe'], 'members.annie': deleteField() }));
+  await assertSucceeds(updateDoc(ref, { memberIds: ['maxi', 'christophe', 'annie'], 'members.annie': { joinedAt: Timestamp.now(), paid: false } }));
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': 3500 }));
+  // The bill drops to $40: 10 + 35 > 40. Allowed (the host is told), but Pay is not.
+  await assertSucceeds(updateDoc(ref, { billCents: 4000 }));
+  const pay = { status: 'paid', paidAt: Timestamp.now(), 'members.maxi.paid': true, 'members.annie.paid': true, 'members.christophe.paid': true };
+  await assertFails(updateDoc(ref, pay));
+  await assertSucceeds(updateDoc(ref, { 'members.annie.customShareCents': null }));
+  await assertSucceeds(updateDoc(ref, pay));
+});
+
+test('a full 8-member party stays within the rules budget: join, custom amount, leave and Pay', async () => {
+  const ids = ['maxi', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6'];
+  const members = Object.fromEntries(ids.map((id, i) => [id, { joinedAt: created, paid: false, ...(i % 2 ? { customShareCents: 500 } : {}) }]));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'parties/custom-full'),
+    party({ billCents: 8000, tip: { type: 'percent', percent: 20 }, memberIds: ids, members })));
+  const ref = doc(db, 'parties/custom-full');
+  await assertSucceeds(updateDoc(ref, { memberIds: [...ids, 'u7'], 'members.u7': { joinedAt: Timestamp.now(), paid: false } }));
+  await assertSucceeds(updateDoc(ref, { 'members.u7.customShareCents': 1200 }));
+  await assertFails(updateDoc(ref, { 'members.u6.customShareCents': 9000 }));
+  const all = [...ids, 'u7'];
+  await assertSucceeds(updateDoc(ref, { memberIds: all.filter((id) => id !== 'u3'), 'members.u3': deleteField() }));
+  const pay = { status: 'paid', paidAt: Timestamp.now() };
+  for (const id of all) if (id !== 'u3') pay[`members.${id}.paid`] = true;
+  await assertSucceeds(updateDoc(ref, pay));
+});
+
 // joinCodes/{merchantId}_{e1}{e2}: the lock that keeps a code unique per merchant.
 function lock(code, over = {}) {
   return { merchantId: 'tonys-greenwich', joinCode: code, partyId: 'p1', expiresAt: expires, ...over };

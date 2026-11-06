@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.splitparty.android.R
+import com.splitparty.android.domain.split.CustomShareProblem
 import com.splitparty.android.format.Money
 import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.components.RollingAmount
@@ -75,6 +77,7 @@ fun TotalArea(state: PartyUiState, actions: TotalActions, modifier: Modifier = M
 
             else -> Waiting()
         }
+        SharesList(state, editable = state.canEditShares && !frozen, onEdit = actions::editShare)
         // The host's Pay, also shown (disabled) once the party expired; members never see it.
         state.pay?.let { pay ->
             val collect = total?.let { t -> t.shareCents?.let { t.totalCents - it } }
@@ -88,6 +91,124 @@ fun TotalArea(state: PartyUiState, actions: TotalActions, modifier: Modifier = M
         }
         if (controls) state.writeError?.let { WriteErrorLine(it) }
     }
+}
+
+/**
+ * Every member's share by the extended split rule, marked "Custom" or "Rest"
+ * ("Equal" while nobody has a custom amount, or before a total). [editable]:
+ * the host taps a row to set that member's amount.
+ */
+@Composable
+private fun SharesList(state: PartyUiState, editable: Boolean, onEdit: (String) -> Unit) {
+    val anyCustom = state.shares.any { it.isCustom }
+    // Listed on every phone once the host set a custom amount (whatever this phone's switch),
+    // and on the host's phone while its "Custom shares" switch is on, so amounts can be set.
+    if (state.shares.isEmpty() || !(editable || anyCustom)) return
+    val enabled = !state.saving
+    Column(Modifier.fillMaxWidth().testTag(PartyTestTags.SHARES), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(stringResource(R.string.shares_title), style = Type.Amount, color = Brand.Ink)
+        if (editable) {
+            Text(stringResource(R.string.shares_edit_hint), style = Type.Body, color = Brand.InkSecondary)
+        }
+        state.shares.forEach { share ->
+            ShareRow(share, hasTotal = state.total != null, anyCustom = anyCustom, editable = editable, enabled = enabled, onEdit = onEdit)
+        }
+        state.sharesProblem?.let { SharesProblemLine(it, isHost = state.isHost) }
+    }
+}
+
+@Composable
+private fun ShareRow(
+    share: MemberShareUi,
+    hasTotal: Boolean,
+    anyCustom: Boolean,
+    editable: Boolean,
+    enabled: Boolean,
+    onEdit: (String) -> Unit
+) {
+    val name = if (share.isMe) stringResource(R.string.shares_you, share.firstName) else share.firstName
+    val marker = shareMarker(share, hasTotal, anyCustom)
+    val amount = share.shareCents ?: share.customCents
+    val spoken = shareDescription(share, name, hasTotal)
+    val editLabel = stringResource(R.string.shares_edit_action, share.firstName)
+    val rowModifier = if (editable) {
+        Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            enabled = enabled,
+            role = Role.Button,
+            onClickLabel = editLabel,
+            onClick = { onEdit(share.userId) }
+        )
+    } else {
+        Modifier
+    }
+    Row(
+        // Tag and tap action stay on the row; its texts read as the one [spoken] label.
+        modifier = Modifier
+            .testTag(PartyTestTags.share(share.userId))
+            .fillMaxWidth()
+            .then(rowModifier)
+            .padding(vertical = 8.dp)
+            .clearAndSetSemantics { contentDescription = spoken },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(name, style = Type.Subtitle, color = Brand.Ink, modifier = Modifier.weight(1f), maxLines = 1)
+        Box(
+            Modifier.background(
+                if (share.isCustom) Brand.Highlight else Brand.Chip,
+                CircleShape
+            ).padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(marker, style = Type.Body, color = if (share.isCustom) Brand.Blue else Brand.InkSecondary)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            amount?.let { Money.format(it) } ?: stringResource(R.string.shares_pending),
+            style = Type.Amount,
+            color = if (editable) Brand.Blue else Brand.Ink
+        )
+    }
+}
+
+@Composable
+private fun shareMarker(share: MemberShareUi, hasTotal: Boolean, anyCustom: Boolean): String = when {
+    share.isCustom -> stringResource(R.string.shares_custom)
+    anyCustom && hasTotal -> stringResource(R.string.shares_remainder)
+    else -> stringResource(R.string.shares_equal)
+}
+
+/** TalkBack: the member's name, whether they are on a custom or remainder share, and the amount. */
+@Composable
+private fun shareDescription(share: MemberShareUi, name: String, hasTotal: Boolean): String {
+    val custom = share.customCents
+    val amount = share.shareCents
+    return when {
+        custom != null && hasTotal -> stringResource(R.string.shares_custom_description, name, Money.spoken(custom))
+        custom != null -> stringResource(R.string.shares_custom_no_total_description, name, Money.spoken(custom))
+        !hasTotal -> stringResource(R.string.shares_equal_description, name)
+        amount == null -> stringResource(R.string.shares_remainder_pending_description, name)
+        else -> stringResource(R.string.shares_remainder_description, name, Money.spoken(amount))
+    }
+}
+
+/** Shown on every phone while the custom amounts do not fit; the host gets what to do about it. */
+@Composable
+private fun SharesProblemLine(problem: SharesProblemUi, isHost: Boolean) {
+    val text = when {
+        !isHost -> stringResource(R.string.shares_problem_member)
+
+        problem.problem == CustomShareProblem.OverTotal ->
+            stringResource(R.string.shares_over_total_host, Money.format(problem.customCents), Money.format(problem.totalCents))
+
+        else -> stringResource(R.string.shares_unassigned_host, Money.format(problem.customCents), Money.format(problem.totalCents))
+    }
+    Text(
+        text,
+        style = Type.Body,
+        color = if (isHost) Brand.Error else Brand.InkSecondary,
+        modifier = Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite }.testTag(PartyTestTags.SHARES_PROBLEM)
+    )
 }
 
 @Composable
@@ -155,7 +276,16 @@ private fun ShareFigures(total: TotalUi, modifier: Modifier = Modifier) = CardSt
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        if (share != null) {
+        if (share == null && total.sharePending) {
+            Text(stringResource(R.string.total_your_share), style = Type.Body, color = Brand.InkSecondary)
+            Text(
+                stringResource(R.string.total_share_pending),
+                style = Type.Body,
+                color = Brand.InkSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+            )
+        } else if (share != null) {
             val spoken = stringResource(R.string.total_your_share_description, Money.spoken(share))
             Text(stringResource(R.string.total_your_share), style = Type.Body, color = Brand.InkSecondary)
             RollingAmount(
@@ -305,10 +435,7 @@ private fun ChangeTotal(enabled: Boolean, actions: TotalActions) {
 
 @Composable
 private fun WriteErrorLine(error: WriteError) {
-    val text = when (error) {
-        WriteError.Failed -> stringResource(R.string.write_failed)
-        WriteError.NotAllowed -> stringResource(R.string.write_not_allowed)
-    }
+    val text = writeErrorText(error)
     Row(
         Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
             liveRegion = LiveRegionMode.Polite

@@ -120,6 +120,16 @@ fun MeScreen(
             )
             Spacer(Modifier.height(extra))
         }
+        item(key = "custom-shares") {
+            SwitchCard(
+                title = stringResource(R.string.custom_shares_switch),
+                hint = stringResource(R.string.custom_shares_switch_hint),
+                on = state.customShares ?: false,
+                onChange = { onAction(MeAction.SetCustomShares(it)) },
+                modifier = Modifier.testTag(MeTestTags.CUSTOM_SHARES_SWITCH)
+            )
+            Spacer(Modifier.height(extra))
+        }
         val profile = state.profile
         if (profile is LiveState.Ready && profile.value == null) {
             item(key = "account-missing") {
@@ -166,6 +176,7 @@ fun MeScreen(
 object MeTestTags {
     const val LIST = "me_list"
     const val DEMO_SWITCH = "me_demo_switch"
+    const val CUSTOM_SHARES_SWITCH = "me_custom_shares_switch"
     const val BALANCE = "me_balance"
     const val DEMO_RESET = "me_demo_reset"
     const val DEMO_RESET_ERROR = "me_demo_reset_error"
@@ -177,7 +188,20 @@ object MeTestTags {
  * the phone were at the venue. A white card row with an iOS-style switch.
  */
 @Composable
-private fun DemoSwitchCard(on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+private fun DemoSwitchCard(on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) = SwitchCard(
+    title = stringResource(R.string.demo_at_merchant),
+    hint = stringResource(R.string.demo_at_merchant_hint),
+    on = on,
+    onChange = onChange,
+    modifier = modifier.testTag(MeTestTags.DEMO_SWITCH)
+)
+
+/**
+ * A white card row with an iOS-style switch, kept on this phone. TalkBack reads
+ * the title and hint as one switch with its on/off state.
+ */
+@Composable
+private fun SwitchCard(title: String, hint: String, on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .padding(horizontal = Dimens.Gutter)
@@ -190,13 +214,12 @@ private fun DemoSwitchCard(on: Boolean, onChange: (Boolean) -> Unit, modifier: M
                 role = Role.Switch,
                 onValueChange = onChange
             )
-            .padding(horizontal = Dimens.CardPadding, vertical = 16.dp)
-            .testTag(MeTestTags.DEMO_SWITCH),
+            .padding(horizontal = Dimens.CardPadding, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.demo_at_merchant), style = Type.Amount, color = Brand.Ink)
-            Text(stringResource(R.string.demo_at_merchant_hint), style = Type.Body, color = Brand.InkSecondary)
+            Text(title, style = Type.Amount, color = Brand.Ink)
+            Text(hint, style = Type.Body, color = Brand.InkSecondary)
         }
         Spacer(Modifier.width(12.dp))
         IosSwitch(on = on)

@@ -10,6 +10,9 @@ interface TotalActions {
 
     fun customTip()
 
+    /** Host with "Custom shares" on: open the keypad for [userId]'s amount. */
+    fun editShare(userId: String) = Unit
+
     /** Host: remove a member (already confirmed). */
     fun removeMember(userId: String) = Unit
 

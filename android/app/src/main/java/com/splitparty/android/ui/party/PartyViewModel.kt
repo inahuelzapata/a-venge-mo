@@ -19,6 +19,7 @@ import com.splitparty.android.domain.repository.ConnectivityObserver
 import com.splitparty.android.domain.repository.LastPartyRepository
 import com.splitparty.android.domain.repository.PartyRepository
 import com.splitparty.android.domain.repository.PartyWriteResult
+import com.splitparty.android.domain.split.CustomShareProblem
 import com.splitparty.android.domain.split.Tip
 import com.splitparty.android.domain.usecase.ObserveUsersUseCase
 import kotlinx.collections.immutable.ImmutableList
@@ -81,12 +82,42 @@ data class TotalUi(
     val tipCents: Long,
     val totalCents: Long,
     val headcount: Int,
-    /** This phone's member's share; null if they are no longer in the party. */
-    val shareCents: Long?
+    /**
+     * This phone's member's share; null if they are no longer in the party, or
+     * while the custom amounts do not fit and this member is on the remainder ([sharePending]).
+     */
+    val shareCents: Long?,
+    /** The custom amounts do not fit the total, so remainder shares are not known. */
+    val sharePending: Boolean = false
 )
 
-/** The host's Pay button: enabled only when [Ready], otherwise disabled with the reason as its label. */
-enum class PayState { Ready, NeedsTotal, NeedsMembers, Expired, Cancelled }
+/**
+ * One member's line in the shares list (docs/firestore-schema.md "Custom shares"),
+ * the same on every phone whatever its switch. [shareCents]: what they pay; null
+ * before a total exists (custom members then show [customCents]) or for remainder
+ * members while the custom amounts do not fit.
+ */
+@Immutable
+data class MemberShareUi(
+    val userId: String,
+    val firstName: String,
+    val isHost: Boolean,
+    val isMe: Boolean,
+    val customCents: Long?,
+    val shareCents: Long?
+) {
+    val isCustom: Boolean get() = customCents != null
+}
+
+/** The custom amounts against the total, when they do not fit (every phone shows why). */
+@Immutable
+data class SharesProblemUi(val problem: CustomShareProblem, val customCents: Long, val totalCents: Long)
+
+/**
+ * The host's Pay button: enabled only when [Ready], otherwise disabled with the reason as its label.
+ * [SharesDontFit]: the custom amounts do not fit the total (docs/firestore-schema.md "Custom shares").
+ */
+enum class PayState { Ready, NeedsTotal, NeedsMembers, SharesDontFit, Expired, Cancelled }
 
 /**
  * A settled party. [amountCents]: collected (host) or paid (member); null when
@@ -96,8 +127,12 @@ enum class PayState { Ready, NeedsTotal, NeedsMembers, Expired, Cancelled }
 @Immutable
 data class SettlementUi(val isHost: Boolean, val amountCents: Long?, val animate: Boolean)
 
-/** Why a bill, tip, removal or leave write did not happen; shown inline. */
-enum class WriteError { NotAllowed, Failed }
+/**
+ * Why a bill, tip, custom amount, removal or leave write did not happen; shown inline.
+ * [SharesOverTotal] / [SharesUnassigned]: the custom amount was refused because the amounts
+ * would add up to more than the total / everyone would have one without reaching it.
+ */
+enum class WriteError { NotAllowed, Failed, SharesOverTotal, SharesUnassigned }
 
 @Immutable
 data class PartyUiState(
@@ -125,7 +160,13 @@ data class PartyUiState(
     /** Host only, while the party is open: the Cancel party control is shown. */
     val canCancel: Boolean = false,
     /** The host's cancel write is running. */
-    val cancelling: Boolean = false
+    val cancelling: Boolean = false,
+    /** Every member's share, host first. Listed on screen once anyone has a custom amount, or while [canEditShares]. */
+    val shares: ImmutableList<MemberShareUi> = persistentListOf(),
+    /** Host, open party, this phone's "Custom shares" switch on: tapping a share edits it. */
+    val canEditShares: Boolean = false,
+    /** Set while the custom amounts do not fit the total. */
+    val sharesProblem: SharesProblemUi? = null
 )
 
 sealed interface PartyEvent {
@@ -168,7 +209,9 @@ class PartyViewModel(
     connectivity: ConnectivityObserver,
     private val clock: Clock,
     private val analytics: Analytics = Analytics.None,
-    private val lastParty: LastPartyRepository = LastPartyRepository.None
+    private val lastParty: LastPartyRepository = LastPartyRepository.None,
+    /** This phone's "Custom shares" switch (Me tab): only shows or hides the host's controls. */
+    customSharesSwitch: Flow<Boolean> = flowOf(false)
 ) : ViewModel() {
     private val _events = Channel<PartyEvent>(Channel.BUFFERED)
     val events: Flow<PartyEvent> = _events.receiveAsFlow()
@@ -198,12 +241,16 @@ class PartyViewModel(
 
     private val users = observeUsers().onStart { emit(emptyMap()) }
 
-    val state: StateFlow<PartyUiState> = combine(lastData, now, users, connectivity.isOnline, writeState) {
+    private val local = combine(writeState, customSharesSwitch.onStart { emit(false) }.distinctUntilChanged()) { write, switchOn ->
+        write to switchOn
+    }
+
+    val state: StateFlow<PartyUiState> = combine(lastData, now, users, connectivity.isOnline, local) {
             event,
             now,
             users,
             online,
-            write
+            (write, switchOn)
         ->
         val party = event.value
         if (party == null) {
@@ -229,7 +276,10 @@ class PartyViewModel(
                 paying = write.paying,
                 settlement = party.toSettlementUi(),
                 canCancel = party.canCancel(userId, now),
-                cancelling = write.cancelling
+                cancelling = write.cancelling,
+                shares = party.toSharesUi(users).toImmutableList(),
+                canEditShares = switchOn && party.hostId == userId && party.isActiveAt(now),
+                sharesProblem = party.toSharesProblemUi()
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PartyUiState())
@@ -250,6 +300,25 @@ class PartyViewModel(
             return
         }
         hostWrite { parties.setTip(partyId, userId, tip) }
+    }
+
+    /**
+     * Host: set [memberId]'s custom amount, or null to put them back on the equal split.
+     * Amounts that would not fit the total are refused here with the reason, and the
+     * party keeps its last valid state; the repository re-checks inside its transaction.
+     */
+    fun setCustomShare(memberId: String, cents: Long?) {
+        val party = latestParty?.takeIf { canWrite() && it.hostId == userId } ?: return
+        when {
+            // Already that amount: nothing to write, but the keypad still closes.
+            party.customShareOf(memberId) == cents -> _events.trySend(PartyEvent.Saved)
+
+            else -> when (party.customShareProblemWith(memberId, cents)) {
+                CustomShareProblem.OverTotal -> writeState.value = WriteState(error = WriteError.SharesOverTotal)
+                CustomShareProblem.Unassigned -> writeState.value = WriteState(error = WriteError.SharesUnassigned)
+                null -> hostWrite { parties.setCustomShare(partyId, userId, memberId, cents) }
+            }
+        }
     }
 
     /** Host: remove a non-host member (after the confirmation). */
@@ -351,15 +420,37 @@ class PartyViewModel(
         return if (bill == null || split == null) {
             null
         } else {
+            val pending = !split.fits && customShareOf(userId) == null
             TotalUi(
                 billCents = bill,
                 tip = TipChoice.of(tip),
                 tipCents = split.tipCents,
                 totalCents = split.totalCents,
                 headcount = split.headcount,
-                shareCents = shareOf(userId)
+                shareCents = shareOf(userId).takeUnless { pending },
+                sharePending = pending && hasMember(userId)
             )
         }
+    }
+
+    /** Everyone's share by the extended split rule (the screen decides when to list them). */
+    private fun Party.toSharesUi(users: Map<String, User>): List<MemberShareUi> {
+        val split = split
+        return members.mapIndexed { i, member ->
+            MemberShareUi(
+                userId = member.userId,
+                firstName = firstName(member.userId, users[member.userId]),
+                isHost = member.userId == hostId,
+                isMe = member.userId == userId,
+                customCents = member.customShareCents,
+                shareCents = split?.takeIf { it.fits || member.customShareCents != null }?.shares?.getOrNull(i)
+            )
+        }
+    }
+
+    private fun Party.toSharesProblemUi(): SharesProblemUi? {
+        val split = split ?: return null
+        return split.problem?.let { SharesProblemUi(it, split.customCents, split.totalCents) }
     }
 
     private data class WriteState(
@@ -378,6 +469,7 @@ class PartyViewModel(
             PayBlocker.Cancelled -> PayState.Cancelled
             PayBlocker.NoTotal -> PayState.NeedsTotal
             PayBlocker.NoMembers -> PayState.NeedsMembers
+            PayBlocker.CustomSharesDontFit -> PayState.SharesDontFit
         }
     }
 

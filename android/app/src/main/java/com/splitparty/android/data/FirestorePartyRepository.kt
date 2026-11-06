@@ -135,6 +135,20 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
         if (party.billCents == null) null else mapOf(FieldPath.of("tip") to tip.toFirestore())
     }
 
+    override suspend fun setCustomShare(partyId: String, hostId: String, memberId: String, cents: Long?): PartyWriteResult =
+        hostWrite(partyId, hostId) { party ->
+            when {
+                !party.hasMember(memberId) || (cents != null && cents < 0) -> null
+
+                party.customShareOf(memberId) == cents -> emptyMap()
+
+                party.customShareProblemWith(memberId, cents) != null -> null
+
+                // Only this one field: the rules' "host custom-amount write" shape.
+                else -> mapOf(FieldPath.of("members", memberId, "customShareCents") to cents)
+            }
+        }
+
     override suspend fun removeMember(partyId: String, hostId: String, memberId: String): PartyWriteResult =
         hostWrite(partyId, hostId) { party ->
             if (memberId == party.hostId) null else memberRemoval(party, memberId)
@@ -145,7 +159,7 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
     }
 
     /** Both member fields in one update, so the rules' memberIds == members keys always holds. */
-    private fun memberRemoval(party: Party, userId: String): Map<FieldPath, Any>? = if (!party.hasMember(userId)) {
+    private fun memberRemoval(party: Party, userId: String): Map<FieldPath, Any?>? = if (!party.hasMember(userId)) {
         emptyMap()
     } else {
         mapOf(
@@ -154,7 +168,7 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
         )
     }
 
-    private suspend fun hostWrite(partyId: String, hostId: String, fields: (Party) -> Map<FieldPath, Any>?): PartyWriteResult =
+    private suspend fun hostWrite(partyId: String, hostId: String, fields: (Party) -> Map<FieldPath, Any?>?): PartyWriteResult =
         partyWrite(partyId) { party -> if (party.hostId != hostId) null else fields(party) }
 
     /**
@@ -164,7 +178,7 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
      * it (or vice versa), so neither is lost. Null from [fields] = not allowed;
      * empty = already in that state.
      */
-    private suspend fun partyWrite(partyId: String, fields: (Party) -> Map<FieldPath, Any>?): PartyWriteResult = attempt {
+    private suspend fun partyWrite(partyId: String, fields: (Party) -> Map<FieldPath, Any?>?): PartyWriteResult = attempt {
         val ref = parties.document(partyId)
         db.runTransaction { tx ->
             val party = tx.get(ref).toParty()
@@ -221,7 +235,11 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
         }.await()
     }
 
-    /** The shares, balances and party update of docs/firestore-schema.md "Paying a party". */
+    /**
+     * The shares, balances and party update of docs/firestore-schema.md "Paying a party". The
+     * shares include the host's custom amounts (the caller already refused amounts that do not
+     * fit, via payBlockerAt); a $0 share is skipped and the host is credited what was collected.
+     */
     private fun writeSettlement(tx: Transaction, party: Party, merchantName: String) {
         val shares = checkNotNull(party.split).shares
         val memo = PartySettlement.memo(merchantName)

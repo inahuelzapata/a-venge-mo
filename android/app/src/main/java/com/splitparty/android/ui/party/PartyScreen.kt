@@ -115,8 +115,9 @@ fun PartyRoute(
             }
         }
     }
-    // Entry screens exist only while the party is open and this phone hosts it.
-    val current = step?.takeIf { state.phase == PartyPhase.Open && state.isHost }
+    // Entry screens exist only while the party is open and this phone hosts it; a share's
+    // keypad also only while this phone's "Custom shares" switch is on.
+    val current = step?.takeIf { state.phase == PartyPhase.Open && state.isHost && (it !is TotalStep.EnterShare || state.canEditShares) }
     val actions = remember(viewModel) {
         object : TotalActions {
             override fun scan() = open(TotalStep.Scan)
@@ -126,6 +127,9 @@ fun PartyRoute(
             override fun selectTip(choice: TipChoice) = viewModel.selectTip(choice)
 
             override fun customTip() = open(TotalStep.EnterTip((viewModel.state.value.total?.tip as? TipChoice.Custom)?.amountCents))
+
+            override fun editShare(userId: String) =
+                open(TotalStep.EnterShare(userId, viewModel.state.value.shares.firstOrNull { it.userId == userId }?.customCents))
 
             override fun removeMember(userId: String) = viewModel.removeMember(userId)
 
@@ -163,6 +167,7 @@ fun PartyRoute(
                 },
                 onConfirmBill = viewModel::confirmBill,
                 onConfirmTip = { viewModel.selectTip(TipChoice.Custom(it)) },
+                onConfirmShare = viewModel::setCustomShare,
                 scanScreen = { close -> ReceiptScanRoute(onBack = close, onResult = { step = it }) }
             )
         }

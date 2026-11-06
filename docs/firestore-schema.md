@@ -107,13 +107,15 @@ One document per Split Party. The id is a Firestore auto id.
 | `members`           | map\<userId, map\>            | Per-member state, keyed by user id. |
 | `members.{uid}.joinedAt` | Timestamp                | When this member joined (for the host: same as `createdAt`). |
 | `members.{uid}.paid`     | bool                     | `false` on join. Set to `true` for every member in the Pay transaction. |
+| `members.{uid}.customShareCents` | int \| null (optional) | The host's custom amount for this member, in cents, `>= 0`. Absent or `null` = the member is on the equal split of what is left. **Written only by the host** (see *Custom shares*); a member never arrives with one, and leaving or being removed takes it away with the member entry. |
 | `cancelledAt`       | Timestamp (only when cancelled) | When the host cancelled. Present **only** on a `cancelled` party, written as `serverTimestamp()`. |
 | `cancelledBy`       | string (only when cancelled)  | `users` id of who cancelled. Present **only** on a `cancelled` party and always equal to `hostId`. |
 | `wrongCodeAttempts` | map\<userId, int\>            | Wrong join-code attempts per user against this party. Missing key means 0. A user with a value `>= 3` is **locked out**: the app must refuse further attempts and never add them to `members`. |
 
 **Not stored (derived on each phone):** total, tip in cents for percent tips,
-headcount and each member's share. Compute them with the split rule below.
-Never write a `shareCents` or `totalCents` field.
+headcount and each member's share. Compute them with the split rule below
+(which honours `customShareCents`). Never write a `shareCents` or `totalCents`
+field.
 
 ### Emoji palette
 
@@ -217,7 +219,7 @@ With `paidAt`, `cancelledAt` and the `expired` status on the documents, the
 PRD's "cancelled vs settled vs timed out" metric can also be computed from
 `parties` directly.
 
-### Split rule (equal split, integer cents)
+### Split rule (integer cents)
 
 All arithmetic is integer arithmetic. No floats anywhere.
 
@@ -233,8 +235,9 @@ share(joinee)  = base
 ```
 
 So the shares always sum exactly to `totalCents`, and any leftover cents go to
-the host. The reference implementation is `backend/lib/split.js` (covered by
-`npm test`).
+the host. That is the whole rule while no member has a `customShareCents`; with
+custom amounts it extends as in *Custom shares* below. The reference
+implementation is `backend/lib/split.js` (covered by `npm test`).
 
 **Worked example.** 3 people (host Maxi, Annie, Christophe), bill `$100.00`
 (`billCents = 10000`), tip 18 % (`tip = {type: "percent", percent: 18}`):
@@ -250,14 +253,86 @@ the host. The reference implementation is `backend/lib/split.js` (covered by
 | Christophe  | **3933** ($39.33) |
 | Sum         | 3934 + 3933 + 3933 = **11800** = totalCents ✓ |
 
+### Custom shares (host only)
+
+The host can give any member, themselves included, a fixed amount instead of an
+equal share (e.g. "Maxi pays $10, Annie $35, Christophe the rest"). Each phone
+shows the custom controls only when its own "Custom shares" switch (Me tab,
+local to the phone, off by default) is on; the switch never changes what a
+party is worth: every phone, switch on or off, computes the shares from the
+party document with the extended rule below.
+
+**Extended split rule** (identical in `backend/lib/split.js`, Android and iOS):
+
+```
+custom     = members with customShareCents != null       // pay exactly that
+equal      = the other members, in memberIds order        // split what is left
+remainder  = totalCents - sum(customShareCents)
+base       = floor(remainder / equal.length)
+leftover   = remainder - base * equal.length              // 0 <= leftover < equal.length
+share(m in custom) = m.customShareCents
+share(equal[0])    = base + leftover   // the host if the host is on the equal split,
+                                       // otherwise the first joinee (join order) on it
+share(equal[i>0])  = base
+```
+
+Shares still always sum exactly to `totalCents`. With no custom amounts this is
+the equal split above, unchanged.
+
+**Validity.** A custom amount is an integer number of cents `>= 0` (`0` means
+the member pays nothing and gets no transaction). The sum of the custom amounts
+may never exceed `totalCents`, and when every member has one they must sum to
+`totalCents` exactly. Before the host sets a bill there is no total yet, so any
+valid amounts can be set; they are checked as soon as a total exists. A bill or
+tip change may leave the amounts over the new total: the party stays as it is,
+every phone keeps showing it, the host's phone says the amounts no longer fit
+and Collect stays disabled until the host changes or clears them. An invalid
+combination can never be saved by the host's custom-amount write nor settled.
+
+**Worked example.** Host Maxi, Annie, Christophe; bill `$60.00`, tip 0 %
+(`totalCents = 6000`). The host sets Maxi `1000` and Annie `3500`:
+
+| Step              | Value |
+| ----------------- | ----- |
+| custom            | Maxi 1000, Annie 3500 (sum 4500 <= 6000 ✓) |
+| equal             | Christophe |
+| remainder         | 6000 − 4500 = **1500** |
+| base / leftover   | floor(1500 / 1) = 1500 / 0 |
+| Maxi (custom)     | **1000** ($10.00) |
+| Annie (custom)    | **3500** ($35.00) |
+| Christophe (rest) | **1500** ($15.00) |
+| Sum               | 1000 + 3500 + 1500 = **6000** = totalCents ✓ |
+
+Setting Christophe to `3500` as well would make the sum 8000 > 6000: refused.
+Clearing Annie (`null`) gives Maxi 1000 and the remaining 5000 split equally:
+Annie 2500, Christophe 2500.
+
+**Writing an amount.** One Firestore transaction per set or clear, run by the
+host's app, like the bill and tip writes:
+
+1. Read the party. It must be `open` with `now < expiresAt`, the caller must
+   be `hostId` and the member must still be in `members`.
+2. With the new amount in place, the amounts must be valid for the current
+   total (if a bill exists). Otherwise write nothing and tell the host.
+3. Update exactly `members.{uid}.customShareCents` (a number, or `null` to
+   clear back to the equal split). Nothing else changes.
+
+**Rules.** Without Firebase Auth the rules recognise the host's write by its
+shape: an update that changes only `members`, keeps `memberIds`, changes each
+entry in nothing but `customShareCents`, and leaves valid amounts that fit the
+total. Any other write that touches `members` (join, leave, removal) must leave
+every remaining member's entry as it was, and a joining member arrives without
+an amount. Pay must leave amounts that fit. A party is created with no amounts.
+
 ### Paying a party (host taps Pay)
 
 One Firestore transaction, run by the host's app:
 
 1. Read the party. It must be `open` with `now < expiresAt`, and `billCents`
    and `tip` must be set.
-2. Compute the shares with the split rule.
-3. For each joinee `j` (every member except the host), create
+2. Compute the shares with the split rule (custom amounts included). If the
+   custom amounts do not fit the total, write nothing (Collect is disabled).
+3. For each joinee `j` (every member except the host) whose share is `> 0`, create
    `transactions/{partyId}_{j}` with `payerId = j`, `payeeId = hostId`,
    `amountCents = share(j)`, `memo = "{merchant.name} Split Party"`,
    `merchantId`, `merchantName`, `partyId`, `source = "party"`. The
@@ -268,7 +343,9 @@ One Firestore transaction, run by the host's app:
 6. Delete `joinCodes/{merchantId}_{code}`.
 
 The host pays the merchant the full total outside the app (mock). Only the
-joinee → host repayments are recorded.
+joinee → host repayments are recorded. A joinee whose share is `0` (for
+example a custom `$0.00`) gets no transaction and no balance move; the host is
+credited the sum of the joinees' shares.
 
 ---
 
@@ -337,7 +414,12 @@ party document is **invalid** (rejected) if, among other things:
   the presets;
 - `expiresAt != createdAt + 5 minutes`;
 - `memberIds` does not start with `hostId`, or its entries differ from the
-  `members` keys.
+  `members` keys;
+- a `members.{uid}` entry has a key other than `joinedAt`, `paid` and
+  `customShareCents`, or a `customShareCents` that is neither `null` nor an
+  integer `>= 0`;
+- it is `paid` with custom amounts that do not fit its total (see *Custom
+  shares*; an `open` party may hold amounts over a lowered total).
 
 The PoC uses username-only login without Firebase Auth, so the rules validate
 **shape**, not identity. The seed/reset scripts use the Admin SDK, which

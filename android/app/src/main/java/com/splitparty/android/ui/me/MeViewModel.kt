@@ -42,6 +42,8 @@ data class MeUiState(
     val users: ImmutableMap<String, User> = persistentMapOf(),
     /** "Demo mode: at Tony's"; null until the stored value is read. */
     val demoAtMerchant: Boolean? = null,
+    /** "Custom shares" (host's uneven amounts controls on this phone); null until read. */
+    val customShares: Boolean? = null,
     val reset: DemoResetUi = DemoResetUi.Idle
 )
 
@@ -62,6 +64,8 @@ sealed interface MeAction {
     data object LogOut : MeAction
 
     data class SetDemoAtMerchant(val on: Boolean) : MeAction
+
+    data class SetCustomShares(val on: Boolean) : MeAction
 
     /** Already confirmed: call `resetDemo`. */
     data object ResetDemo : MeAction
@@ -86,9 +90,12 @@ class MeViewModel(
         observeUser(userId),
         observeUserTransactions(userId).map { state -> state.map { it.toImmutableList() } },
         observeUsers().map { it.toImmutableMap() }.onStart { emit(persistentMapOf()) },
-        demoSettings.atMerchant.map<Boolean, Boolean?> { it }.onStart { emit(null) },
+        combine(
+            demoSettings.atMerchant.map<Boolean, Boolean?> { it }.onStart { emit(null) },
+            demoSettings.customShares.map<Boolean, Boolean?> { it }.onStart { emit(null) }
+        ) { atMerchant, customShares -> atMerchant to customShares },
         resetState
-    ) { profile, transactions, users, demoAtMerchant, reset ->
+    ) { profile, transactions, users, (demoAtMerchant, customShares), reset ->
         val user = (profile as? LiveState.Ready)?.value ?: users[userId]
         MeUiState(
             userId = userId,
@@ -98,6 +105,7 @@ class MeViewModel(
             transactions = transactions,
             users = users,
             demoAtMerchant = demoAtMerchant,
+            customShares = customShares,
             reset = reset
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initial)
@@ -112,6 +120,8 @@ class MeViewModel(
                 if (!action.on) merchantEntrance.replay()
                 viewModelScope.launch { demoSettings.setAtMerchant(action.on) }
             }
+
+            is MeAction.SetCustomShares -> viewModelScope.launch { demoSettings.setCustomShares(action.on) }
 
             MeAction.ResetDemo -> resetDemo()
         }

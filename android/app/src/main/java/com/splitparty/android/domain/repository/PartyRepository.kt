@@ -76,6 +76,14 @@ interface PartyRepository {
     /** Host only: drops [memberId] (never the host) from `memberIds` and `members` in one write. */
     suspend fun removeMember(partyId: String, hostId: String, memberId: String): PartyWriteResult
 
+    /**
+     * Host only (docs/firestore-schema.md "Custom shares"): `members.{memberId}.customShareCents`
+     * = [cents], or null to put the member back on the equal split. One transaction that re-reads
+     * the party and refuses ([PartyWriteResult.NotAllowed], nothing written) after expiry, for a
+     * member no longer in the party, or when the amounts would not fit the current total.
+     */
+    suspend fun setCustomShare(partyId: String, hostId: String, memberId: String, cents: Long?): PartyWriteResult
+
     /** A non-host member leaves: drops [userId] from `memberIds` and `members`; wrong attempts untouched. */
     suspend fun leave(partyId: String, userId: String): PartyWriteResult
 

@@ -71,11 +71,17 @@ class FakeSessionRepository(initial: String? = null) : SessionRepository {
     }
 }
 
-class FakeDemoSettingsRepository(initial: Boolean = true) : DemoSettingsRepository {
+class FakeDemoSettingsRepository(initial: Boolean = true, customSharesOn: Boolean = false) : DemoSettingsRepository {
     override val atMerchant = MutableStateFlow(initial)
 
     override suspend fun setAtMerchant(on: Boolean) {
         atMerchant.value = on
+    }
+
+    override val customShares = MutableStateFlow(customSharesOn)
+
+    override suspend fun setCustomShares(on: Boolean) {
+        customShares.value = on
     }
 }
 
@@ -136,6 +142,18 @@ class FakePartyRepository : PartyRepository {
 
     override suspend fun removeMember(partyId: String, hostId: String, memberId: String) =
         write(partyId, "remove:$memberId") { p -> p.copy(members = p.members.filterNot { it.userId == memberId }) }
+
+    /** Like the real write: refused (nothing written) when the amounts would not fit the total. */
+    override suspend fun setCustomShare(partyId: String, hostId: String, memberId: String, cents: Long?): PartyWriteResult {
+        val party = (parties[partyId]?.value as? LiveEvent.Data)?.value
+        if (party != null && party.customShareProblemWith(memberId, cents) != null) {
+            writes += "custom:$memberId:$cents:refused"
+            return PartyWriteResult.NotAllowed
+        }
+        return write(partyId, "custom:$memberId:$cents") { p ->
+            p.copy(members = p.members.map { if (it.userId == memberId) it.copy(customShareCents = cents) else it })
+        }
+    }
 
     override suspend fun leave(partyId: String, userId: String) =
         write(partyId, "leave:$userId") { p -> p.copy(members = p.members.filterNot { it.userId == userId }) }

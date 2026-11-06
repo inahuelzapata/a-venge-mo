@@ -43,6 +43,32 @@ for (const [name, over] of [
   test(`invalid: ${name}`, () => assert.notDeepEqual(validateParty(goodParty(over)), []));
 }
 
+// Custom shares (docs/firestore-schema.md "Custom shares").
+const trio = (custom = {}, over = {}) => goodParty({
+  billCents: 6000, tip: { type: 'custom', amountCents: 0 }, memberIds: ['maxi', 'annie', 'christophe'],
+  members: Object.fromEntries(['maxi', 'annie', 'christophe'].map((id) => [id, { joinedAt: t0, paid: false, ...(id in custom ? { customShareCents: custom[id] } : {}) }])),
+  ...over,
+});
+
+test('custom shares: absent, null for some members, or set for every member are all valid', () => {
+  assert.deepEqual(validateParty(trio()), []);
+  assert.deepEqual(validateParty(trio({ annie: null, maxi: 1000 })), []);
+  assert.deepEqual(validateParty(trio({ maxi: 1000, annie: 3500, christophe: 1500 })), []);
+  // An open party whose bill dropped under its amounts is kept (the host must fix them before Collect).
+  assert.deepEqual(validateParty(trio({ annie: 3500, christophe: 3500 })), []);
+});
+
+for (const [name, party] of [
+  ['non-integer custom amount', trio({ annie: 12.5 })],
+  ['negative custom amount', trio({ annie: -1 })],
+  ['string custom amount', trio({ annie: '3500' })],
+  ['any other new member key', goodParty({ members: { maxi: { joinedAt: t0, paid: false, shareCents: 1 }, annie: { joinedAt: t0, paid: false } } })],
+  ['paid with custom amounts over the total', trio({ annie: 3500, christophe: 3500 }, { status: 'paid', paidAt: t0 })],
+  ['paid with every member custom not adding up', trio({ maxi: 1000, annie: 1000, christophe: 1000 }, { status: 'paid', paidAt: t0 })],
+]) {
+  test(`invalid: ${name}`, () => assert.notDeepEqual(validateParty(party), []));
+}
+
 test('seeded users carry their photo URL as avatar and pass the validator', () => {
   const base = 'https://taller.ai/_next/image?url=%2Fleadership%2F';
   assert.deepEqual(Object.fromEntries(Object.entries(SEED_USERS).map(([id, u]) => [id, u.avatar])), {

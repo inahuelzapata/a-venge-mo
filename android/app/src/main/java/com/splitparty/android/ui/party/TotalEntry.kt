@@ -69,6 +69,9 @@ sealed interface TotalStep {
     /** Keypad for a custom tip in dollars and cents (0 allowed). */
     data class EnterTip(val prefillCents: Long? = null) : TotalStep
 
+    /** Keypad for one member's custom share (host, "Custom shares" switch on), with a clear back to the equal split. */
+    data class EnterShare(val memberId: String, val prefillCents: Long? = null) : TotalStep
+
     /** The camera and recognition. */
     data object Scan : TotalStep
 
@@ -85,6 +88,7 @@ sealed interface TotalStep {
         private fun TotalStep.encode(): String = when (this) {
             is EnterBill -> "bill|${prefillCents ?: ""}|${notice?.name ?: ""}"
             is EnterTip -> "tip|${prefillCents ?: ""}"
+            is EnterShare -> "share|${prefillCents ?: ""}|$memberId"
             Scan -> "scan"
             is ConfirmScan -> "confirm|$cents|$line"
         }
@@ -103,6 +107,8 @@ sealed interface TotalStep {
                 )
 
                 "tip" -> EnterTip(parts.getOrNull(1)?.toLongOrNull())
+
+                "share" -> parts.getOrNull(2)?.let { EnterShare(it, parts.getOrNull(1)?.toLongOrNull()) }
 
                 "scan" -> Scan
 
@@ -133,7 +139,8 @@ fun TotalEntryOverlay(
     onConfirmBill: (Long) -> Unit,
     onConfirmTip: (Long) -> Unit,
     scanScreen: @Composable (onBack: () -> Unit) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onConfirmShare: (memberId: String, cents: Long?) -> Unit = { _, _ -> }
 ) {
     BackHandler { onStep(null) }
     Column(
@@ -169,6 +176,22 @@ fun TotalEntryOverlay(
                 onConfirm = onConfirmTip
             )
 
+            is TotalStep.EnterShare -> {
+                val name = state.shares.firstOrNull { it.userId == step.memberId }?.firstName.orEmpty()
+                KeypadEntry(
+                    title = stringResource(R.string.entry_share_title, name),
+                    prefill = step.prefillCents,
+                    notice = null,
+                    // $0.00 is a valid custom share: that member pays nothing.
+                    minCents = 0L,
+                    saving = state.saving,
+                    writeError = state.writeError,
+                    onBack = close,
+                    onConfirm = { onConfirmShare(step.memberId, it) },
+                    onClear = { onConfirmShare(step.memberId, null) }
+                )
+            }
+
             TotalStep.Scan -> scanScreen(close)
 
             is TotalStep.ConfirmScan -> ConfirmScanned(
@@ -201,7 +224,9 @@ fun KeypadEntry(
     writeError: WriteError?,
     onBack: () -> Unit,
     onConfirm: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** When set, a "Back to equal split" button under Confirm (custom shares). */
+    onClear: (() -> Unit)? = null
 ) {
     var text by rememberSaveable { mutableStateOf(prefill?.let(CentsInput::toInput).orEmpty()) }
     var error by rememberSaveable { mutableStateOf<AmountError?>(null) }
@@ -248,6 +273,15 @@ fun KeypadEntry(
             enabled = !saving,
             modifier = Modifier.padding(horizontal = Dimens.HeaderMargin).testTag(EntryTestTags.CONFIRM)
         )
+        if (onClear != null) {
+            Spacer(Modifier.height(10.dp))
+            SoftPillButton(
+                stringResource(R.string.entry_share_clear),
+                onClick = onClear,
+                enabled = !saving,
+                modifier = Modifier.padding(horizontal = Dimens.HeaderMargin).fillMaxWidth().testTag(EntryTestTags.CLEAR)
+            )
+        }
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -397,9 +431,11 @@ private fun amountErrorText(error: AmountError, minCents: Long): String = when (
 }
 
 @Composable
-private fun writeErrorText(error: WriteError): String = when (error) {
+internal fun writeErrorText(error: WriteError): String = when (error) {
     WriteError.Failed -> stringResource(R.string.write_failed)
     WriteError.NotAllowed -> stringResource(R.string.write_not_allowed)
+    WriteError.SharesOverTotal -> stringResource(R.string.write_shares_over_total)
+    WriteError.SharesUnassigned -> stringResource(R.string.write_shares_unassigned)
 }
 
 object EntryTestTags {
@@ -408,6 +444,7 @@ object EntryTestTags {
     const val NOTICE = "entry_notice"
     const val CONFIRM = "entry_confirm"
     const val EDIT = "entry_edit"
+    const val CLEAR = "entry_clear"
 
     fun key(key: String) = "entry_key_$key"
 }

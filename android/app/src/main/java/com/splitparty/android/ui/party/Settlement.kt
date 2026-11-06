@@ -87,6 +87,8 @@ private fun payLabel(pay: PayState, collectCents: Long?): String = when (pay) {
 
     PayState.NeedsMembers -> stringResource(R.string.pay_needs_members)
 
+    PayState.SharesDontFit -> stringResource(R.string.pay_shares_dont_fit)
+
     PayState.Expired -> stringResource(R.string.pay_expired)
 
     PayState.Cancelled -> stringResource(R.string.pay_cancelled)

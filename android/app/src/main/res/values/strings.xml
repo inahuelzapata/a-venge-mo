@@ -9,6 +9,8 @@
     <!-- Demo switch on Me (stands in for the geofence) -->
     <string name="demo_at_merchant">Demo mode: at Tony\'s</string>
     <string name="demo_at_merchant_hint">Shows Tony\'s card on Home as if you were there.</string>
+    <string name="custom_shares_switch">Custom shares</string>
+    <string name="custom_shares_switch_hint">As host, tap a share in your party to set an uneven amount.</string>
 
     <!-- Home banner slot -->
     <string name="start_party_failed">Couldn\'t start the party. Check your connection and try again.</string>
@@ -53,6 +55,28 @@
     <string name="total_change">Change total</string>
     <string name="write_failed">Couldn\'t save. Check your connection and try again.</string>
     <string name="write_not_allowed">This party is no longer open, so nothing was changed.</string>
+    <string name="write_shares_over_total">That would add up to more than the total, so nothing was changed.</string>
+    <string name="write_shares_unassigned">With everyone on a custom amount, they must add up to the total. Nothing was changed.</string>
+    <!-- Custom shares (docs/firestore-schema.md "Custom shares") -->
+    <string name="shares_title">Shares</string>
+    <string name="shares_custom">Custom</string>
+    <string name="shares_remainder">Rest</string>
+    <string name="shares_equal">Equal</string>
+    <string name="shares_you">%1$s (you)</string>
+    <string name="shares_pending">—</string>
+    <string name="shares_edit_hint">Tap a share to set a custom amount.</string>
+    <string name="shares_custom_description">%1$s, custom share, %2$s</string>
+    <string name="shares_custom_no_total_description">%1$s, custom share, %2$s, total not set yet</string>
+    <string name="shares_remainder_description">%1$s, remainder share, %2$s</string>
+    <string name="shares_remainder_pending_description">%1$s, remainder share, waiting for the custom amounts to fit</string>
+    <string name="shares_equal_description">%1$s, equal share, total not set yet</string>
+    <string name="shares_edit_action">Change %1$s\'s amount</string>
+    <string name="shares_over_total_host">Custom amounts add up to %1$s, more than the %2$s total. Change or clear one to collect.</string>
+    <string name="shares_unassigned_host">Everyone has a custom amount, but they add up to %1$s, not the %2$s total. Change or clear one to collect.</string>
+    <string name="shares_problem_member">The custom amounts don\'t fit the total yet. The host is fixing them.</string>
+    <string name="total_share_pending">Your share updates once the host fixes the custom amounts.</string>
+    <string name="entry_share_title">%1$s\'s share</string>
+    <string name="entry_share_clear">Back to equal split</string>
     <string name="entry_bill_title">Enter total</string>
     <string name="entry_tip_title">Custom tip</string>
     <string name="entry_confirm">Confirm</string>
@@ -106,6 +130,7 @@
     <string name="pay_action_amount">Collect · %1$s</string>
     <string name="pay_needs_total">Add the total</string>
     <string name="pay_needs_members">Waiting for friends to join</string>
+    <string name="pay_shares_dont_fit">Fix the custom amounts</string>
     <string name="pay_expired">This party has expired</string>
     <string name="pay_cancelled">Party cancelled</string>
     <string name="cancel_action">Cancel party</string>

@@ -212,4 +212,9 @@ object PartyTestTags {
     fun tipChip(label: String) = "party_tip_$label"
 
     fun seat(userId: String) = "party_seat_$userId"
+
+    const val SHARES = "party_shares"
+    const val SHARES_PROBLEM = "party_shares_problem"
+
+    fun share(userId: String) = "party_share_$userId"
 }

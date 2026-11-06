@@ -99,7 +99,9 @@ val viewModelModule = module {
     viewModelOf(::HomeViewModel)
     viewModelOf(::MeViewModel)
     // Two String parameters (partyId, userId): resolved by position, not by type.
-    viewModel { (partyId: String, userId: String) -> PartyViewModel(partyId, userId, get(), get(), get(), get(), get(), get()) }
+    viewModel { (partyId: String, userId: String) ->
+        PartyViewModel(partyId, userId, get(), get(), get(), get(), get(), get(), get<DemoSettingsRepository>().customShares)
+    }
     viewModel { (partyId: String, userId: String) -> JoinViewModel(partyId, userId, get(), get(), get()) }
 }
 
