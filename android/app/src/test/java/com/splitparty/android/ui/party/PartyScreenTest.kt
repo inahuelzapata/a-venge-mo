@@ -55,7 +55,7 @@ class PartyScreenTest {
         compose.onNodeWithContentDescription("Annie, host").assertIsDisplayed()
         compose.onAllNodesWithTag(PartyTestTags.EMPTY_SEAT).assertCountEquals(2)
         compose.onNodeWithText("Waiting for the total").assertExists()
-        compose.onNodeWithText("Pay").assertDoesNotExist()
+        compose.onNodeWithText("Collect").assertDoesNotExist()
     }
 
     @Test

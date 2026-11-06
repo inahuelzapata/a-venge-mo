@@ -101,9 +101,9 @@
     <string name="join_failed">Couldn\'t join. Check your connection and try again.</string>
     <string name="join_unavailable">This party is no longer open.</string>
 
-    <!-- Pay (PoC-11) -->
-    <string name="pay_action">Pay</string>
-    <string name="pay_action_amount">Pay · %1$s</string>
+    <!-- Pay (PoC-11). The host-facing button says "Collect" (same verb as iOS); keys keep the pay_ prefix. -->
+    <string name="pay_action">Collect</string>
+    <string name="pay_action_amount">Collect · %1$s</string>
     <string name="pay_needs_total">Add the total</string>
     <string name="pay_needs_members">Waiting for friends to join</string>
     <string name="pay_expired">This party has expired</string>
@@ -117,8 +117,8 @@
     <string name="party_cancelled_title">Party cancelled by host</string>
     <string name="party_cancelled_title_host">You cancelled this party</string>
     <string name="party_cancelled_body">Nobody was charged.</string>
-    <string name="pay_description_ready">Pay, collects %1$s from everyone</string>
-    <string name="pay_description_disabled">Pay, disabled. %1$s</string>
+    <string name="pay_description_ready">Collect %1$s from everyone</string>
+    <string name="pay_description_disabled">Collect, disabled. %1$s</string>
     <string name="settle_member_paid">%1$s, paid</string>
     <string name="settle_member_pending">%1$s, pending</string>
     <string name="settle_collected_title">You collected</string>
