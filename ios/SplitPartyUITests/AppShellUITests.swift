@@ -132,7 +132,7 @@ final class AppShellUITests: XCTestCase {
         XCTAssertTrue(homeScreen.waitForExistence(timeout: Self.screenTimeout))
         assertBannerCardIsAbove(transactionRows.firstMatch)
         XCTAssertEqual(bannerImage.label,
-                       "Split the check with friends. A faster, easier way to take care of the bill.",
+                       "Tony's at the J House. Answer a trivia and get a 10% discount.",
                        "VoiceOver reads the banner's own copy, not an unnamed image")
         XCTAssertEqual(startPartyButton.label, "Start a party")
         XCTAssertEqual(bannerCard.buttons.count, 2, "Only the image and the button are tap targets")

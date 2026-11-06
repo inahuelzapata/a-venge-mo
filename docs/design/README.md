@@ -11,7 +11,7 @@ app is built to match them screen for screen.
 | [`comparisons/`](comparisons/) | Each screen as iOS (left) and Android (right) at the same width, plus `-overlay.png` with Android at 50% over iOS |
 | [`android-captures/`](android-captures/) | The Android side of each comparison |
 | [`capture/`](capture/) | Scripts that recreate all of the above |
-| [`../../brand/`](../../brand/) | The Aven-mo mark and app icon sources, the script that generates every platform's brand assets (see "Brand mark" in the conventions note), and the "Split the check" banner artwork `split-party-banner.png` (see "Split the check card") |
+| [`../../brand/`](../../brand/) | The Aven-mo mark and app icon sources, the script that generates every platform's brand assets (see "Brand mark" in the conventions note), and the "Split the check" banner artwork `banners/split-the-check-with-friends.png` (see "Split the check card") |
 | [`home-feed-reference-1.jpg`](home-feed-reference-1.jpg), [`-2.jpg`](home-feed-reference-2.jpg) | The original inspiration screenshots from a real payments app. Only the layout idea is used: their ads, merchants and people are examples. They are not the contract |
 
 ## Refreshing
