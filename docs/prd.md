@@ -46,3 +46,6 @@ Real money movement, authentication beyond username, server-side jobs
 
 - Data contract: [Firestore schema](firestore-schema.md)
 - How the repository is organised: [Repository structure](repo-structure.md)
+- Payments integration (wallet, payments, PayPal, Statsig):
+  [Payments Integration PRD](payments-integration/prd-payments-integration.md)
+  ([PDF](payments-integration/prd-payments-integration.pdf))
