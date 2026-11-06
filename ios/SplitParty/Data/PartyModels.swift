@@ -301,17 +301,17 @@ enum PartyActionError: Error, Equatable {
         case .rejected: "The database refused the party. Nothing was created; try again."
         case .partyNoLongerOpen: "This party is no longer open."
         case .lockedOut: "Too many wrong codes for this party."
-        case .notReadyToPay: "Add the total and wait for a friend to join before paying."
+        case .notReadyToPay: "Add the total and wait for a friend to join before collecting."
         }
     }
 
     /// For Pay: says that nothing moved, so the host knows a retry is safe.
     var payMessage: String {
         switch self {
-        case .offline: "You're offline. Nothing was paid; try again when you're connected."
-        case .unreachable: "Couldn't reach the database. Nothing was paid; try again."
-        case .rejected: "The database refused the payment. Nothing was paid."
-        case .partyNoLongerOpen: "This party is no longer open. Nothing was paid."
+        case .offline: "You're offline. Nothing was collected; try again when you're connected."
+        case .unreachable: "Couldn't reach the database. Nothing was collected; try again."
+        case .rejected: "The database refused the payment. Nothing was collected."
+        case .partyNoLongerOpen: "This party is no longer open. Nothing was collected."
         case .lockedOut, .notReadyToPay: message
         }
     }

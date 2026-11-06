@@ -26,7 +26,7 @@ final class PayFlowUITests: XCTestCase {
         openParty(as: "annie", hostedBy: "annie", members: ["maxi"])
         let pay = payButton
         XCTAssertTrue(pay.waitForExistence(timeout: Self.screenTimeout))
-        XCTAssertEqual(pay.label, "Pay, unavailable: Add the total")
+        XCTAssertEqual(pay.label, "Collect, unavailable: Add the total")
         XCTAssertFalse(pay.isEnabled)
     }
 
@@ -34,7 +34,7 @@ final class PayFlowUITests: XCTestCase {
         openParty(as: "annie", hostedBy: "annie", members: [], extra: billArguments(cents: 10_000, tip: "18"))
         let pay = payButton
         XCTAssertTrue(pay.waitForExistence(timeout: Self.screenTimeout))
-        XCTAssertEqual(pay.label, "Pay, unavailable: Waiting for friends to join")
+        XCTAssertEqual(pay.label, "Collect, unavailable: Waiting for friends to join")
         XCTAssertFalse(pay.isEnabled)
     }
 
@@ -52,7 +52,7 @@ final class PayFlowUITests: XCTestCase {
                   extra: billArguments(cents: 10_000, tip: "18"))
         let pay = payButton
         XCTAssertTrue(pay.waitForExistence(timeout: Self.screenTimeout))
-        XCTAssertEqual(pay.label, "Pay, collect 78 dollars and 66 cents from Maxi and Christophe")
+        XCTAssertEqual(pay.label, "Collect 78 dollars and 66 cents from Maxi and Christophe")
         pay.tap()
 
         XCTAssertTrue(element("settlementSuccess").waitForExistence(timeout: Self.settleTimeout))
@@ -114,7 +114,7 @@ final class PayFlowUITests: XCTestCase {
                   extra: billArguments(cents: 10_000, tip: "18") + ["-UITestPartyScript", "1:remove=christophe"])
         let pay = payButton
         let halfReady = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label == %@", "Pay, collect 59 dollars from Maxi"), object: pay)
+            predicate: NSPredicate(format: "label == %@", "Collect 59 dollars from Maxi"), object: pay)
         XCTAssertEqual(XCTWaiter().wait(for: [halfReady], timeout: 4), .completed)
         pay.tap()
         XCTAssertTrue(element("settlementSuccess").waitForExistence(timeout: Self.settleTimeout))
@@ -126,7 +126,7 @@ final class PayFlowUITests: XCTestCase {
         openParty(as: "annie", hostedBy: "annie", members: ["maxi"],
                   extra: billArguments(cents: 10_000, tip: "18") + ["-UITestFriendPartyAge", "288"])
         XCTAssertTrue(app.staticTexts["This party has expired"].waitForExistence(timeout: 15))
-        XCTAssertEqual(payButton.label, "Pay, unavailable: Party expired")
+        XCTAssertEqual(payButton.label, "Collect, unavailable: Party expired")
         XCTAssertFalse(payButton.isEnabled)
         app.buttons["backToHomeButton"].tap()
         assertSeededRowsStart(at: 0)
@@ -144,7 +144,7 @@ final class PayFlowUITests: XCTestCase {
         start.tap()
         XCTAssertTrue(element("payButton").waitForExistence(timeout: Self.screenTimeout))
         XCTAssertNotEqual(element("partyScreen").value as? String, paidPartyId)
-        XCTAssertEqual(payButton.label, "Pay, unavailable: Add the total")
+        XCTAssertEqual(payButton.label, "Collect, unavailable: Add the total")
     }
 
     // MARK: Demo reset
