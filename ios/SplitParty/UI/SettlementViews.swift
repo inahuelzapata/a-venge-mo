@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: Pay button (host)
 
 /// Under the total card on the host's phone: the Pay button, what it does, and
-/// the inline error when Pay failed (nothing was paid then).
+/// the inline error when Pay failed (nothing was collected then).
 struct PayArea: View {
     let party: SplitParty
     let now: Date
@@ -48,7 +48,8 @@ struct PayArea: View {
     }
 }
 
-/// Brand-blue capsule reading "Pay $78.66" when the party can be settled;
+/// Brand-blue capsule reading "Collect $78.66" when the party can be settled
+/// (the host receives the joinees' shares, so it never says "Pay");
 /// otherwise grey, disabled, and reading why ("Add the total", "Waiting for
 /// friends to join", "Party expired").
 struct PayButton: View {
@@ -82,18 +83,18 @@ struct PayButton: View {
     }
 
     private var title: String {
-        if isPaying { return "Paying…" }
+        if isPaying { return "Collecting…" }
         if let blocker { return blocker.label }
-        return collectCents.map { "Pay \(Money.format(cents: $0))" } ?? "Pay"
+        return collectCents.map { "Collect \(Money.format(cents: $0))" } ?? "Collect"
     }
 
-    /// "Pay, collect 78 dollars and 66 cents from Maxi and Christophe" or
-    /// "Pay, unavailable: Add the total".
+    /// "Collect 78 dollars and 66 cents from Maxi and Christophe" or
+    /// "Collect, unavailable: Add the total".
     private var accessibilityTitle: String {
-        if isPaying { return "Paying" }
-        if let blocker { return "Pay, unavailable: \(blocker.label)" }
-        guard let collectCents else { return "Pay" }
-        return "Pay, collect \(Money.spoken(cents: collectCents)) from \(NameList.join(payerNames))"
+        if isPaying { return "Collecting" }
+        if let blocker { return "Collect, unavailable: \(blocker.label)" }
+        guard let collectCents else { return "Collect" }
+        return "Collect \(Money.spoken(cents: collectCents)) from \(NameList.join(payerNames))"
     }
 }
 
