@@ -9,6 +9,8 @@ struct PartyTotalSection: View {
     let party: SplitParty
     let room: PartyRoomModel
     let usersById: [String: UserAccount]
+    /// The host with the "Custom shares" switch on: member shares open the keypad.
+    var canSetCustomShares = false
 
     @State private var sheet: TotalSheet?
 
@@ -17,6 +19,10 @@ struct PartyTotalSection: View {
             if let split = party.split {
                 VStack(spacing: Theme.totalSectionSpacing) {
                     ShareSummary(split: split, tip: party.tip, userId: room.userId)
+                    MemberSharesList(split: split, usersById: usersById, isHost: room.isHost,
+                                     onSetShare: canSetCustomShares
+                                         ? { await room.setCustomShare(memberId: $0, cents: $1) } : nil,
+                                     isSaving: room.isSaving)
                     if room.isHost {
                         TipChipRow(party: party, room: room, onCustom: { sheet = .customTip })
                         EditTotalButtons(onScan: { sheet = .scan }, onEnter: { sheet = .enterTotal },

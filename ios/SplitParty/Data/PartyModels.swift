@@ -29,6 +29,9 @@ enum PartySchema {
     enum MemberField {
         static let joinedAt = "joinedAt"
         static let paid = "paid"
+        /// Integer cents the host set for this member; absent (or null) means the
+        /// member is on the equal split of the remainder. Host-written only.
+        static let customShareCents = "customShareCents"
     }
 
     enum LockField {
@@ -159,6 +162,10 @@ struct SplitParty: Equatable, Identifiable {
     let paidMemberIds: Set<String>
     /// When the host cancelled; nil unless `status == .cancelled` (or while the server time is pending).
     let cancelledAt: Date?
+    /// `members.{uid}.customShareCents` of the members that have one. Empty for a
+    /// party where everyone is on the equal split (including documents written
+    /// before custom amounts existed).
+    let customShareCentsByMember: [String: Int]
 
     /// Nil when a required field is missing or malformed.
     init?(id: String, data: [String: Any], dateOf: (Any?) -> Date?) {
@@ -177,18 +184,24 @@ struct SplitParty: Equatable, Identifiable {
         let paidMemberIds = members.compactMap { memberId, value in
             (value as? [String: Any])?[PartySchema.MemberField.paid] as? Bool == true ? memberId : nil
         }
+        // Null, missing, fractional or negative amounts read as "on the equal split".
+        let customShares = members.compactMapValues { value -> Int? in
+            FirestoreValue.integer((value as? [String: Any])?[PartySchema.MemberField.customShareCents])
+                .flatMap { $0 >= 0 ? $0 : nil }
+        }
         self.init(id: id, hostId: hostId, merchantId: merchantId, joinCode: joinCode, status: status,
                   createdAt: createdAt, expiresAt: expiresAt, memberIds: memberIds,
                   wrongCodeAttempts: rawAttempts.compactMapValues { FirestoreValue.integer($0) },
                   billCents: billCents, tip: TipChoice(firestoreValue: data[PartySchema.PartyField.tip]),
                   paidAt: dateOf(data[PartySchema.PartyField.paidAt]), paidMemberIds: Set(paidMemberIds),
-                  cancelledAt: dateOf(data[PartySchema.PartyField.cancelledAt]))
+                  cancelledAt: dateOf(data[PartySchema.PartyField.cancelledAt]),
+                  customShareCentsByMember: customShares)
     }
 
     init(id: String, hostId: String, merchantId: String, joinCode: JoinCode, status: PartyStatus,
          createdAt: Date, expiresAt: Date, memberIds: [String], wrongCodeAttempts: [String: Int],
          billCents: Int? = nil, tip: TipChoice? = nil, paidAt: Date? = nil, paidMemberIds: Set<String> = [],
-         cancelledAt: Date? = nil) {
+         cancelledAt: Date? = nil, customShareCentsByMember: [String: Int] = [:]) {
         self.id = id
         self.hostId = hostId
         self.merchantId = merchantId
@@ -203,11 +216,36 @@ struct SplitParty: Equatable, Identifiable {
         self.paidAt = paidAt
         self.paidMemberIds = paidMemberIds
         self.cancelledAt = cancelledAt
+        self.customShareCentsByMember = customShareCentsByMember
     }
 
     /// Every member's share, or nil while there is no bill.
     var split: PartySplit? {
-        PartySplit(billCents: billCents, tip: tip, memberIds: memberIds)
+        PartySplit(billCents: billCents, tip: tip, memberIds: memberIds,
+                   customShareCentsByMember: customShareCentsByMember)
+    }
+
+    /// The custom amounts after the host sets `cents` for `memberId` (nil clears it
+    /// back to the equal split), checked against the current total. Run before
+    /// every custom-amount write, on the party just re-read, so a write never
+    /// leaves the party worse than its last valid state.
+    /// Throws `PartyActionError.customSharesDontFit` when the new amounts would
+    /// not fit the total. Without a bill there is no total yet, so any amount
+    /// ≥ 0 fits (docs/firestore-schema.md "Custom shares", rules `packedFits`).
+    func customShares(setting cents: Int?, for memberId: String) throws -> [String: Int] {
+        var customShares = customShareCentsByMember.filter { memberIds.contains($0.key) }
+        customShares[memberId] = cents
+        // Clearing is always allowed: it only hands an amount back to the remainder.
+        guard let cents else { return customShares }
+        guard cents >= 0 else { throw PartyActionError.customSharesDontFit(.negativeAmount) }
+        guard let split = PartySplit(billCents: billCents, tip: tip, memberIds: memberIds) else {
+            return customShares
+        }
+        if let problem = CustomShareProblem.check(customShareCentsByMember: customShares, memberIds: memberIds,
+                                                  totalCents: split.totalCents) {
+            throw PartyActionError.customSharesDontFit(problem)
+        }
+        return customShares
     }
 
     /// Open by status AND by the clock. An `open` party past `expiresAt` counts
@@ -242,9 +280,16 @@ struct SplitParty: Equatable, Identifiable {
         if status == .paid { return .alreadyPaid }
         if status == .cancelled { return .cancelled }
         guard isActive(at: now) else { return .expired }
-        guard billCents != nil else { return .needsTotal }
+        guard let split else { return .needsTotal }
+        if split.customShareProblem != nil { return .customSharesDontFit }
         guard !joineeIds.isEmpty else { return .needsFriends }
         return nil
+    }
+
+    /// What the settlement transaction throws when Collect is blocked by custom
+    /// amounts that no longer fit the total.
+    var settleRefusalForCustomShares: PartyActionError {
+        split?.customShareProblem.map(PartyActionError.customSharesDontFit) ?? .notReadyToPay
     }
 
     func isMember(_ userId: String) -> Bool {
@@ -271,10 +316,13 @@ enum PayBlocker: Equatable {
     case expired
     case alreadyPaid
     case cancelled
+    /// The host's custom amounts no longer fit the total (e.g. the bill was lowered).
+    case customSharesDontFit
 
     var label: String {
         switch self {
         case .needsTotal: "Add the total"
+        case .customSharesDontFit: "Fix the custom amounts"
         case .needsFriends: "Waiting for friends to join"
         case .expired: "Party expired"
         case .alreadyPaid: "Paid"
@@ -293,6 +341,8 @@ enum PartyActionError: Error, Equatable {
     case lockedOut
     /// Pay was asked for a party without a bill or without any friend in it.
     case notReadyToPay
+    /// A custom amount was refused: with it the amounts would not fit the total.
+    case customSharesDontFit(CustomShareProblem)
 
     var message: String {
         switch self {
@@ -302,6 +352,7 @@ enum PartyActionError: Error, Equatable {
         case .partyNoLongerOpen: "This party is no longer open."
         case .lockedOut: "Too many wrong codes for this party."
         case .notReadyToPay: "Add the total and wait for a friend to join before collecting."
+        case let .customSharesDontFit(problem): problem.message
         }
     }
 
@@ -312,7 +363,7 @@ enum PartyActionError: Error, Equatable {
         case .unreachable: "Couldn't reach the database. Nothing was collected; try again."
         case .rejected: "The database refused the payment. Nothing was collected."
         case .partyNoLongerOpen: "This party is no longer open. Nothing was collected."
-        case .lockedOut, .notReadyToPay: message
+        case .lockedOut, .notReadyToPay, .customSharesDontFit: message
         }
     }
 
@@ -323,7 +374,7 @@ enum PartyActionError: Error, Equatable {
         case .unreachable: "Couldn't reach the database. The party wasn't cancelled; try again."
         case .rejected: "The database refused the cancel. The party is still open."
         case .partyNoLongerOpen: "This party is no longer open, so it can't be cancelled."
-        case .lockedOut, .notReadyToPay: message
+        case .lockedOut, .notReadyToPay, .customSharesDontFit: message
         }
     }
 
@@ -334,7 +385,7 @@ enum PartyActionError: Error, Equatable {
         case .offline: "You're offline. Nothing was saved; try again when you're connected."
         case .unreachable: "Couldn't reach the database. Nothing was saved; try again."
         case .rejected: "The database refused the change. Nothing was saved."
-        case .partyNoLongerOpen, .lockedOut, .notReadyToPay: message
+        case .partyNoLongerOpen, .lockedOut, .notReadyToPay, .customSharesDontFit: message
         }
     }
 }

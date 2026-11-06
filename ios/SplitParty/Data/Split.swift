@@ -67,10 +67,16 @@ enum TipChoice: Equatable {
     }
 }
 
-/// Every member's share of a party, from the equal-split rule in
-/// docs/firestore-schema.md ("Split rule") and backend/lib/split.js. Integer
-/// cents only; the host (first member) carries the leftover cents, so the shares
-/// sum exactly to the total.
+/// Every member's share of a party, from the extended split rule (the equal-split
+/// rule of docs/firestore-schema.md "Split rule" and backend/lib/split.js, plus
+/// the host's custom amounts). Integer cents only:
+/// - a member with a custom amount (`members.{uid}.customShareCents`) pays exactly that;
+/// - the total minus the custom amounts is split equally among everyone else
+///   (the "remainder" members);
+/// - the leftover cents go to the first remainder member in join order, which is
+///   the host whenever the host is on the remainder.
+/// With no custom amounts this is exactly the old equal split. While the custom
+/// amounts are valid (`customShareProblem == nil`) the shares sum to the total.
 struct PartySplit: Equatable {
     let billCents: Int
     let tipCents: Int
@@ -78,30 +84,94 @@ struct PartySplit: Equatable {
     /// Member ids in `memberIds` order, host first.
     let memberIds: [String]
     let sharesByMember: [String: Int]
+    /// Custom amounts of current members only (a departed member's amount is ignored).
+    let customShareCentsByMember: [String: Int]
+    /// Why the custom amounts don't fit this total, or nil when they do. While
+    /// set, remainder members show $0.00 and the party cannot be settled.
+    let customShareProblem: CustomShareProblem?
 
     var headcount: Int { memberIds.count }
 
     /// Nil when there is no bill yet, or no members. A missing tip counts as 0%
     /// ("the tip is 0% until the host picks one").
-    init?(billCents: Int?, tip: TipChoice?, memberIds: [String]) {
+    init?(billCents: Int?, tip: TipChoice?, memberIds: [String], customShareCentsByMember: [String: Int] = [:]) {
         guard let billCents, billCents >= 0, !memberIds.isEmpty else { return nil }
         let tipCents = (tip ?? .zero).tipCents(onBillCents: billCents)
         let totalCents = billCents + tipCents
-        let base = totalCents / memberIds.count
-        let leftover = totalCents - base * memberIds.count
-        var shares: [String: Int] = [:]
-        for (index, memberId) in memberIds.enumerated() {
-            shares[memberId] = index == 0 ? base + leftover : base
+        let customShares = customShareCentsByMember.filter { memberIds.contains($0.key) && $0.value >= 0 }
+        let remainderIds = memberIds.filter { customShares[$0] == nil }
+        let customSum = customShares.values.reduce(0, +)
+
+        var shares = customShares
+        if !remainderIds.isEmpty {
+            // Over the total there is nothing left to split: the rest show $0.00.
+            let remainderCents = max(0, totalCents - customSum)
+            let base = remainderCents / remainderIds.count
+            let leftover = remainderCents - base * remainderIds.count
+            for (index, memberId) in remainderIds.enumerated() {
+                shares[memberId] = index == 0 ? base + leftover : base
+            }
         }
         self.billCents = billCents
         self.tipCents = tipCents
         self.totalCents = totalCents
         self.memberIds = memberIds
         self.sharesByMember = shares
+        self.customShareCentsByMember = customShares
+        self.customShareProblem = CustomShareProblem.check(customShareCentsByMember: customShares,
+                                                           memberIds: memberIds, totalCents: totalCents)
     }
 
     func share(of memberId: String) -> Int? {
         sharesByMember[memberId]
+    }
+
+    /// True when the host set this member's amount; false when they are on the remainder.
+    func hasCustomShare(_ memberId: String) -> Bool {
+        customShareCentsByMember[memberId] != nil
+    }
+
+    var hasCustomShares: Bool {
+        !customShareCentsByMember.isEmpty
+    }
+}
+
+/// Why a set of custom amounts is not valid for a party's total. The same check
+/// runs before every custom-amount write and on every phone that displays a party.
+enum CustomShareProblem: Equatable {
+    /// The custom amounts add up to more than the total.
+    case exceedsTotal(customCents: Int, totalCents: Int)
+    /// Everyone has a custom amount, so they must add up to the total exactly.
+    case everyoneCustomButNotTheTotal(customCents: Int, totalCents: Int)
+    /// A custom amount below zero (never written by this app; only a malformed document).
+    case negativeAmount
+
+    /// Nil when the amounts are valid: each ≥ 0, their sum ≤ the total, and equal
+    /// to it when every member has one. `customShareCentsByMember` must hold
+    /// current members only.
+    static func check(customShareCentsByMember: [String: Int], memberIds: [String],
+                      totalCents: Int) -> CustomShareProblem? {
+        guard !customShareCentsByMember.isEmpty else { return nil }
+        if customShareCentsByMember.values.contains(where: { $0 < 0 }) { return .negativeAmount }
+        let customCents = customShareCentsByMember.values.reduce(0, +)
+        if customCents > totalCents { return .exceedsTotal(customCents: customCents, totalCents: totalCents) }
+        let everyoneIsCustom = memberIds.allSatisfy { customShareCentsByMember[$0] != nil }
+        if everyoneIsCustom && customCents != totalCents {
+            return .everyoneCustomButNotTheTotal(customCents: customCents, totalCents: totalCents)
+        }
+        return nil
+    }
+
+    /// Shown to the host on the party screen and when a new amount is refused.
+    var message: String {
+        switch self {
+        case let .exceedsTotal(customCents, totalCents):
+            "The custom amounts add up to \(Money.format(cents: customCents)), more than the total of \(Money.format(cents: totalCents))."
+        case let .everyoneCustomButNotTheTotal(customCents, totalCents):
+            "Everyone has a custom amount, so they must add up to \(Money.format(cents: totalCents)). They add up to \(Money.format(cents: customCents))."
+        case .negativeAmount:
+            "A custom amount can't be negative."
+        }
     }
 }
 
@@ -131,6 +201,9 @@ struct CentsInput {
     static let bill = CentsInput(minimumCents: 1, maximumCents: 999_999)
     /// A custom tip may be $0.00 (no tip) up to $9,999.99.
     static let customTip = CentsInput(minimumCents: 0, maximumCents: 999_999)
+    /// A member's custom share uses the bill's range, $0.01 to $9,999.99: the
+    /// keypad never offers $0.00 (product decision); "Back to equal" clears instead.
+    static let customShare = CentsInput(minimumCents: 1, maximumCents: 999_999)
 
     let minimumCents: Int
     let maximumCents: Int

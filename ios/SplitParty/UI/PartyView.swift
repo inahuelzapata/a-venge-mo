@@ -56,6 +56,13 @@ final class PartyRoomModel {
         await write { try await $0.setTip(partyId: self.partyId, tip: tip) }
     }
 
+    /// Host only: sets one member's custom amount, or clears it (`cents` nil).
+    /// Refused (with the reason) when the amounts would not fit the total.
+    func setCustomShare(memberId: String, cents: Int?) async -> String? {
+        guard isHost else { return nil }
+        return await write { try await $0.setCustomShare(partyId: self.partyId, memberId: memberId, cents: cents) }
+    }
+
     /// Host only; the host can never remove themselves.
     func removeMember(_ memberId: String) async -> String? {
         guard memberId != party?.hostId else { return nil }
@@ -173,6 +180,7 @@ struct PartyView: View {
     let onBackToHome: () -> Void
 
     @Environment(LiveDataStore.self) private var liveData
+    @Environment(AppModel.self) private var appModel
     @State private var room: PartyRoomModel?
 
     var body: some View {
@@ -246,6 +254,8 @@ struct PartyView: View {
             } else {
                 OpenPartyContent(party: party, room: room, now: hub.now, usersById: liveData.usersById,
                                  isReconnecting: room.isFromCache || !hub.connection.isNetworkAvailable,
+                                 // This phone's switch only decides whether the host gets the controls.
+                                 canSetCustomShares: room.isHost && appModel.isCustomSharesEnabled,
                                  onLeft: onBackToHome, onCancelled: leaveScreen)
             }
         } else if room.hasLoaded {
@@ -271,6 +281,8 @@ private struct OpenPartyContent: View {
     let now: Date
     let usersById: [String: UserAccount]
     let isReconnecting: Bool
+    /// The host with the Me tab's "Custom shares" switch on.
+    let canSetCustomShares: Bool
     let onLeft: () -> Void
     /// The host's cancel landed: back to Home, where the merchant card is free again.
     let onCancelled: () -> Void
@@ -313,7 +325,8 @@ private struct OpenPartyContent: View {
                     }
                 }
                 PartyCard {
-                    PartyTotalSection(party: party, room: room, usersById: usersById)
+                    PartyTotalSection(party: party, room: room, usersById: usersById,
+                                      canSetCustomShares: canSetCustomShares && !room.isPaying)
                 }
                 if room.isHost {
                     PayArea(party: party, now: now, usersById: usersById, isPaying: room.isPaying,

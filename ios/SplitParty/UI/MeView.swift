@@ -16,6 +16,7 @@ struct MeView: View {
                 ProfileCard(user: liveData.signedInUser, userId: liveData.userId,
                             onLogOut: appModel.logOut)
                 DemoModeCard(isAtMerchant: Bindable(appModel).isDemoAtMerchant)
+                CustomSharesCard(isEnabled: Bindable(appModel).isCustomSharesEnabled)
                 Text("Your payments")
                     .font(.system(size: 20, weight: .semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,6 +105,37 @@ private struct DemoModeCard: View {
         .background(RoundedRectangle(cornerRadius: Theme.cardCornerRadius).fill(Theme.card))
         .padding(.horizontal, Theme.screenGutter)
         .accessibilityIdentifier("demoModeToggle")
+    }
+}
+
+/// Feature switch for uneven splits: while on, hosting a party on this phone lets
+/// you tap a member's share to set a custom amount. Local to this phone and
+/// remembered; other phones (and parties already set up) are unaffected.
+private struct CustomSharesCard: View {
+    @Binding var isEnabled: Bool
+
+    static let title = "Custom shares"
+
+    var body: some View {
+        Toggle(isOn: $isEnabled) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.primaryText)
+                Text("As host, set how much each friend pays")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .tint(Theme.brandBlue)
+        .padding(.horizontal, Theme.cardPadding)
+        .padding(.vertical, 14)
+        .background(RoundedRectangle(cornerRadius: Theme.cardCornerRadius).fill(Theme.card))
+        .padding(.horizontal, Theme.screenGutter)
+        // The Toggle reads its state ("on"/"off") itself; the label and hint say what it does.
+        .accessibilityLabel(Self.title)
+        .accessibilityHint("When on, tap a member's share in a party you host to set a custom amount")
+        .accessibilityIdentifier("customSharesToggle")
     }
 }
 

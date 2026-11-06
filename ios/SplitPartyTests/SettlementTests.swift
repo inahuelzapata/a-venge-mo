@@ -7,11 +7,32 @@ final class SettlementTests: XCTestCase {
     private let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func party(memberIds: [String] = ["annie", "maxi", "christophe"], billCents: Int? = 10_000,
-                       tip: TipChoice? = .percent(18), status: PartyStatus = .open) -> SplitParty {
+                       tip: TipChoice? = .percent(18), status: PartyStatus = .open,
+                       customShares: [String: Int] = [:]) -> SplitParty {
         SplitParty(id: "p1", hostId: memberIds[0], merchantId: DemoMerchant.id,
                    joinCode: JoinCode(["🍕", "🍺"])!, status: status, createdAt: createdAt,
                    expiresAt: createdAt.addingTimeInterval(300), memberIds: memberIds, wrongCodeAttempts: [:],
-                   billCents: billCents, tip: tip)
+                   billCents: billCents, tip: tip, customShareCentsByMember: customShares)
+    }
+
+    func testCustomSharesTenThirtyFiveAndTheRest() throws {
+        let custom = party(memberIds: ["maxi", "annie", "christophe"], billCents: 6_000, tip: nil,
+                           customShares: ["maxi": 1_000, "annie": 3_500])
+        let settlement = try XCTUnwrap(PartySettlement(party: custom, merchantName: "Tony's"))
+        XCTAssertEqual(settlement.payments, [
+            .init(transactionId: "p1_annie", payerId: "annie", amountCents: 3_500),
+            .init(transactionId: "p1_christophe", payerId: "christophe", amountCents: 1_500),
+        ])
+        XCTAssertEqual(settlement.collectedCents, 5_000)
+    }
+
+    func testAZeroCustomShareIsNotCharged() throws {
+        let custom = party(memberIds: ["maxi", "annie", "christophe"], billCents: 6_000, tip: nil,
+                           customShares: ["annie": 0])
+        let settlement = try XCTUnwrap(PartySettlement(party: custom, merchantName: "Tony's"))
+        XCTAssertEqual(settlement.payments.map(\.payerId), ["christophe"])
+        XCTAssertEqual(settlement.collectedCents, 3_000)
+        XCTAssertNil(settlement.payment(of: "annie"))
     }
 
     func testAnnieHostsOneHundredAtEighteenPercent() throws {

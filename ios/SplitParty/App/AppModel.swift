@@ -25,8 +25,15 @@ final class AppModel {
         }
     }
 
+    /// The "Custom shares" switch (Me tab): while on, a host on this phone can set
+    /// custom amounts per member. Local to the phone, off by default, persisted.
+    var isCustomSharesEnabled: Bool {
+        didSet { customSharesStore.save(isEnabled: isCustomSharesEnabled) }
+    }
+
     @ObservationIgnored private let sessionStore: SessionStore
     @ObservationIgnored private let demoModeStore: DemoModeStore
+    @ObservationIgnored private let customSharesStore: CustomSharesStore
 
     /// The app's real setup: the Firestore target from Info.plist, unless a Debug
     /// build was launched by the UI tests with a fixture (see `UITestLaunch`).
@@ -37,6 +44,7 @@ final class AppModel {
             if launch.resetsSession {
                 sessionStore.clear()
                 DemoModeStore().reset()
+                CustomSharesStore().reset()
                 LastPartyStore().partyId = nil
                 CelebrationLedger().clear()
             }
@@ -67,13 +75,16 @@ final class AppModel {
 
     /// `dataSource` nil means setup failed and `setupProblem` says why.
     init(dataSource: (any PaymentDataSource)?, targetSummary: String, setupProblem: String? = nil,
-         sessionStore: SessionStore = SessionStore(), demoModeStore: DemoModeStore = DemoModeStore()) {
+         sessionStore: SessionStore = SessionStore(), demoModeStore: DemoModeStore = DemoModeStore(),
+         customSharesStore: CustomSharesStore = CustomSharesStore()) {
         self.repository = dataSource
         self.targetSummary = targetSummary
         self.setupProblem = setupProblem
         self.sessionStore = sessionStore
         self.demoModeStore = demoModeStore
         self.isDemoAtMerchant = demoModeStore.isAtMerchant
+        self.customSharesStore = customSharesStore
+        self.isCustomSharesEnabled = customSharesStore.isEnabled
         // Stay signed in across restarts: reopen straight on Home for the saved user.
         if let dataSource, let savedUserId = sessionStore.signedInUserId {
             startSession(userId: savedUserId, repository: dataSource)
@@ -125,9 +136,11 @@ final class AppModel {
 ///   the other seeded users join it one by one at this interval.
 /// - `-UITestFriendPartyBill <cents>` and `-UITestFriendPartyTip 18|custom:700`
 ///   give that party a bill and tip from the start.
+/// - `-UITestFriendPartyCustomShares maxi:1000,annie:3500` gives members custom amounts.
 /// - `-UITestPartyScript "2:tip=20;4:join=christophe;6:remove=annie;8:bill=20000"`:
 ///   changes other phones make to that party, each at its second after sign-in
 ///   (typing the username takes a variable few seconds, so launch is no anchor).
+///   "custom=annie:3500" / "custom=annie:clear" set or clear a custom amount;
 ///   "pay=host" settles the party as the host's phone would; "cancel=host"
 ///   cancels it as the host's phone would; "reset=demo" runs
 ///   Demo reset as if another phone had tapped it.
@@ -145,6 +158,7 @@ struct UITestLaunch {
     static let friendsJoinEveryKey = "UITestFriendsJoinEvery"
     static let friendPartyBillKey = "UITestFriendPartyBill"
     static let friendPartyTipKey = "UITestFriendPartyTip"
+    static let friendPartyCustomSharesKey = "UITestFriendPartyCustomShares"
     static let partyScriptKey = "UITestPartyScript"
     static let demoResetKey = "UITestDemoReset"
     static let writeDelayKey = "UITestWriteDelay"
@@ -159,6 +173,7 @@ struct UITestLaunch {
     var friendsJoinInterval: Double?
     var friendPartyBillCents: Int?
     var friendPartyTip: TipChoice?
+    var friendPartyCustomShares: [String: Int] = [:]
     var partyScript: [(seconds: Double, change: String)] = []
     var demoResetFails = false
     var writeDelaySeconds: Double?
@@ -171,10 +186,12 @@ struct UITestLaunch {
         let age = friendPartyAge
         let bill = friendPartyBillCents
         let tip = friendPartyTip
+        let customShares = friendPartyCustomShares
         let script = partyScript
         let addFriendParty = {
             let party = fixture.addParty(hostId: hostId, memberIds: memberIds,
-                                         createdAt: Date().addingTimeInterval(-age), billCents: bill, tip: tip)
+                                         createdAt: Date().addingTimeInterval(-age), billCents: bill, tip: tip,
+                                         customShareCentsByMember: customShares)
             guard !script.isEmpty else { return }
             fixture.afterSignIn = {
                 Task { @MainActor in
@@ -208,6 +225,10 @@ struct UITestLaunch {
         case "bill": if let cents = Int(parts[1]) { try await fixture.setBill(partyId: partyId, billCents: cents) }
         case "join": try await fixture.joinParty(id: partyId, userId: parts[1])
         case "remove": try await fixture.removeMember(partyId: partyId, memberId: parts[1])
+        case "custom":
+            let target = parts[1].split(separator: ":").map(String.init)
+            guard target.count == 2 else { return }
+            try await fixture.setCustomShare(partyId: partyId, memberId: target[0], cents: Int(target[1]))
         case "pay": try await fixture.settleParty(id: partyId)
         case "cancel":
             if let party = fixture.parties[partyId] {
@@ -216,6 +237,16 @@ struct UITestLaunch {
         case "reset": try await fixture.resetDemo()
         default: break
         }
+    }
+
+    /// "maxi:1000,annie:3500" → ["maxi": 1000, "annie": 3500].
+    private static func parseCustomShares(_ raw: String) -> [String: Int] {
+        var shares: [String: Int] = [:]
+        for entry in raw.split(separator: ",") {
+            let parts = entry.split(separator: ":").map(String.init)
+            if parts.count == 2, let cents = Int(parts[1]) { shares[parts[0]] = cents }
+        }
+        return shares
     }
 
     private static func parseTip(_ raw: String) -> TipChoice? {
@@ -243,6 +274,8 @@ struct UITestLaunch {
             ? nil : defaults.double(forKey: friendsJoinEveryKey)
         launch.friendPartyBillCents = defaults.string(forKey: friendPartyBillKey).flatMap { Int($0) }
         launch.friendPartyTip = defaults.string(forKey: friendPartyTipKey).flatMap(parseTip)
+        launch.friendPartyCustomShares = defaults.string(forKey: friendPartyCustomSharesKey)
+            .map(parseCustomShares) ?? [:]
         launch.demoResetFails = defaults.string(forKey: demoResetKey) == "fail"
         launch.writeDelaySeconds = defaults.object(forKey: writeDelayKey) == nil
             ? nil : defaults.double(forKey: writeDelayKey)

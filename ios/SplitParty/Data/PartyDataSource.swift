@@ -52,6 +52,14 @@ protocol PartyDataSource: AnyObject {
     /// Host only: replaces the tip. Throws `PartyActionError`.
     func setTip(partyId: String, tip: TipChoice) async throws
 
+    /// Host only: sets `members.{memberId}.customShareCents` to `cents`, or clears
+    /// it (back to the equal split of the remainder) when `cents` is nil. Its own
+    /// transaction: re-reads the party, refuses once it is no longer open, and
+    /// refuses an amount that would not fit the current total
+    /// (`PartyActionError.customSharesDontFit`), so the party keeps its last valid
+    /// state. Does nothing when `memberId` is no longer in the party.
+    func setCustomShare(partyId: String, memberId: String, cents: Int?) async throws
+
     /// Drops a non-host member from `memberIds` and `members` in one transaction,
     /// so a join landing at the same moment is kept. Used both for the host
     /// removing someone and for a member leaving. Throws `PartyActionError`.

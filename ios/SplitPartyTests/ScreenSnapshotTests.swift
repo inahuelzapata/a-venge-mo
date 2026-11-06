@@ -122,7 +122,9 @@ final class ScreenSnapshotTests: XCTestCase {
     private func makeAppModel(scenario: FixtureDataSource.Scenario, signedInUserId: String?) -> AppModel {
         AppModel(dataSource: FixtureDataSource(scenario: scenario), targetSummary: Self.emulatorSummary,
                  sessionStore: makeSessionStore(signedInUserId: signedInUserId),
-                 demoModeStore: DemoModeStore(defaults: throwawayDefaults(suiteName: "ScreenSnapshotTests.demoMode")))
+                 demoModeStore: DemoModeStore(defaults: throwawayDefaults(suiteName: "ScreenSnapshotTests.demoMode")),
+                 customSharesStore: CustomSharesStore(
+                     defaults: throwawayDefaults(suiteName: "ScreenSnapshotTests.customShares")))
     }
 
     /// A throwaway defaults suite, so tests never touch the app's real saved session.

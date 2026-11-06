@@ -52,6 +52,121 @@ final class SplitRuleTests: XCTestCase {
     }
 }
 
+/// The extended split rule: custom amounts pay exactly that, the rest of the
+/// total is split equally among the others, leftover cents to the first of them
+/// in join order (the host when the host is on the remainder).
+final class CustomShareRuleTests: XCTestCase {
+    private let threeMembers = ["maxi", "annie", "christophe"]
+
+    private func split(totalCents: Int, customs: [String: Int],
+                       members: [String]? = nil) throws -> PartySplit {
+        try XCTUnwrap(PartySplit(billCents: totalCents, tip: .zero, memberIds: members ?? threeMembers,
+                                 customShareCentsByMember: customs))
+    }
+
+    func testNoCustomAmountsIsTheUnchangedEqualSplit() throws {
+        let extended = try XCTUnwrap(PartySplit(billCents: 10_000, tip: .percent(18), memberIds: threeMembers,
+                                                customShareCentsByMember: [:]))
+        let equal = try XCTUnwrap(PartySplit(billCents: 10_000, tip: .percent(18), memberIds: threeMembers))
+        XCTAssertEqual(extended.sharesByMember, equal.sharesByMember)
+        XCTAssertEqual(threeMembers.map { extended.share(of: $0) }, [3_934, 3_933, 3_933])
+        XCTAssertNil(extended.customShareProblem)
+        XCTAssertFalse(extended.hasCustomShares)
+    }
+
+    func testSixtyDollarsTenThirtyFiveAndTheRest() throws {
+        let split = try split(totalCents: 6_000, customs: ["maxi": 1_000, "annie": 3_500])
+        XCTAssertEqual(threeMembers.map { split.share(of: $0) }, [1_000, 3_500, 1_500])
+        XCTAssertTrue(split.hasCustomShare("maxi"))
+        XCTAssertTrue(split.hasCustomShare("annie"))
+        XCTAssertFalse(split.hasCustomShare("christophe"))
+        XCTAssertNil(split.customShareProblem)
+    }
+
+    func testClearingOneAmountSplitsTheRestEqually() throws {
+        let split = try split(totalCents: 6_000, customs: ["maxi": 1_000])
+        XCTAssertEqual(threeMembers.map { split.share(of: $0) }, [1_000, 2_500, 2_500])
+    }
+
+    func testLeftoverCentsGoToTheHostWhenOnTheRemainder() throws {
+        // 10 001 − 1 000 = 9 001 over two: 4 501 for the host, 4 500 for Christophe.
+        let split = try split(totalCents: 10_001, customs: ["annie": 1_000])
+        XCTAssertEqual(threeMembers.map { split.share(of: $0) }, [4_501, 1_000, 4_500])
+    }
+
+    func testLeftoverCentsGoToTheFirstJoineeOnTheRemainderWhenTheHostIsCustom() throws {
+        let members = ["maxi", "annie", "christophe", "dana"]
+        // 10 002 − 1 000 = 9 002 over three: base 3 000, 2 leftover cents to Annie.
+        let split = try split(totalCents: 10_002, customs: ["maxi": 1_000], members: members)
+        XCTAssertEqual(members.map { split.share(of: $0) }, [1_000, 3_002, 3_000, 3_000])
+    }
+
+    func testEveryoneCustomSummingExactlyToTheTotalIsValid() throws {
+        let split = try split(totalCents: 6_000, customs: ["maxi": 1_000, "annie": 3_500, "christophe": 1_500])
+        XCTAssertNil(split.customShareProblem)
+        XCTAssertEqual(threeMembers.map { split.share(of: $0) }, [1_000, 3_500, 1_500])
+    }
+
+    func testEveryoneCustomNotSummingToTheTotalIsRejected() throws {
+        let split = try split(totalCents: 6_000, customs: ["maxi": 1_000, "annie": 3_500, "christophe": 1_000])
+        XCTAssertEqual(split.customShareProblem,
+                       .everyoneCustomButNotTheTotal(customCents: 5_500, totalCents: 6_000))
+    }
+
+    func testOverTheTotalIsRejectedAndTheRestShowZero() throws {
+        let split = try split(totalCents: 6_000, customs: ["annie": 3_500, "christophe": 3_500])
+        XCTAssertEqual(split.customShareProblem, .exceedsTotal(customCents: 7_000, totalCents: 6_000))
+        XCTAssertEqual(split.share(of: "maxi"), 0)
+        XCTAssertEqual(split.customShareProblem?.message,
+                       "The custom amounts add up to $70.00, more than the total of $60.00.")
+    }
+
+    func testLoweringTheBillUnderTheCustomAmountsBecomesInvalid() throws {
+        XCTAssertNil(try split(totalCents: 6_000, customs: ["annie": 3_500]).customShareProblem)
+        XCTAssertEqual(try split(totalCents: 3_000, customs: ["annie": 3_500]).customShareProblem,
+                       .exceedsTotal(customCents: 3_500, totalCents: 3_000))
+    }
+
+    func testADepartedMembersAmountIsIgnored() throws {
+        let split = try split(totalCents: 6_000, customs: ["maxi": 1_000, "annie": 3_500],
+                              members: ["maxi", "christophe"])
+        XCTAssertEqual(split.share(of: "maxi"), 1_000)
+        XCTAssertEqual(split.share(of: "christophe"), 5_000)
+        XCTAssertNil(split.share(of: "annie"))
+        XCTAssertFalse(split.hasCustomShare("annie"))
+    }
+
+    func testZeroCustomAmountIsValidAndNegativeIsNot() throws {
+        XCTAssertEqual(try split(totalCents: 6_000, customs: ["annie": 0]).share(of: "christophe"), 3_000)
+        XCTAssertNil(try split(totalCents: 6_000, customs: ["annie": 0]).customShareProblem)
+        XCTAssertEqual(CustomShareProblem.check(customShareCentsByMember: ["annie": -1], memberIds: threeMembers,
+                                                totalCents: 6_000), .negativeAmount)
+    }
+
+    func testValidSharesAlwaysSumToTheTotal() throws {
+        for total in stride(from: 0, through: 3_000, by: 97) {
+            for headcount in 2...8 {
+                let members = (0..<headcount).map { "m\($0)" }
+                for customCount in 0..<headcount {
+                    let customs = Dictionary(uniqueKeysWithValues: members.prefix(customCount).enumerated()
+                        .map { ($1, ($0 * 37) % (total / headcount + 1)) })
+                    let split = try split(totalCents: total, customs: customs, members: members)
+                    guard split.customShareProblem == nil else { continue }
+                    XCTAssertEqual(members.compactMap { split.share(of: $0) }.reduce(0, +), total)
+                }
+            }
+        }
+    }
+
+    func testCustomShareKeypadRefusesZero() {
+        XCTAssertEqual(CentsInput.customShare.parse("0"), .failure(.belowMinimum(1)))
+        XCTAssertEqual(CentsInput.customShare.parse("0.01"), .success(1))
+        XCTAssertEqual(CentsInput.customShare.parse("9999.99"), .success(999_999))
+        XCTAssertEqual(CentsInput.customShare.parse("10000"), .failure(.aboveMaximum(999_999)))
+        XCTAssertEqual(CentsInput.customShare.parse("35.001"), .failure(.tooManyDecimals))
+    }
+}
+
 final class TipChoiceTests: XCTestCase {
     func testFirestoreShapesRoundTrip() {
         for tip in [TipChoice.percent(18), .custom(amountCents: 700), .zero] {
@@ -89,6 +204,41 @@ final class TipChoiceTests: XCTestCase {
         let waiting = try XCTUnwrap(SplitParty(id: "p1", data: unset, dateOf: { $0 as? Date }))
         XCTAssertNil(waiting.billCents)
         XCTAssertNil(waiting.split)
+    }
+
+    /// `members.{uid}.customShareCents` as written by any client: an amount, null,
+    /// absent (older documents) or malformed (ignored, so the member is on the equal split).
+    func testPartyDocumentCarriesCustomShares() throws {
+        let createdAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let joined: [String: Any] = ["joinedAt": createdAt, "paid": false]
+        func member(_ extra: [String: Any]) -> [String: Any] { joined.merging(extra) { $1 } }
+        let data: [String: Any] = [
+            "hostId": "maxi", "merchantId": DemoMerchant.id, "joinCode": ["🍕", "🍺"], "status": "open",
+            "createdAt": createdAt, "expiresAt": createdAt.addingTimeInterval(300),
+            "memberIds": ["maxi", "annie", "christophe"], "billCents": 6_000,
+            "tip": ["type": "custom", "amountCents": 0],
+            "members": [
+                "maxi": member(["customShareCents": 1_000]),
+                "annie": member(["customShareCents": NSNumber(value: 3_500)]),
+                "christophe": member(["customShareCents": NSNull()]),
+            ],
+        ]
+        let party = try XCTUnwrap(SplitParty(id: "p1", data: data, dateOf: { $0 as? Date }))
+        XCTAssertEqual(party.customShareCentsByMember, ["maxi": 1_000, "annie": 3_500])
+        XCTAssertEqual(party.split.map { s in party.memberIds.map { s.share(of: $0) } }, [1_000, 3_500, 1_500])
+
+        var legacy = data
+        legacy["members"] = ["maxi": joined, "annie": joined, "christophe": joined]
+        let plain = try XCTUnwrap(SplitParty(id: "p1", data: legacy, dateOf: { $0 as? Date }))
+        XCTAssertTrue(plain.customShareCentsByMember.isEmpty)
+        XCTAssertEqual(plain.split?.share(of: "christophe"), 2_000)
+
+        var malformed = data
+        malformed["members"] = ["maxi": member(["customShareCents": 10.5]),
+                                "annie": member(["customShareCents": -5]),
+                                "christophe": member(["customShareCents": "35"])]
+        XCTAssertTrue(try XCTUnwrap(SplitParty(id: "p1", data: malformed, dateOf: { $0 as? Date }))
+            .customShareCentsByMember.isEmpty)
     }
 }
 
@@ -163,6 +313,103 @@ final class PartyWriteTests: XCTestCase {
             XCTAssertEqual(error as? PartyActionError, .partyNoLongerOpen)
         }
         XCTAssertEqual(try current(party.id, in: fixture).billCents, 1_000)
+    }
+
+    func testHostSetsTenAndThirtyFiveAndTheRestIsTheRemainder() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let party = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie", "christophe"], billCents: 6_000,
+                                     tip: .zero)
+        try await fixture.setCustomShare(partyId: party.id, memberId: "maxi", cents: 1_000)
+        try await fixture.setCustomShare(partyId: party.id, memberId: "annie", cents: 3_500)
+        let split = try XCTUnwrap(try current(party.id, in: fixture).split)
+        XCTAssertEqual(["maxi", "annie", "christophe"].map { split.share(of: $0) }, [1_000, 3_500, 1_500])
+    }
+
+    func testAnAmountThatWouldExceedTheTotalIsRefusedAndTheLastValidStateKept() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let party = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie", "christophe"], billCents: 6_000,
+                                     tip: .zero, customShareCentsByMember: ["annie": 3_500])
+        do {
+            try await fixture.setCustomShare(partyId: party.id, memberId: "christophe", cents: 3_500)
+            XCTFail("$70 of custom amounts must not fit a $60 total")
+        } catch {
+            XCTAssertEqual(error as? PartyActionError,
+                           .customSharesDontFit(.exceedsTotal(customCents: 7_000, totalCents: 6_000)))
+        }
+        XCTAssertEqual(try current(party.id, in: fixture).customShareCentsByMember, ["annie": 3_500])
+    }
+
+    func testEveryoneCustomMustAddUpToTheTotal() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let party = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie"], billCents: 6_000, tip: .zero,
+                                     customShareCentsByMember: ["maxi": 1_000])
+        do {
+            try await fixture.setCustomShare(partyId: party.id, memberId: "annie", cents: 4_000)
+            XCTFail("Everyone custom at $50 must not settle a $60 total")
+        } catch {
+            XCTAssertEqual(error as? PartyActionError,
+                           .customSharesDontFit(.everyoneCustomButNotTheTotal(customCents: 5_000, totalCents: 6_000)))
+        }
+        try await fixture.setCustomShare(partyId: party.id, memberId: "annie", cents: 5_000)
+        XCTAssertNil(try current(party.id, in: fixture).split?.customShareProblem)
+    }
+
+    func testClearingReturnsTheMemberToTheEqualSplit() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let party = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie", "christophe"], billCents: 6_000,
+                                     tip: .zero, customShareCentsByMember: ["maxi": 1_000, "annie": 3_500])
+        try await fixture.setCustomShare(partyId: party.id, memberId: "annie", cents: nil)
+        let split = try XCTUnwrap(try current(party.id, in: fixture).split)
+        XCTAssertEqual(["maxi", "annie", "christophe"].map { split.share(of: $0) }, [1_000, 2_500, 2_500])
+        XCTAssertFalse(split.hasCustomShare("annie"))
+    }
+
+    func testLoweringTheBillUnderTheAmountsBlocksCollectUntilFixed() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let party = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie", "christophe"], billCents: 6_000,
+                                     tip: .zero, customShareCentsByMember: ["maxi": 1_000, "annie": 3_500])
+        try await fixture.setBill(partyId: party.id, billCents: 4_000)
+        var lowered = try current(party.id, in: fixture)
+        XCTAssertEqual(lowered.payBlocker(at: Date()), .customSharesDontFit)
+        XCTAssertEqual(PayBlocker.customSharesDontFit.label, "Fix the custom amounts")
+        do {
+            try await fixture.settleParty(id: party.id)
+            XCTFail("Collect must refuse amounts that no longer fit")
+        } catch {
+            XCTAssertEqual(error as? PartyActionError,
+                           .customSharesDontFit(.exceedsTotal(customCents: 4_500, totalCents: 4_000)))
+        }
+        try await fixture.setCustomShare(partyId: party.id, memberId: "annie", cents: nil)
+        lowered = try current(party.id, in: fixture)
+        XCTAssertNil(lowered.payBlocker(at: Date()))
+        XCTAssertEqual(lowered.split?.share(of: "annie"), 1_500)
+    }
+
+    func testALeavingMemberTakesTheirAmountWithThem() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let party = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie", "christophe"], billCents: 6_000,
+                                     tip: .zero, customShareCentsByMember: ["maxi": 1_000, "annie": 3_500])
+        try await fixture.removeMember(partyId: party.id, memberId: "annie")
+        let left = try current(party.id, in: fixture)
+        XCTAssertEqual(left.customShareCentsByMember, ["maxi": 1_000])
+        XCTAssertEqual(left.split?.share(of: "christophe"), 5_000)
+        XCTAssertEqual(left.split.map { s in left.memberIds.compactMap { s.share(of: $0) }.reduce(0, +) }, 6_000)
+    }
+
+    func testNoCustomAmountAfterExpiryButAnyAmountBeforeATotal() async throws {
+        let fixture = FixtureDataSource(scenario: .seeded)
+        let expired = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie"],
+                                       createdAt: Date().addingTimeInterval(-301), billCents: 6_000, tip: .zero)
+        do {
+            try await fixture.setCustomShare(partyId: expired.id, memberId: "annie", cents: 1_000)
+            XCTFail("An expired party must refuse a custom amount")
+        } catch {
+            XCTAssertEqual(error as? PartyActionError, .partyNoLongerOpen)
+        }
+        // Without a bill there is no total to exceed (schema "Custom shares", rules packedFits).
+        let noBill = fixture.addParty(hostId: "maxi", memberIds: ["maxi", "annie"])
+        try await fixture.setCustomShare(partyId: noBill.id, memberId: "annie", cents: 1_000)
+        XCTAssertEqual(try current(noBill.id, in: fixture).customShareCentsByMember, ["annie": 1_000])
     }
 
     private func current(_ partyId: String, in fixture: FixtureDataSource) throws -> SplitParty {
