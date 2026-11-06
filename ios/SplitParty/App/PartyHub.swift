@@ -236,7 +236,8 @@ final class PartyHub {
 
     /// Relaunch mid-party lands straight back on the party screen. With no open
     /// party, the party screen the user last had open is reopened if it was paid
-    /// in the last few minutes, so a phone killed during Pay shows the paid state.
+    /// or cancelled in the last few minutes, so a phone killed during Pay shows the
+    /// paid state and one closed before the host cancelled shows the cancelled state.
     private func openLaunchPartyOnce() {
         guard !hasCheckedLaunchParty else { return }
         hasCheckedLaunchParty = true
@@ -249,8 +250,11 @@ final class PartyHub {
             guard let self, case let .success(document) = result, !document.isFromCache else { return }
             self.launchPartyCheck?.cancel()
             self.launchPartyCheck = nil
-            if let party = document.item, party.status == .paid, party.isMember(self.userId),
-               Date().timeIntervalSince(party.paidAt ?? Date()) < Self.reopenPaidPartyWindow {
+            // Paid or cancelled while the app was closed: show how it ended, not Home.
+            if let party = document.item, party.isMember(self.userId),
+               let endedAt = party.status == .paid ? (party.paidAt ?? Date())
+                   : party.isCancelled ? (party.cancelledAt ?? Date()) : nil,
+               Date().timeIntervalSince(endedAt) < Self.reopenPaidPartyWindow {
                 self.partyToOpenOnLaunch = party.id
             } else {
                 self.lastPartyStore.partyId = nil

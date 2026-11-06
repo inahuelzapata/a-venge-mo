@@ -2,6 +2,7 @@ package com.splitparty.android.ui.party
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +48,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -108,6 +110,8 @@ fun PartyRoute(
 
                 // The settlement view plays its own tick and success haptics; any open entry screen closes.
                 PartyEvent.Settled -> step = null
+
+                PartyEvent.CancelledByMe -> currentOnHome()
             }
         }
     }
@@ -129,6 +133,8 @@ fun PartyRoute(
 
             override fun pay() = viewModel.pay()
 
+            override fun cancel() = viewModel.cancel()
+
             private fun open(next: TotalStep) {
                 viewModel.clearWriteError()
                 step = next
@@ -136,7 +142,16 @@ fun PartyRoute(
         }
     }
     Box(modifier.fillMaxSize()) {
-        PartyScreen(state, contentPadding, onBack = onHome, actions = actions)
+        PartyScreen(
+            state,
+            contentPadding,
+            onBack = onHome,
+            actions = actions,
+            onBackFromEnd = {
+                viewModel.leaveFinishedParty()
+                onHome()
+            }
+        )
         if (current != null) {
             TotalEntryOverlay(
                 step = current,
@@ -165,7 +180,8 @@ fun PartyScreen(
     contentPadding: PaddingValues,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    actions: TotalActions = TotalActions.None
+    actions: TotalActions = TotalActions.None,
+    onBackFromEnd: () -> Unit = onBack
 ) {
     Column(
         modifier = modifier
@@ -188,6 +204,9 @@ fun PartyScreen(
 
             PartyPhase.Settled -> SettledParty(state, onBack, Modifier.weight(1f))
 
+            // Its own wording: a cancelled party is never shown as expired or paid.
+            PartyPhase.Cancelled -> CancelledParty(state.isHost, onBackFromEnd)
+
             PartyPhase.NotFound -> PartyOver(stringResource(R.string.party_not_found), "", onBack)
         }
     }
@@ -208,6 +227,19 @@ private fun OpenParty(state: PartyUiState, actions: TotalActions, modifier: Modi
         var leaving by remember { mutableStateOf(false) }
         MembersCard(state.members, onRemove = if (state.isHost) ({ removing = it }) else null)
         TotalArea(state, actions)
+        var cancelling by remember { mutableStateOf(false) }
+        if (state.canCancel) {
+            val description = stringResource(R.string.cancel_action_description)
+            SoftPillButton(
+                stringResource(R.string.cancel_action),
+                onClick = { cancelling = true },
+                enabled = !state.saving,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .testTag(PartyTestTags.CANCEL)
+                    .semantics { contentDescription = description }
+            )
+        }
         if (!state.isHost) {
             SoftPillButton(
                 stringResource(R.string.leave_action),
@@ -227,6 +259,20 @@ private fun OpenParty(state: PartyUiState, actions: TotalActions, modifier: Modi
                     removing = null
                 },
                 onDismiss = { removing = null }
+            )
+        }
+        // Nothing is cancelled until "Cancel party" is tapped here; Keep party,
+        // Back or a tap outside leaves the party as it was.
+        if (cancelling && state.canCancel) {
+            ConfirmDialog(
+                title = stringResource(R.string.cancel_title),
+                body = stringResource(R.string.cancel_body),
+                confirmLabel = stringResource(R.string.cancel_confirm),
+                cancelLabel = stringResource(R.string.cancel_keep),
+                onConfirm = actions::cancel,
+                onDismiss = { cancelling = false },
+                busy = state.cancelling,
+                error = state.writeError.takeIf { !state.saving }
             )
         }
         if (leaving) {
@@ -443,16 +489,41 @@ private fun ReconnectingPill(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The host ended the party: replaces the live split on every member's phone.
+ * TalkBack announces it as it appears; it fades in unless animations are off.
+ */
+@Composable
+private fun CancelledParty(isHost: Boolean, onHome: () -> Unit, modifier: Modifier = Modifier) {
+    val reduce = LocalReduceMotion.current
+    val alpha = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(reduce) { if (!reduce) alpha.animateTo(1f, tween(CANCELLED_FADE_MS)) }
+    val title = stringResource(if (isHost) R.string.party_cancelled_title_host else R.string.party_cancelled_title)
+    PartyOver(
+        title,
+        stringResource(R.string.party_cancelled_body),
+        onHome,
+        modifier.graphicsLayer { this.alpha = alpha.value }.semantics {
+            paneTitle = title
+            liveRegion = LiveRegionMode.Assertive
+        },
+        tag = PartyTestTags.CANCELLED
+    )
+}
+
+private const val CANCELLED_FADE_MS = 250
+
 @Composable
 private fun PartyOver(
     title: String,
     body: String,
     onHome: () -> Unit,
     modifier: Modifier = Modifier,
-    frozen: (@Composable () -> Unit)? = null
+    frozen: (@Composable () -> Unit)? = null,
+    tag: String = PartyTestTags.EXPIRED
 ) {
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag(PartyTestTags.EXPIRED),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag(tag),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

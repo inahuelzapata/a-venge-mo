@@ -93,6 +93,10 @@ class PayScreenshotTest {
         settled.copy(isHost = false, pay = null, settlement = SettlementUi(isHost = false, amountCents = 3_933, animate = false))
     )
 
+    /** What every joinee's phone shows once the host cancelled (its own wording, not "expired"). */
+    @Test
+    fun cancelledMember() = party("cancelled-member", host.copy(phase = PartyPhase.Cancelled, isHost = false, pay = null))
+
     @Test
     fun meDemoSection() = paparazzi.screen("me-demo-section") {
         ShellFrame(current = Tab.Me, onSelect = {}) { padding ->

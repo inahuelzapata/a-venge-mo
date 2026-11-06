@@ -2,6 +2,7 @@ package com.splitparty.android.domain.repository
 
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyCancellation
 import com.splitparty.android.domain.split.Tip
 import kotlinx.coroutines.flow.Flow
 
@@ -31,6 +32,18 @@ sealed interface PartyWriteResult {
 
     /** No connection or the write was rejected (rules). */
     data object Failed : PartyWriteResult
+}
+
+/** Outcome of the host's cancel. Anything but [Cancelled] has written nothing. */
+sealed interface CancelPartyResult {
+    /** The party is cancelled. [cancellation] is what this call committed; null when it already was. */
+    data class Cancelled(val cancellation: PartyCancellation?) : CancelPartyResult
+
+    /** Not the host, or the party is paid, expired or gone. */
+    data object NotAllowed : CancelPartyResult
+
+    /** No connection or the write was rejected (rules). */
+    data object Failed : CancelPartyResult
 }
 
 /** Split Party reads and writes (docs/firestore-schema.md, `parties` and `joinCodes`). */
@@ -75,6 +88,14 @@ interface PartyRepository {
      * Not active, no bill or no joinee: [PartyWriteResult.NotAllowed].
      */
     suspend fun settle(partyId: String, hostId: String): PartyWriteResult
+
+    /**
+     * Host only, after "Cancel party?" (docs/firestore-schema.md "Cancelling a party"):
+     * one transaction that sets `status: cancelled`, `cancelledAt`, `cancelledBy` and
+     * frees the party's own join-code lock. No payment and no balance move; works
+     * with or without a bill or joinees, at any time before expiry.
+     */
+    suspend fun cancel(partyId: String, hostId: String): CancelPartyResult
 
     /** `wrongCodeAttempts.{userId}` += 1. */
     suspend fun recordWrongAttempt(partyId: String, userId: String)

@@ -57,7 +57,8 @@ struct JoinConfirmationView: View {
                                 + "Ask them to start a new one if you're at the same table.",
                             systemImage: "lock.fill", onBackToHome: onBackToHome)
         } else if !party.isActive(at: hub.now) {
-            PartyClosedView(title: party.isExpired(at: hub.now) ? "This party has expired" : "This party is closed",
+            PartyClosedView(title: party.isCancelled ? "Party cancelled by host"
+                                : party.isExpired(at: hub.now) ? "This party has expired" : "This party is closed",
                             message: "There's nothing to join.", systemImage: "clock.badge.xmark",
                             onBackToHome: onBackToHome)
         } else {

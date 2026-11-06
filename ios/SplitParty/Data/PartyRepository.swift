@@ -73,6 +73,10 @@ extension PaymentRepository {
     func settleParty(id: String) async throws {
         try await PartyWriter(firestore: firestore).settleParty(id: id)
     }
+
+    func cancelParty(id: String, hostId: String) async throws -> PartyCancellation? {
+        try await PartyWriter(firestore: firestore).cancelParty(id: id, hostId: hostId)
+    }
 }
 
 /// The party transactions. Deliberately not main-actor isolated: Firestore runs
@@ -361,7 +365,7 @@ private struct PartyWriter: @unchecked Sendable {
                     guard let party = Self.party(from: snapshot) else { return PartyActionError.partyNoLongerOpen }
                     switch party.payBlocker(at: Date()) {
                     case .alreadyPaid: return nil
-                    case .expired: return PartyActionError.partyNoLongerOpen
+                    case .expired, .cancelled: return PartyActionError.partyNoLongerOpen
                     case .needsTotal, .needsFriends: return PartyActionError.notReadyToPay
                     case nil: break
                     }
@@ -433,6 +437,76 @@ private struct PartyWriter: @unchecked Sendable {
             update[FieldPath([PartySchema.PartyField.members, memberId, PartySchema.MemberField.paid])] = true
         }
         return update
+    }
+
+    // MARK: Cancel
+
+    /// docs/firestore-schema.md "Cancelling a party": the party read in the
+    /// transaction must be open, unexpired and hosted by `hostId`; then only
+    /// status + cancel stamp change and the party's own lock is released.
+    func cancelParty(id: String, hostId: String) async throws -> PartyCancellation? {
+        do {
+            return try await runCancel(id: id, hostId: hostId)
+        } catch {
+            // A commit whose acknowledgement was lost: if the server shows the party
+            // cancelled by this host, the cancel landed (only the host can cancel).
+            if let party = await serverParty(id: id), party.isCancelled, party.hostId == hostId {
+                return Self.cancellation(of: party, at: party.cancelledAt ?? Date())
+            }
+            throw error
+        }
+    }
+
+    private func serverParty(id: String) async -> SplitParty? {
+        guard let snapshot = try? await parties.document(id).getDocument(source: .server) else { return nil }
+        return Self.party(from: snapshot)
+    }
+
+    private static func cancellation(of party: SplitParty, at time: Date) -> PartyCancellation {
+        PartyCancellation(partyId: party.id, memberCount: party.memberIds.count,
+                          secondsSinceCreated: max(0, Int(time.timeIntervalSince(party.createdAt))))
+    }
+
+    private func runCancel(id: String, hostId: String) async throws -> PartyCancellation? {
+        let partyReference = parties.document(id)
+        let joinCodes = self.joinCodes
+        return try await withPartyTimeout {
+            let outcome = try await firestore.runTransaction { transaction, errorPointer -> Any? in
+                do {
+                    let snapshot = try transaction.getDocument(partyReference)
+                    guard let party = Self.party(from: snapshot), party.hostId == hostId else {
+                        return PartyActionError.rejected
+                    }
+                    if party.isCancelled { return NSNull() }  // already done: nothing to write or log
+                    let now = Date()
+                    guard party.canCancel(by: hostId, at: now) else { return PartyActionError.partyNoLongerOpen }
+                    let lockReference = joinCodes.document(
+                        PartySchema.joinCodeLockId(merchantId: party.merchantId, code: party.joinCode))
+                    let lock = try transaction.getDocument(lockReference)
+                    transaction.updateData([
+                        PartySchema.PartyField.status: PartyStatus.cancelled.rawValue,
+                        PartySchema.PartyField.cancelledAt: FieldValue.serverTimestamp(),
+                        PartySchema.PartyField.cancelledBy: hostId,
+                    ], forDocument: partyReference)
+                    // Freed so the host can start again at once (never a newer party's lock).
+                    if lock.get(PartySchema.LockField.partyId) as? String == party.id {
+                        transaction.deleteDocument(lockReference)
+                    }
+                    return CancelOutcome(cancellation: Self.cancellation(of: party, at: now))
+                } catch {
+                    errorPointer?.pointee = error as NSError
+                    return nil
+                }
+            }
+            if let refusal = outcome as? PartyActionError { throw refusal }
+            return (outcome as? CancelOutcome)?.cancellation
+        }
+    }
+
+    /// Boxes the value out of the Objective-C transaction block.
+    private final class CancelOutcome: NSObject {
+        let cancellation: PartyCancellation
+        init(cancellation: PartyCancellation) { self.cancellation = cancellation }
     }
 
     // MARK: Errors

@@ -28,7 +28,7 @@ final class FixtureDataSource: PaymentDataSource {
     private struct FixtureUnreachableError: Error {}
 
     // Split Party state (see the "Parties" extension below).
-    private var parties: [String: SplitParty] = [:]
+    private(set) var parties: [String: SplitParty] = [:]
     private var openPartyListeners: [UUID: (merchantId: String,
                                             onChange: (Result<LiveList<SplitParty>, Error>) -> Void)] = [:]
     private var partyListeners: [UUID: (partyId: String,
@@ -106,6 +106,17 @@ final class FixtureDataSource: PaymentDataSource {
         openPartyListeners.values.forEach { $0.onChange(openPartiesResult(merchantId: $0.merchantId)) }
         partyListeners.values.filter { removedPartyIds.contains($0.partyId) }
             .forEach { $0.onChange(.success(LiveDocument(item: nil, isFromCache: false))) }
+    }
+
+    func cancelParty(id: String, hostId: String) async throws -> PartyCancellation? {
+        guard scenario != .unreachable else { throw PartyActionError.unreachable }
+        guard let party = parties[id], party.hostId == hostId else { throw PartyActionError.rejected }
+        if party.isCancelled { return nil }
+        let now = Date()
+        guard party.canCancel(by: hostId, at: now) else { throw PartyActionError.partyNoLongerOpen }
+        replace(party, status: .cancelled, cancelledAt: now)
+        return PartyCancellation(partyId: id, memberCount: party.memberIds.count,
+                                 secondsSinceCreated: max(0, Int(now.timeIntervalSince(party.createdAt))))
     }
 
     // MARK: Test controls
@@ -289,7 +300,7 @@ extension FixtureDataSource {
         guard let party = parties[id] else { throw PartyActionError.partyNoLongerOpen }
         switch party.payBlocker(at: Date()) {
         case .alreadyPaid: return
-        case .expired: throw PartyActionError.partyNoLongerOpen
+        case .expired, .cancelled: throw PartyActionError.partyNoLongerOpen
         case .needsTotal, .needsFriends: throw PartyActionError.notReadyToPay
         case nil: break
         }
@@ -336,12 +347,14 @@ extension FixtureDataSource {
 
     /// Stores a copy of `party` with the given fields changed; nil keeps a field.
     private func replace(_ party: SplitParty, status: PartyStatus? = nil, memberIds: [String]? = nil,
-                         wrongCodeAttempts: [String: Int]? = nil, billCents: Int? = nil, tip: TipChoice? = nil) {
+                         wrongCodeAttempts: [String: Int]? = nil, billCents: Int? = nil, tip: TipChoice? = nil,
+                         cancelledAt: Date? = nil) {
         store(SplitParty(id: party.id, hostId: party.hostId, merchantId: party.merchantId, joinCode: party.joinCode,
                          status: status ?? party.status, createdAt: party.createdAt, expiresAt: party.expiresAt,
                          memberIds: memberIds ?? party.memberIds,
                          wrongCodeAttempts: wrongCodeAttempts ?? party.wrongCodeAttempts,
-                         billCents: billCents ?? party.billCents, tip: tip ?? party.tip))
+                         billCents: billCents ?? party.billCents, tip: tip ?? party.tip,
+                         cancelledAt: cancelledAt ?? party.cancelledAt))
     }
 
     private func store(_ party: SplitParty) {

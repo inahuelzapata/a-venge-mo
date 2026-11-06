@@ -19,6 +19,9 @@ interface TotalActions {
     /** Host: settle everyone (no confirmation: joining was consent). */
     fun pay() = Unit
 
+    /** Host: cancel the party for everyone (already confirmed on "Cancel party?"). */
+    fun cancel() = Unit
+
     companion object {
         val None = object : TotalActions {
             override fun scan() = Unit

@@ -13,9 +13,11 @@ import com.splitparty.android.data.firebase.toParty
 import com.splitparty.android.domain.model.DemoMerchant
 import com.splitparty.android.domain.model.LiveEvent
 import com.splitparty.android.domain.model.Party
+import com.splitparty.android.domain.model.PartyCancellation
 import com.splitparty.android.domain.model.PartyStatus
 import com.splitparty.android.domain.party.JoinCodes
 import com.splitparty.android.domain.party.PartySettlement
+import com.splitparty.android.domain.repository.CancelPartyResult
 import com.splitparty.android.domain.repository.CreatePartyResult
 import com.splitparty.android.domain.repository.JoinPartyResult
 import com.splitparty.android.domain.repository.PartyRepository
@@ -262,6 +264,54 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
         tx.update(parties.document(party.id), first.key, first.value, *rest.flatMap { listOf(it.key, it.value) }.toTypedArray())
     }
 
+    override suspend fun cancel(partyId: String, hostId: String): CancelPartyResult =
+        runCancel(partyId, hostId) ?: cancelledOnServer(partyId, hostId) ?: CancelPartyResult.Failed
+
+    /**
+     * After a failure (typically a lost commit acknowledgement): a party the server
+     * shows cancelled by [hostId] means this cancel landed (only the host can cancel).
+     */
+    private suspend fun cancelledOnServer(partyId: String, hostId: String): CancelPartyResult? =
+        attempt { parties.document(partyId).get(Source.SERVER).await().toParty() }
+            ?.takeIf { it.isCancelled && it.hostId == hostId }
+            ?.let { CancelPartyResult.Cancelled(it.cancellationAt(it.cancelledAtMillis ?: clock())) }
+
+    private fun Party.cancellationAt(nowMillis: Long) =
+        PartyCancellation(id, members.size, ((nowMillis - createdAtMillis) / MILLIS_PER_SECOND).coerceAtLeast(0L))
+
+    private suspend fun runCancel(partyId: String, hostId: String): CancelPartyResult? = attempt {
+        val partyRef = parties.document(partyId)
+        db.runTransaction { tx ->
+            val party = tx.get(partyRef).toParty()
+            val now = clock()
+            when {
+                party == null || party.hostId != hostId -> CancelPartyResult.NotAllowed
+
+                // A retried tap whose first commit landed: nothing to write, nothing to log.
+                party.isCancelled -> CancelPartyResult.Cancelled(null)
+
+                !party.canCancel(hostId, now) -> CancelPartyResult.NotAllowed
+
+                else -> {
+                    val lockRef = locks.document(JoinCodes.lockId(party.merchantId, party.joinCode))
+                    val ownLock = tx.get(lockRef).let { it.exists() && it.getString("partyId") == partyId }
+                    tx.update(
+                        partyRef,
+                        "status",
+                        PartyStatus.Cancelled.wire,
+                        "cancelledAt",
+                        FieldValue.serverTimestamp(),
+                        "cancelledBy",
+                        hostId
+                    )
+                    // Freed so the host can start again at once (never a newer party's lock).
+                    if (ownLock) tx.delete(lockRef)
+                    CancelPartyResult.Cancelled(party.cancellationAt(now))
+                }
+            }
+        }.await()
+    }
+
     override suspend fun recordWrongAttempt(partyId: String, userId: String) {
         // Not awaited past the timeout: offline the increment is queued and lands on reconnect.
         attempt { parties.document(partyId).update(FieldPath.of("wrongCodeAttempts", userId), FieldValue.increment(1)).await() }
@@ -305,6 +355,7 @@ class FirestorePartyRepository(private val db: FirebaseFirestore, private val cl
 
     private companion object {
         const val WRITE_TIMEOUT_MS = 8_000L
+        const val MILLIS_PER_SECOND = 1_000L
 
         /** 144 codes per merchant; a handful of tries always finds a free one at demo scale. */
         const val MAX_CODE_TRIES = 20

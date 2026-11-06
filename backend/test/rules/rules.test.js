@@ -4,7 +4,9 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { deleteDoc, deleteField, doc, getDoc, getDocs, collection, runTransaction, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import {
+  deleteDoc, deleteField, doc, getDoc, getDocs, collection, increment, runTransaction, serverTimestamp, setDoc, updateDoc, Timestamp,
+} from 'firebase/firestore';
 
 let env;
 let db;
@@ -97,6 +99,67 @@ test('a user document whose avatar is a photo URL: phone may move the balance, n
   }));
   await assertSucceeds(updateDoc(doc(db, 'users/maxi'), { balanceCents: 20000 }));
   await assertFails(updateDoc(doc(db, 'users/maxi'), { avatar: 'avatar_maxi' }));
+});
+
+// Host cancel (docs/firestore-schema.md "Cancelling a party"): status cancelled plus
+// cancelledAt (server time) and cancelledBy == hostId, from open and before expiresAt only.
+function liveParty(over = {}) {
+  const createdAt = Timestamp.fromMillis(Math.floor(Date.now() / 1000) * 1000);
+  return party({ createdAt, expiresAt: Timestamp.fromMillis(createdAt.toMillis() + 5 * 60 * 1000), ...over });
+}
+const cancelBy = (uid) => ({ status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: uid });
+
+test('the host cancels at any point: with a total and joinees, or with no total and nobody in', async () => {
+  await assertSucceeds(setDoc(doc(db, 'parties/cancel-full'), liveParty()));
+  await assertSucceeds(updateDoc(doc(db, 'parties/cancel-full'), cancelBy('maxi')));
+  await assertSucceeds(setDoc(doc(db, 'parties/cancel-empty'), liveParty({
+    billCents: null, tip: null, memberIds: ['maxi'], members: { maxi: { joinedAt: created, paid: false } },
+  })));
+  await assertSucceeds(updateDoc(doc(db, 'parties/cancel-empty'), cancelBy('maxi')));
+  const stored = (await getDoc(doc(db, 'parties/cancel-full'))).data();
+  assert.equal(stored.status, 'cancelled');
+  assert.equal(stored.billCents, 10000, 'the bill and members are kept as they were');
+});
+
+test('a non-host cannot cancel, and a cancel cannot change anything else', async () => {
+  const ref = doc(db, 'parties/cancel-guarded');
+  await assertSucceeds(setDoc(ref, liveParty()));
+  await assertFails(updateDoc(ref, cancelBy('annie')));
+  await assertFails(updateDoc(ref, { status: 'cancelled' }));
+  await assertFails(updateDoc(ref, { ...cancelBy('maxi'), cancelledAt: Timestamp.fromMillis(Date.now() - 60000) }));
+  await assertFails(updateDoc(ref, { ...cancelBy('maxi'), 'members.annie.paid': true }));
+  await assertFails(updateDoc(ref, { cancelledAt: serverTimestamp(), cancelledBy: 'maxi' }));
+  assert.equal((await getDoc(ref)).get('status'), 'open');
+});
+
+test('paid, expired and cancelled parties cannot be cancelled; an open party past expiresAt neither', async () => {
+  for (const status of ['paid', 'expired']) {
+    const ref = doc(db, `parties/cancel-${status}`);
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `parties/cancel-${status}`),
+      liveParty({ status, paidAt: status === 'paid' ? Timestamp.now() : null })));
+    await assertFails(updateDoc(ref, cancelBy('maxi')));
+    assert.equal((await getDoc(ref)).get('status'), status);
+  }
+  const stale = doc(db, 'parties/cancel-stale');
+  await assertSucceeds(setDoc(stale, party()));  // created 3 Nov 2026: long past expiresAt
+  await assertFails(updateDoc(stale, cancelBy('maxi')));
+  const twice = doc(db, 'parties/cancel-twice');
+  await assertSucceeds(setDoc(twice, liveParty()));
+  await assertSucceeds(updateDoc(twice, cancelBy('maxi')));
+  await assertFails(updateDoc(twice, cancelBy('maxi')));
+  await assertFails(updateDoc(twice, { status: 'open', cancelledAt: deleteField(), cancelledBy: deleteField() }));
+});
+
+test('nobody can join a cancelled party or be counted against it, and it cannot be paid', async () => {
+  const ref = doc(db, 'parties/cancel-join');
+  await assertSucceeds(setDoc(ref, liveParty()));
+  await assertSucceeds(updateDoc(ref, cancelBy('maxi')));
+  await assertFails(updateDoc(ref, {
+    memberIds: ['maxi', 'annie', 'christophe'], 'members.christophe': { joinedAt: Timestamp.now(), paid: false },
+  }));
+  await assertFails(updateDoc(ref, { 'wrongCodeAttempts.christophe': increment(1) }));
+  await assertFails(updateDoc(ref, { status: 'paid', paidAt: Timestamp.now() }));
+  await assertFails(setDoc(doc(db, 'parties/cancel-born'), liveParty(cancelBy('maxi'))));
 });
 
 // joinCodes/{merchantId}_{e1}{e2}: the lock that keeps a code unique per merchant.

@@ -19,6 +19,11 @@ export function goodParty(over = {}) {
 
 test('a schema-conforming party is valid', () => assert.deepEqual(validateParty(goodParty()), []));
 
+test('a party cancelled by its host (no total, no joinees) is valid', () => assert.deepEqual(validateParty(goodParty({
+  status: 'cancelled', cancelledAt: t0, cancelledBy: 'maxi', billCents: null, tip: null,
+  memberIds: ['maxi'], members: { maxi: { joinedAt: t0, paid: false } },
+})), []));
+
 for (const [name, over] of [
   ['non-integer bill', { billCents: 12.5 }],
   ['string bill', { billCents: '1000' }],
@@ -31,6 +36,9 @@ for (const [name, over] of [
   ['host not first member', { memberIds: ['annie', 'maxi'] }],
   ['bad tip preset', { tip: { type: 'percent', percent: 17 } }],
   ['stored share field', { shareCents: 3933 }],
+  ['cancelled without a cancel stamp', { status: 'cancelled' }],
+  ['cancelled by a non-host', { status: 'cancelled', cancelledAt: t0, cancelledBy: 'annie' }],
+  ['cancel stamp on an open party', { cancelledAt: t0, cancelledBy: 'maxi' }],
 ]) {
   test(`invalid: ${name}`, () => assert.notDeepEqual(validateParty(goodParty(over)), []));
 }

@@ -32,10 +32,13 @@ const PARTY_FIELDS = [
   'billCents', 'tip', 'memberIds', 'members', 'wrongCodeAttempts',
 ];
 
+/** Present exactly when status is cancelled (firestore.rules validCancellation). */
+const CANCEL_FIELDS = ['cancelledAt', 'cancelledBy'];
+
 export function validateParty(p) {
   const problems = [];
   if (!isPlainObject(p)) return ['party must be an object'];
-  checkKeys(p, PARTY_FIELDS, [], problems);
+  checkKeys(p, PARTY_FIELDS, CANCEL_FIELDS, problems);
 
   if (!isStr(p.hostId)) problems.push('hostId must be a non-empty string');
   if (!isStr(p.merchantId)) problems.push('merchantId must be a non-empty string');
@@ -70,6 +73,12 @@ export function validateParty(p) {
       if (Object.keys(t).sort().join() !== 'amountCents,type') problems.push('custom tip must have exactly {type, amountCents}');
       if (!isNonNegInt(t.amountCents)) problems.push('tip.amountCents must be a non-negative integer');
     } else problems.push('tip.type must be percent or custom');
+  }
+  if (p.status === 'cancelled') {
+    if (millis(p.cancelledAt) === null) problems.push('cancelledAt must be a timestamp when status is cancelled');
+    if (p.cancelledBy !== p.hostId) problems.push('cancelledBy must equal hostId (only the host cancels)');
+  } else if (CANCEL_FIELDS.some((k) => k in p)) {
+    problems.push('cancelledAt and cancelledBy are only allowed when status is cancelled');
   }
   if (p.status === 'paid' && (p.billCents === null || p.tip === null)) problems.push('a paid party needs billCents and tip');
 

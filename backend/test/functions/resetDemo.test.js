@@ -136,6 +136,28 @@ test('after a paid party, resetDemo returns success within 5 s and the DB equals
   assert.deepEqual(await snapshot(), seededState);
 });
 
+test('resetDemo clears a host-cancelled party along with an open one', async () => {
+  const createdAt = Timestamp.now();
+  const expiresAt = Timestamp.fromMillis(createdAt.toMillis() + PARTY_TTL_MS);
+  const base = {
+    hostId: 'maxi', merchantId: MERCHANT_ID, createdAt, expiresAt, paidAt: null, billCents: null, tip: null,
+    memberIds: ['maxi', 'annie'], wrongCodeAttempts: {},
+    members: { maxi: { joinedAt: createdAt, paid: false }, annie: { joinedAt: createdAt, paid: false } },
+  };
+  await db.collection('parties').doc().set({
+    ...base, joinCode: ['🍕', '🍺'], status: 'cancelled', cancelledAt: Timestamp.now(), cancelledBy: 'maxi',
+  });
+  const open = db.collection('parties').doc();
+  await open.set({ ...base, hostId: 'annie', memberIds: ['annie'], members: { annie: base.members.annie },
+    joinCode: ['🌮', '🔥'], status: 'open' });
+  await db.doc(`joinCodes/${joinCodeLockId(MERCHANT_ID, ['🌮', '🔥'])}`)
+    .set({ merchantId: MERCHANT_ID, joinCode: ['🌮', '🔥'], partyId: open.id, expiresAt });
+  assertSuccess(await callResetDemo());
+  assert.equal((await db.collection('parties').get()).size, 0);
+  assert.equal((await db.collection('joinCodes').get()).size, 0);
+  assert.deepEqual(await snapshot(), seededState);
+});
+
 test('resetDemo on an already-seeded DB succeeds and changes nothing', async () => {
   assert.deepEqual(await snapshot(), seededState);
   assertSuccess(await callResetDemo());

@@ -4,11 +4,15 @@ import com.splitparty.android.domain.split.Split
 import com.splitparty.android.domain.split.SplitResult
 import com.splitparty.android.domain.split.Tip
 
-/** `parties.status` (docs/firestore-schema.md). Unknown values read as [Expired], so they never block anyone. */
+/**
+ * `parties.status` (docs/firestore-schema.md). [Cancelled] (host only) is its own
+ * state, never shown as expired or paid. Unknown values read as [Expired], so they never block anyone.
+ */
 enum class PartyStatus(val wire: String) {
     Open("open"),
     Paid("paid"),
-    Expired("expired");
+    Expired("expired"),
+    Cancelled("cancelled");
 
     companion object {
         fun fromWire(value: String?): PartyStatus = entries.firstOrNull { it.wire == value } ?: Expired
@@ -36,7 +40,9 @@ data class Party(
     /** Pre-tip bill in cents; null until the host confirms one. */
     val billCents: Long? = null,
     /** Null until chosen (reads as 0%). */
-    val tip: Tip? = null
+    val tip: Tip? = null,
+    /** When the host cancelled; null unless [PartyStatus.Cancelled] (or while the server time is pending). */
+    val cancelledAtMillis: Long? = null
 ) {
     val memberIds: List<String> get() = members.map { it.userId }
 
@@ -46,6 +52,11 @@ data class Party(
      * the clock always wins.
      */
     fun isActiveAt(nowMillis: Long): Boolean = status == PartyStatus.Open && nowMillis < expiresAtMillis
+
+    val isCancelled: Boolean get() = status == PartyStatus.Cancelled
+
+    /** Only the host, only while the party is open and unexpired (docs/firestore-schema.md "Cancelling a party"). */
+    fun canCancel(userId: String, nowMillis: Long): Boolean = userId == hostId && isActiveAt(nowMillis)
 
     fun hasMember(userId: String): Boolean = members.any { it.userId == userId }
 
@@ -65,6 +76,7 @@ data class Party(
     /** What blocks Pay right now, or null when the host can settle. */
     fun payBlockerAt(nowMillis: Long): PayBlocker? = when {
         status == PartyStatus.Paid -> PayBlocker.AlreadyPaid
+        status == PartyStatus.Cancelled -> PayBlocker.Cancelled
         !isActiveAt(nowMillis) -> PayBlocker.Expired
         billCents == null -> PayBlocker.NoTotal
         joinees.isEmpty() -> PayBlocker.NoMembers
@@ -83,7 +95,10 @@ data class Party(
 }
 
 /** Why the host cannot tap Pay yet. */
-enum class PayBlocker { AlreadyPaid, Expired, NoTotal, NoMembers }
+enum class PayBlocker { AlreadyPaid, Cancelled, Expired, NoTotal, NoMembers }
+
+/** A cancel this phone committed: the fields of the `party_cancelled` analytics event. */
+data class PartyCancellation(val partyId: String, val memberCount: Int, val secondsSinceCreated: Long)
 
 /** The one seeded merchant (backend/lib/seedData.js). The demo switch stands in for its geofence. */
 object DemoMerchant {

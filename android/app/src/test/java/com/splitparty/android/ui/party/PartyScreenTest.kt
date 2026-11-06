@@ -1,17 +1,23 @@
 package com.splitparty.android.ui.party
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.splitparty.android.ui.theme.SplitPartyTheme
 import kotlinx.collections.immutable.persistentListOf
@@ -64,6 +70,68 @@ class PartyScreenTest {
     fun reconnectingIndicator() {
         show(open.copy(reconnecting = true))
         compose.onNodeWithText("Reconnecting…").assertIsDisplayed()
+    }
+
+    private var cancels = 0
+    private val countingActions = object : TotalActions {
+        override fun scan() = Unit
+
+        override fun enterTotal() = Unit
+
+        override fun selectTip(choice: TipChoice) = Unit
+
+        override fun customTip() = Unit
+
+        override fun cancel() {
+            cancels++
+        }
+    }
+
+    private fun showWithActions(state: PartyUiState) = compose.setContent {
+        SplitPartyTheme { PartyScreen(state, PaddingValues(), onBack = { backs++ }, actions = countingActions) }
+    }
+
+    @Test
+    fun hostCancelsOnlyAfterConfirmingAndKeepPartyChangesNothing() {
+        showWithActions(open.copy(isHost = true, canCancel = true))
+        compose.onNodeWithContentDescription("Cancel party. Ends the party for everyone. Nobody is charged.")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("Cancel party?").assertIsDisplayed()
+        compose.onNodeWithText("Keep party").performClick()
+        compose.onNodeWithText("Cancel party?").assertDoesNotExist()
+        assertEquals(0, cancels)
+
+        compose.onNodeWithTag(PartyTestTags.CANCEL).performScrollTo().performClick()
+        compose.onAllNodesWithText("Cancel party").filterToOne(hasClickAction() and !hasTestTag(PartyTestTags.CANCEL))
+            .performClick()
+        assertEquals(1, cancels)
+    }
+
+    @Test
+    fun joineesNeverSeeTheCancelControl() {
+        show(open.copy(members = persistentListOf(annie, maxi), isHost = false, canCancel = false))
+        compose.onNodeWithTag(PartyTestTags.CANCEL).assertDoesNotExist()
+        compose.onNodeWithText("Cancel party").assertDoesNotExist()
+    }
+
+    @Test
+    fun cancelledStateHasItsOwnWordingAndIsAnnounced() {
+        show(open.copy(phase = PartyPhase.Cancelled, members = persistentListOf(annie, maxi)))
+        compose.onNodeWithText("Party cancelled by host").assertIsDisplayed()
+        compose.onNodeWithText("Nobody was charged.").assertIsDisplayed()
+        compose.onNodeWithText("This party has expired").assertDoesNotExist()
+        compose.onNodeWithTag(PartyTestTags.TOTAL).assertDoesNotExist()
+        compose.onNodeWithTag(PartyTestTags.CANCELLED)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Party cancelled by host"))
+        compose.onNodeWithText("Back to Home").performClick()
+        assertEquals(1, backs)
+    }
+
+    @Test
+    fun theHostSeesTheyCancelledIt() {
+        show(open.copy(phase = PartyPhase.Cancelled, isHost = true))
+        compose.onNodeWithText("You cancelled this party").assertIsDisplayed()
     }
 
     @Test
