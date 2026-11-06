@@ -67,9 +67,9 @@ class PayScreenTest {
     fun readyPayCollectsEveryoneElsesShareInOneTap() {
         show(hostOpen)
         compose.onNodeWithTag(PartyTestTags.PAY).performScrollTo().assertIsEnabled()
-            .assertContentDescriptionEquals("Pay, collects 78 dollars and 66 cents from everyone")
+            .assertContentDescriptionEquals("Collect 78 dollars and 66 cents from everyone")
             .performClick()
-        compose.onNodeWithText("Pay · $78.66", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Collect · $78.66", useUnmergedTree = true).assertExists()
         assertEquals(1, pays)
     }
 
@@ -77,7 +77,7 @@ class PayScreenTest {
     fun withoutATotalPayIsDisabledAndSaysWhy() {
         show(hostOpen.copy(total = null, pay = PayState.NeedsTotal))
         compose.onNodeWithTag(PartyTestTags.PAY).performScrollTo().assertIsNotEnabled()
-            .assertContentDescriptionEquals("Pay, disabled. Add the total")
+            .assertContentDescriptionEquals("Collect, disabled. Add the total")
             .performClick()
         assertEquals(0, pays)
     }
@@ -86,7 +86,7 @@ class PayScreenTest {
     fun withoutMembersPayIsDisabledAndSaysWhy() {
         show(hostOpen.copy(members = persistentListOf(annie), pay = PayState.NeedsMembers))
         compose.onNodeWithTag(PartyTestTags.PAY).performScrollTo().assertIsNotEnabled()
-            .assertContentDescriptionEquals("Pay, disabled. Waiting for friends to join")
+            .assertContentDescriptionEquals("Collect, disabled. Waiting for friends to join")
     }
 
     @Test
@@ -99,7 +99,7 @@ class PayScreenTest {
     fun expiredPartyShowsPayDisabled() {
         show(hostOpen.copy(phase = PartyPhase.Expired, pay = PayState.Expired))
         compose.onNodeWithTag(PartyTestTags.PAY).performScrollTo().assertIsNotEnabled()
-            .assertContentDescriptionEquals("Pay, disabled. This party has expired")
+            .assertContentDescriptionEquals("Collect, disabled. This party has expired")
     }
 
     @Test

@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 
 private const val PRESSED_ALPHA = 0.8f
 
-/** What the Pay button reads: the amount when ready, otherwise why it is disabled. */
+/** What the host's button reads ("Collect · $x"): the amount when ready, otherwise why it is disabled. */
 @Composable
 private fun payLabel(pay: PayState, collectCents: Long?): String = when (pay) {
     PayState.Ready -> collectCents?.let { stringResource(R.string.pay_action_amount, Money.format(it)) }
@@ -93,7 +93,7 @@ private fun payLabel(pay: PayState, collectCents: Long?): String = when (pay) {
 }
 
 /**
- * The host's Pay button (PoC-11), the bottom of the total area: brand blue
+ * The host's Pay button (PoC-11, labelled "Collect"), the bottom of the total area: brand blue
  * capsule, no ripple or elevation (a press dims it). Disabled it is grey and
  * its label is the reason. No second confirmation: joining was consent.
  */
