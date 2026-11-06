@@ -144,6 +144,6 @@ class HomeScreenTest {
     }
 
     private companion object {
-        const val BANNER_COPY = "Split the check with friends. A faster, easier way to take care of the bill."
+        const val BANNER_COPY = "Tony's at the J House. Answer a trivia and get a 10% discount."
     }
 }

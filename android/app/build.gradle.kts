@@ -97,27 +97,50 @@ ktlint {
 
 // Shared artwork lives once in the repo's brand/ folder (iOS bundles the same
 // file). It is copied into generated resources at build time, never committed
-// under android/. drawable-nodpi: the 1774 px source is wider than a full-width
-// card on any phone (386 dp x 4.5), so one size stays crisp at every density.
+// under android/. drawable-nodpi: the 1738 px source is wider than a full-width
+// card on any phone (378 dp image x 4.5), so one size stays crisp at every density.
+//
+// Missing file (or an unpulled Git LFS pointer instead of a PNG): the build still
+// succeeds and emits a plain chip-grey vector at the artwork's 1738 x 905
+// proportions under the same resource name, so the card keeps its height and its
+// "Start a party" button. Run `git lfs pull` to get the real artwork.
 abstract class SharedBannerResources : DefaultTask() {
-    @get:InputFile
+    // A file collection, not @InputFile, so an absent source is a valid input.
+    @get:InputFiles
     @get:PathSensitive(PathSensitivity.NONE)
-    abstract val banner: RegularFileProperty
+    abstract val banner: ConfigurableFileCollection
 
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
     @TaskAction
     fun copy() {
-        val target = outputDir.get().dir("drawable-nodpi").asFile
-        target.deleteRecursively()
-        target.mkdirs()
-        banner.get().asFile.copyTo(target.resolve("split_party_banner.png"))
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        val source = banner.singleFile
+        val pngSignature = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        val isPng = source.isFile && source.inputStream().use { it.readNBytes(pngSignature.size) }.contentEquals(pngSignature)
+        if (isPng) {
+            val target = out.resolve("drawable-nodpi").apply { mkdirs() }
+            source.copyTo(target.resolve("split_party_banner.png"))
+        } else {
+            logger.warn("Split the check banner not found at $source (missing or not pulled from Git LFS); using a plain placeholder.")
+            val target = out.resolve("drawable").apply { mkdirs() }
+            target.resolve("split_party_banner.xml").writeText(
+                """
+                <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:width="1738dp" android:height="905dp"
+                    android:viewportWidth="1738" android:viewportHeight="905">
+                    <path android:fillColor="#FFF1F1F3" android:pathData="M0,0h1738v905h-1738z" />
+                </vector>
+                """.trimIndent()
+            )
+        }
     }
 }
 
 val sharedBannerResources = tasks.register<SharedBannerResources>("sharedBannerResources") {
-    banner.set(rootProject.layout.projectDirectory.file("../brand/banners/split-the-check-with-friends.png"))
+    banner.from(rootProject.layout.projectDirectory.file("../brand/banners/split-the-check-with-friends.png"))
 }
 
 androidComponents {

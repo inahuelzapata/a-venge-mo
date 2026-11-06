@@ -53,6 +53,9 @@ object Type {
     val RowPrimary = role(20, FontWeight.Normal)
     val Field = role(18, FontWeight.Normal)
     val Button = role(18, FontWeight.SemiBold)
+
+    /** Compact card actions ("Start a party" on the Split the check card). */
+    val ButtonCompact = role(15, FontWeight.SemiBold)
     val Amount = role(17, FontWeight.SemiBold)
     val Subtitle = role(17, FontWeight.Normal)
     val RowSecondary = role(15, FontWeight.Normal)

@@ -27,6 +27,7 @@ import com.splitparty.android.ui.components.PillButton
 import com.splitparty.android.ui.theme.Brand
 import com.splitparty.android.ui.theme.Dimens
 import com.splitparty.android.ui.theme.SplitPartyTheme
+import com.splitparty.android.ui.theme.Type
 
 /**
  * The Home feed's entry to Split Party (PoC-7): the bundled "Split the check
@@ -70,11 +71,13 @@ fun SplitPartyCard(onStartParty: () -> Unit, modifier: Modifier = Modifier, busy
             onClick = onStartParty,
             enabled = !busy,
             busy = busy,
+            height = Dimens.BannerButtonHeight,
+            style = Type.ButtonCompact,
             modifier = Modifier
-                .padding(horizontal = Dimens.BannerButtonMargin)
+                .padding(horizontal = Dimens.BannerButtonSideMargin - Dimens.BannerCardInset)
                 .testTag(SplitPartyCardTestTags.BUTTON)
         )
-        Spacer(Modifier.height(Dimens.BannerButtonMargin - Dimens.BannerCardInset))
+        Spacer(Modifier.height(Dimens.BannerButtonBottomMargin - Dimens.BannerCardInset))
     }
 }
 
