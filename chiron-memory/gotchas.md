@@ -182,3 +182,11 @@ What: On the iOS 27.2 simulator a SwiftUI `.confirmationDialog` shows as a popov
 ## Shared booted simulator: other sessions' builds collide with UI tests
 
 What: UI tests run on the already-booted "iPhone 18 Pro" landed signed in on a party screen (no username field) even with -UITestResetSession, because other worktree sessions were using the same simulator; on a freshly created simulator the same tests pass · Where: ios UI tests · Learned: create a dedicated simulator per worktree (`xcrun simctl create`) before running UI tests, and delete it afterwards
+
+## Firestore rules hit the 1000-expression cap on 8-member parties
+
+What: Re-validating every member entry (validMember x8) plus summing custom amounts made join/Pay/custom writes on an 8-member party fail with "maximum of 1000 expressions to evaluate" (rules deny), while 7 members passed · Where: backend/firestore.rules · Learned: updates now check only the entries their write shape can change (validMembersUpdate: untouched / custom write / Pay / join-leave via members.diff), and pack [amount, has one] into one int (amount*16+1) so each entry is read once. Keep the rules test "a full 8-member party stays within the rules budget" green when adding rules
+
+## Android unit tests: whole-suite run SIGABRTs and LoginScreenTest fails on this Mac, also on main
+
+What: `./gradlew testDebugUnitTest` / `check` aborts the test JVM (exit 134, layoutlib `Surface.nativeSetProducerThrottlingEnabled` NoSuchMethodError) once Paparazzi classes share a JVM with the rest, and LoginScreenTest.showsTheInlineErrorAndTarget fails — both reproduced on untouched main (2026-11-05) · Where: android/ · Learned: run the non-screenshot packages together (`--tests 'com.splitparty.android.ui.*'` etc.) and each *ScreenshotTest class on its own (`verifyPaparazziDebug --tests "*MeScreenshotTest"`); after recordPaparazziDebug, revert goldens that changed but already verified (sub-tolerance noise)
