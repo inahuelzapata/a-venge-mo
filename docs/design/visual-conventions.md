@@ -130,10 +130,10 @@ Android.
 | Element | Value |
 | ------- | ----- |
 | Card | White, radius 28, 8 gutter (386 wide on 402), no shadow or elevation. 16 below the header, 12 above the first row |
-| Hero image | `brand/banners/split-the-check-with-friends.png` (1774 × 887, 2:1), 4 from the card's top and sides, full card width minus 8, scaled to fit with no crop, radius 24 (concentric with the card) |
+| Hero image | `brand/banners/split-the-check-with-friends.png` (1738 × 905, about 1.92 : 1), 4 from the card's top and sides, full card width minus 8, scaled to fit with no crop, radius 24 (concentric with the card) |
 | Button | Pill button (52, black, "Start a party"), 12 below the image, 16 from the card's sides and bottom |
 | Taps | Image and button open Split Party. Nothing else on the card is tappable. No ripple; the button dims to 80% while pressed |
-| Accessibility | The image is announced by the banner's own copy ("Split the check with friends. A faster, easier way to take care of the bill."), the button as "Start a party, button" |
+| Accessibility | The image is announced by the banner's own copy ("Tony's at the J House. Answer a trivia and get a 10% discount."), the button as "Start a party, button" |
 | Demo switch | Shown only while "Demo mode: at Tony's" (Me tab) is on, which it is by default. Off: no item at all, so the feed sits directly below the header with no gap. Arrival animation: see "Home banner slot" below (iOS values) |
 
 The banner artwork is committed once, in `brand/banners/`. Android copies it into
@@ -277,13 +277,13 @@ above the empty/error card). Measured on [`ios-captures/home-feed.png`](ios-capt
 | Value | iOS (pt) and Android (dp) |
 | ----- | ------------------------- |
 | Position | First feed item, 16 below the header (y 130 on the reference device), 16 above the first payment card |
-| Card | White, radius 28 (continuous), 8 gutter left and right (386 wide). 259 tall on a 402 screen |
-| Hero image | 4 from the card's top, left and right edges (378 wide). Radius 24 (continuous, concentric with the card). Aspect ratio **2 : 1**, fitted, never cropped: 189 tall at 378 wide |
+| Card | White, radius 28 (continuous), 8 gutter left and right (386 wide). 267 tall on a 402 screen |
+| Hero image | 4 from the card's top, left and right edges (378 wide). Radius 24 (continuous, concentric with the card). Aspect ratio **1738 : 905** (about 1.92 : 1), fitted, never cropped: 197 tall at 378 wide |
 | Image to button | 12 |
 | Button | Black `#000000` capsule, **38** tall, **18** from each card edge (the 4 image inset plus 14). "Start a party", 15 semibold, white, centred. Pressed: 80% opacity |
 | Button to card bottom | 16 |
 | Tap targets | Hero image and button only, both open Split Party. The image shows no press feedback |
-| Accessibility | The image is one element labelled with the banner copy ("Split the check with friends. A faster, easier way to take care of the bill."). The button is labelled "Start a party". No unnamed image |
+| Accessibility | The image is one element labelled with the banner copy ("Tony's at the J House. Answer a trivia and get a 10% discount."). The button is labelled "Start a party". No unnamed image |
 | Theme | Same in light and dark: the app is light-only |
 
 For comparison, the Kalshi reference card measures 3.3 image inset, 37.3 button
@@ -293,7 +293,7 @@ button keeps 18 from the card edge, a choice made in review.
 
 | File | What it is |
 | ---- | ---------- |
-| `brand/split-party-banner.png` | The banner artwork as supplied, 1774 × 887 px (2 : 1). Committed only here. The iOS project bundles this file directly ("Shared brand assets" group), with no copy in `Assets.xcassets`. 1774 px covers a 3x card on the widest iPhone (416 pt card image → 1248 px) |
+| `brand/banners/split-the-check-with-friends.png` | The banner artwork as supplied ("Answer a trivia and get a 10% discount", Tony's at the J House), 1738 × 905 px (about 1.92 : 1), with its white border and rounded corners baked in. Committed only here, the one file both apps use (Android copies it at build time, see above). The iOS project bundles this file directly ("Shared brand assets" group), with no copy in `Assets.xcassets`. 1738 px covers a 3x card on the widest iPhone (416 pt card image → 1248 px) |
 
 The placeholder screen this card used to open is gone on both platforms:
 "Start a party" now opens the party screen below.

@@ -16,7 +16,7 @@ struct SplitPartyBannerCard: View {
     let onStartParty: () -> Void
 
     /// The words baked into the artwork, so VoiceOver reads what sighted people see.
-    static let bannerCopy = "Split the check with friends. A faster, easier way to take care of the bill."
+    static let bannerCopy = "Tony's at the J House. Answer a trivia and get a 10% discount."
     static let buttonTitle = "Start a party"
 
     var body: some View {
@@ -48,12 +48,14 @@ struct SplitPartyBannerCard: View {
 /// The banner image at its own aspect ratio, so none of its text is ever cropped
 /// whatever the phone's width.
 private struct BannerArtwork: View {
-    /// `brand/split-party-banner.png`, bundled straight from the shared brand
-    /// folder (see the Xcode project's "Shared brand assets" group). Loaded once,
-    /// so re-rendering Home never decodes it again.
-    private static let image = UIImage(named: "split-party-banner.png")
-    /// The supplied artwork is 1774 × 887. Only used if the file is missing.
-    private static let fallbackAspectRatio: CGFloat = 2
+    /// `brand/banners/split-the-check-with-friends.png`, bundled straight from
+    /// the shared brand folder (see the Xcode project's "Shared brand assets"
+    /// group). Android's build reads the same file, so there is one copy only.
+    /// Loaded once, so re-rendering Home never decodes it again.
+    private static let image = UIImage(named: "split-the-check-with-friends.png")
+    /// The supplied artwork is 1738 × 905 (about 1.92 : 1). Only used if the
+    /// file is missing, so the placeholder takes the same space as the image.
+    private static let fallbackAspectRatio: CGFloat = 1738.0 / 905.0
 
     var body: some View {
         Group {
